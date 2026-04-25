@@ -1,0 +1,37 @@
+{
+  "name": "@aefree/pi-plastic",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "keywords": [
+    "pi-package"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts",
+      "./extensions/bash-cm-diff-guard.ts",
+      "./extensions/bash-cm-merge-guard.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "scripts": {
+    "test": "npx --yes tsx tests/plastic-tool-validation.ts && npx --yes tsx tests/plastic-checkin-path-resolution.ts && npx --yes tsx tests/plastic-extension-registration.test.ts && npx --yes tsx tests/bash-cm-diff-guard-validation.ts"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "description": "Pi tools and skills for Plastic SCM and Unity Version Control workflows.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/aefreedman/pi-plastic.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aefreedman/pi-plastic/issues"
+  },
+  "homepage": "https://github.com/aefreedman/pi-plastic#readme"
+}
