@@ -24,9 +24,6 @@ plastic_status()
 # Then use cm codereview ... as fallback for review create/assign
 ```
 
-Use template content from:
-- ../../executing-work/assets/code-review-template.md
-
 ## CLI Not Available
 
 - Document branch and changeset in plan/issue tracker.
