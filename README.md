@@ -1,8 +1,9 @@
 # Pi Plastic
 
-Pi extension package that ports the proven OpenCode Plastic SCM / Unity Version Control workflows into Pi with minimal behavioral drift.
+Pi tools and skill guidance for Plastic SCM / Unity Version Control workflows.
 
-Current tool set:
+## Tools
+
 - `plastic_status`
 - `plastic_update`
 - `plastic_add`
@@ -30,17 +31,55 @@ Current tool set:
 - `plastic_workspaceCreate`
 - `plastic_workspaceList`
 
-Notes:
-- The package uses a copy-first port of the OpenCode implementation so the established Plastic workflows, preflights, safety guards, and output contracts are preserved in Pi.
-- `plastic_diff` remains a disabled alias by design; use `plastic_diffFile` or `plastic_diffRevisions` for text-only diffs.
-- The core implementation lives in `src/opencode-plastic.ts`; `index.ts` is the thin Pi registration layer.
-- The package also ships Plastic-specific bash safety rails for blocking `cm diff` and unsafe `cm merge --merge` usage.
-- Merge tooling now surfaces Plastic `FILE_CONFLICT` records, reports merge-state metadata from `cm status`, and provides `plastic_finalizeMerge` for the reviewed/manual-resolution case where Plastic still needs merge metadata finalized before checkin.
-- The package now also ships the `using-plastic` skill under `skills/using-plastic/` so Plastic workflow guidance travels with the tools.
+## Safety behavior
 
-Testing:
-- `npm test` runs the ported Plastic validation suite, the path-resolution regression tests, and the bash `cm diff` guard validation.
-- Real smoke validation should be executed against a local Plastic workspace using `status`, `currentBranch`, and `checkin(preflight=true)` before release.
+- `plastic_diff` remains a disabled alias by design; use `plastic_diffFile` or `plastic_diffRevisions` for text-only diffs.
+- Bash safety rails block `cm diff` and unsafe interactive `cm merge --merge` usage.
+- Merge tooling surfaces Plastic `FILE_CONFLICT` records and merge-state metadata from `cm status`.
+- `plastic_finalizeMerge` supports reviewed/manual-resolution flows where Plastic still needs merge metadata finalized before checkin.
+
+## Included skill
+
+- `using-plastic` - PlasticSCM branch, workspace, merge, shelveset, checkin, and code-review workflow guidance
+
+## Install
+
+From GitHub:
+
+```bash
+pi install git:git@github.com:aefreedman/pi-plastic.git
+```
+
+Local development install:
+
+```bash
+pi install <path-to-pi-plastic>
+```
+
+Project-local install:
+
+```bash
+pi install -l <path-to-pi-plastic>
+```
+
+## Requirements
+
+- Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`
+- A configured Plastic workspace for workspace-scoped operations
+
+## Testing
+
+```bash
+npm test
+```
+
+The test suite covers tool validation, path-resolution regressions, extension registration, and bash guard behavior. Real smoke validation should be run against a local Plastic workspace before relying on mutation tools in a new environment.
+
+## Implementation notes
+
+- The core implementation lives in `src/opencode-plastic.ts`.
+- `index.ts` is the Pi registration layer.
+- Output shapes are intentionally stable for prompt and workflow compatibility.
 
 ## License
 
