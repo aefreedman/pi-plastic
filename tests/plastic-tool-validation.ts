@@ -34,7 +34,7 @@ const checkForbidden = (contents: string, target: string, patterns: RegExp[]): n
 const main = (): void => {
   let failures = 0;
 
-  const plasticPath = new URL("../src/opencode-plastic.ts", import.meta.url);
+  const plasticPath = new URL("../src/plastic-core.ts", import.meta.url);
   const skillPath = new URL("../skills/using-plastic/SKILL.md", import.meta.url);
   const reviewingPath = new URL("../skills/using-plastic/references/reviewing-changes.md", import.meta.url);
   const changesetPath = new URL("../skills/using-plastic/references/changeset-operations.md", import.meta.url);
@@ -44,7 +44,7 @@ const main = (): void => {
   const bashMergeGuardPath = new URL("../extensions/bash-cm-merge-guard.ts", import.meta.url);
 
   const plasticText = readText(plasticPath);
-  failures += checkRequired(plasticText, "plastic-tools/src/opencode-plastic.ts", [
+  failures += checkRequired(plasticText, "pi-plastic/src/plastic-core.ts", [
     "const BLOCKED_CM_DIFF_MESSAGE",
     "ensureCmCommandAllowed(args);",
     'command === "diff"',
@@ -76,19 +76,19 @@ const main = (): void => {
     "updateAfter is disabled for unattended safety",
     '["update", "--dontmerge", "--noinput"]',
   ]);
-  failures += checkForbidden(plasticText, "plastic-tools/src/opencode-plastic.ts", [
+  failures += checkForbidden(plasticText, "pi-plastic/src/plastic-core.ts", [
     /runCm\(\["diff"/,
     /runCmRaw\(\["diff"/,
     /runCm\(\["update"\]/,
   ]);
 
   const skillText = readText(skillPath);
-  failures += checkRequired(skillText, "plastic-tools/skills/using-plastic/SKILL.md", [
+  failures += checkRequired(skillText, "pi-plastic/skills/using-plastic/SKILL.md", [
     "Never run `cm diff` in Pi.",
     "plastic_diffRevisions",
     "plastic_merge",
   ]);
-  failures += checkForbidden(skillText, "plastic-tools/skills/using-plastic/SKILL.md", [
+  failures += checkForbidden(skillText, "pi-plastic/skills/using-plastic/SKILL.md", [
     /^\s*-\s+plastic_diff\s*$/m,
   ]);
 
@@ -100,7 +100,7 @@ const main = (): void => {
   ] as const;
 
   for (const [name, text] of refs) {
-    failures += checkForbidden(text, `plastic-tools/skills/using-plastic/references/${name}`, [
+    failures += checkForbidden(text, `pi-plastic/skills/using-plastic/references/${name}`, [
       /cm diff\s+br:/,
       /cm diff\s+cs:/,
       /cm diff\s+lb:/,
@@ -112,7 +112,7 @@ const main = (): void => {
   }
 
   const bashGuardText = readText(bashGuardPath);
-  failures += checkRequired(bashGuardText, "plastic-tools/extensions/bash-cm-diff-guard.ts", [
+  failures += checkRequired(bashGuardText, "pi-plastic/extensions/bash-cm-diff-guard.ts", [
     'pi.on("tool_call"',
     "isBashToolCall",
     "commandRunsCmDiff",
@@ -122,7 +122,7 @@ const main = (): void => {
   ]);
 
   const bashMergeGuardText = readText(bashMergeGuardPath);
-  failures += checkRequired(bashMergeGuardText, "plastic-tools/extensions/bash-cm-merge-guard.ts", [
+  failures += checkRequired(bashMergeGuardText, "pi-plastic/extensions/bash-cm-merge-guard.ts", [
     'pi.on("tool_call"',
     "isBashToolCall",
     "commandRunsUnsafeCmMerge",

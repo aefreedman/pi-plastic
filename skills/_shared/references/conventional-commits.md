@@ -116,7 +116,7 @@ Related to #125
 ```
 feat(dashboard): add analytics widget
 
-Co-Authored-By: <AI Assistant Name (e.g., Codex, Claude, OpenCode)>
+Co-Authored-By: <AI Assistant Name (e.g., Codex, Claude, Pi Coding Agent)>
 ```
 
 ---
@@ -130,7 +130,7 @@ feat(feature): implement new capability
 
 [Body explaining the change]
 
-Co-Authored-By: <AI Assistant Name (e.g., Codex, Claude, OpenCode)>
+Co-Authored-By: <AI Assistant Name (e.g., Codex, Claude, Pi Coding Agent)>
 ```
 
 ---
@@ -177,7 +177,7 @@ Uses WebSocket for real-time updates.
 
 Closes #89
 
-Co-Authored-By: <AI Assistant Name (e.g., Codex, Claude, OpenCode)>
+Co-Authored-By: <AI Assistant Name (e.g., Codex, Claude, Pi Coding Agent)>
 ```
 
 ---

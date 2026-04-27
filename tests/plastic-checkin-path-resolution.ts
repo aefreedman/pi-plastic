@@ -1,4 +1,4 @@
-import { __plasticCheckinInternals, __plasticSwitchInternals } from "../src/opencode-plastic.ts";
+import { __plasticCheckinInternals, __plasticSwitchInternals } from "../src/plastic-core.ts";
 
 const assert = (condition: boolean, message: string): void =>
 {

@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn } from "node:child_process";
-import { tool } from "./opencode-compat";
+import { tool } from "./pi-tool-compat";
 import { promises as fs } from "fs";
 import { tmpdir } from "os";
 import { dirname, isAbsolute, join, relative, resolve } from "path";
@@ -121,7 +121,7 @@ const spawnAndCollect = async (command: string, args: string[], cwd: string, inp
     }
 };
 
-const BLOCKED_CM_DIFF_MESSAGE = "`cm diff` is blocked in OpenCode because it may launch GUI windows and hang the CLI. Use `plastic_diffFile` (workspace vs revision) or `plastic_diffRevisions` (revision vs revision text diff).";
+const BLOCKED_CM_DIFF_MESSAGE = "`cm diff` is blocked in Pi because it may launch GUI windows and hang the CLI. Use `plastic_diffFile` (workspace vs revision) or `plastic_diffRevisions` (revision vs revision text diff).";
 
 const ensureCmCommandAllowed = (args: string[]): void =>
 {
@@ -1974,7 +1974,7 @@ export const diffRevisions = tool({
         const rightLabel = args.rightRevision.includes("#") ? args.rightRevision.replace("#", "@") : args.rightRevision;
         const leftContent = await runCmRaw(["cat", args.leftRevision], args.workdir);
         const rightContent = await runCmRaw(["cat", args.rightRevision], args.workdir);
-        const tempDir = await fs.mkdtemp(join(tmpdir(), "opencode-plastic-"));
+        const tempDir = await fs.mkdtemp(join(tmpdir(), "plastic-core-"));
         const leftPath = join(tempDir, "left.txt");
         const rightPath = join(tempDir, "right.txt");
 
@@ -2029,7 +2029,7 @@ export const diffFile = tool({
             throw error;
         }
 
-        const tempDir = await fs.mkdtemp(join(tmpdir(), "opencode-plastic-"));
+        const tempDir = await fs.mkdtemp(join(tmpdir(), "plastic-core-"));
         const basePath = join(tempDir, "base.txt");
 
         try

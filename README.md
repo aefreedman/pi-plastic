@@ -77,7 +77,7 @@ The test suite covers tool validation, path-resolution regressions, extension re
 
 ## Implementation notes
 
-- The core implementation lives in `src/opencode-plastic.ts`.
+- The core implementation lives in `src/plastic-core.ts`.
 - `index.ts` is the Pi registration layer.
 - Output shapes are intentionally stable for prompt and workflow compatibility.
 
