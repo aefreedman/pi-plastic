@@ -51,6 +51,9 @@ const main = (): void => {
     "export const merge = tool({",
     "export const finalizeMerge = tool({",
     "export const resolveDeleteChangeConflict = tool({",
+    "export const patch = tool({",
+    "__plasticPatchInternals",
+    "buildPatchCommandArgs",
     "export const diffRevisions = tool({",
     "plastic_diff is disabled",
     "parseMachineReadablePendingItems",
@@ -86,6 +89,7 @@ const main = (): void => {
   failures += checkRequired(skillText, "pi-plastic/skills/using-plastic/SKILL.md", [
     "Never run `cm diff` in Pi.",
     "plastic_diffRevisions",
+    "plastic_patch",
     "plastic_merge",
   ]);
   failures += checkForbidden(skillText, "pi-plastic/skills/using-plastic/SKILL.md", [

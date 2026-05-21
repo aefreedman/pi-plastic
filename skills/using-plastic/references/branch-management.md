@@ -12,22 +12,22 @@ current_branch=$(cm status | head -1 | cut -d@ -f1 | xargs)
 cm find branches --format="{name}" | head -20
 ```
 
-Use detected parent (often `/main` or `/dev`).
+Use the detected parent branch from the repository instead of copying a branch name from documentation.
 
 ## Create Branch
 
 Preferred tool-first flow:
 
 ```text
-plastic_branchCreate(branch="/main/feature-name", comment="Feature description")
-plastic_switchBranch(branch="/main/feature-name")
+plastic_branchCreate(branch="<branch-spec>", comment="<branch-description>")
+plastic_switchBranch(branch="<branch-spec>")
 ```
 
 Manual shell fallback:
 
 ```bash
-cm branch create /main/feature-name -c="Feature description"
-cm switch --silent --noinput /main/feature-name
+cm branch create <branch-spec> -c="<branch-description>"
+cm switch --silent --noinput <branch-spec>
 ```
 
 Agent preference: use runtime `plastic_*` methods first; keep shell commands as manual fallback
@@ -43,20 +43,20 @@ Pending-change behavior in unattended runs:
 Preferred tool-first flow:
 
 ```text
-plastic_merge(source="/main/feature-name")
+plastic_merge(source="<source-branch-spec>")
 ```
 
 Manual shell fallback:
 
 ```bash
-cm merge /main/feature-name --merge --nointeractiveresolution --mergetype=try
+cm merge <source-branch-spec> --merge --nointeractiveresolution --mergetype=try
 ```
 
 Optional explicit override (higher clobber risk, use only when required):
 
 ```text
-plastic_merge(source="/main/feature-name", strategy="destination")
-plastic_merge(source="/main/feature-name", strategy="source")
+plastic_merge(source="<source-branch-spec>", strategy="destination")
+plastic_merge(source="<source-branch-spec>", strategy="source")
 ```
 
 ## Naming Guidelines

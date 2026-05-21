@@ -3,14 +3,14 @@
 ## Branch Already Exists
 
 ```bash
-cm find branch "where name='/main/feature-name'"
+cm find branch "where name='<branch-name>'"
 ```
 
 ## Cannot Switch (Pending Changes)
 
 ```bash
 cm shelveset create --all -c="Auto-save before switch"
-cm switch --silent --noinput /main/other-branch
+cm switch --silent --noinput <branch-spec>
 ```
 
 - In unattended mode, `pendingChanges="bring"` is blocked only when tracked pending changes exist.
@@ -40,8 +40,8 @@ cm codereview -e <review-id> --reviewer="reviewer-name"
 
 - `cm diff` is blocked in Pi because it can launch GUI windows and hang the CLI.
 - Use text-only alternatives:
-  - `plastic_diffFile(path="Assets/Scripts/PlayerController.cs", revision="cs:123")`
-  - `plastic_diffRevisions(leftRevision="Assets/Scripts/PlayerController.cs#cs:122", rightRevision="Assets/Scripts/PlayerController.cs#cs:123")`
+  - `plastic_diffFile(path="<workspace-path>", revision="<revision-spec>")`
+  - `plastic_diffRevisions(leftRevision="<left-revspec>", rightRevision="<right-revspec>")`
 
 ## GUI/Prompt Opens During Merge
 
@@ -49,26 +49,26 @@ cm codereview -e <review-id> --reviewer="reviewer-name"
 - Preferred:
 
 ```text
-plastic_merge(source="br:/main/feature-name")
+plastic_merge(source="<source-branch-spec>")
 ```
 
 - Shell fallback must be non-interactive and use safe auto-resolution:
 
 ```bash
-cm merge br:/main/feature-name --merge --nointeractiveresolution --mergetype=try
+cm merge <source-branch-spec> --merge --nointeractiveresolution --mergetype=try
 ```
 
 - Explicit override (only when intentional):
 
 ```text
-plastic_merge(source="br:/main/feature-name", strategy="destination")
-plastic_merge(source="br:/main/feature-name", strategy="source")
+plastic_merge(source="<source-branch-spec>", strategy="destination")
+plastic_merge(source="<source-branch-spec>", strategy="source")
 ```
 
 - If Plastic reports a delete/change directory conflict and you intentionally want to accept the source-side deletion, use:
 
 ```text
-plastic_resolveDeleteChangeConflict(paths=["Assets/Scripts/LegacyThing.cs"], keepOnDisk=true)
+plastic_resolveDeleteChangeConflict(paths=["<workspace-path>"], keepOnDisk=true)
 ```
 
 - Then rerun `plastic_merge(...)`.
@@ -84,7 +84,7 @@ plastic_resolveDeleteChangeConflict(paths=["Assets/Scripts/LegacyThing.cs"], kee
 - Recovery flow:
   1. Run `plastic_status()` and inspect merge-state details plus any `FILE_CONFLICT` paths reported by `plastic_merge(...)`.
   2. Resolve/review the listed files manually and run compile/tests as appropriate.
-  3. Run `plastic_finalizeMerge(source="br:/source-branch", strategy="destination")` to finalize Plastic merge metadata while preserving the reviewed destination/manual result. Use `strategy="source"` only when accepting source is intentional.
+  3. Run `plastic_finalizeMerge(source="<source-branch-spec>", strategy="destination")` to finalize Plastic merge metadata while preserving the reviewed destination/manual result. Use `strategy="source"` only when accepting source is intentional.
   4. Run `plastic_status()` again.
   5. Retry `plastic_checkin(...)` after merge-in-progress hints are gone.
 - If you are unsure whether the reviewed workspace result will be preserved, create a shelveset before finalizing.

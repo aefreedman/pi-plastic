@@ -14,7 +14,7 @@ Never run interactive `cm merge --merge` flows. Use `plastic_merge` (preferred) 
 
 Treat `plastic_merge` success as provisional until `plastic_status` confirms there are no merge-in-progress hints. Pending merge links are expected until the merge result is checked in; merge-in-progress hints are not. If files are manually resolved and validated but checkin is blocked by Plastic merge metadata, use `plastic_finalizeMerge` with an explicit source/destination policy before retrying checkin.
 
-`plastic_diff` is intentionally disabled. Use `plastic_diffFile` or `plastic_diffRevisions` for text-only diffs.
+`plastic_diff` is intentionally disabled. Use `plastic_diffFile` or `plastic_diffRevisions` for text-only file diffs. Use `plastic_patch` for review patch generation with `clean` and `integration` filters; it is generation-only and does not apply patches.
 
 Prefer runtime `plastic_*` tools first. Keep `cm` shell commands as manual fallback.
 

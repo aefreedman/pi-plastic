@@ -48,6 +48,7 @@ const PLASTIC_EXPORTS = [
   "undo",
   "resolveDeleteChangeConflict",
   "diff",
+  "patch",
   "diffRevisions",
   "diffFile",
   "branchCreate",
@@ -139,6 +140,15 @@ const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       assignAlias(input, "dateFormat", ["date_format"]);
       assignAlias(input, "comparisonMethod", ["comparison_method"]);
       assignAlias(input, "fullPaths", ["full_paths"]);
+      return input;
+    },
+  },
+  patch: {
+    prepareArguments(args) {
+      const input = normalizeArgs(args);
+      normalizeWorkdirAliases(input);
+      assignAlias(input, "output", ["output_file", "outputFile"]);
+      assignAlias(input, "toolPath", ["tool_path", "tool"]);
       return input;
     },
   },
