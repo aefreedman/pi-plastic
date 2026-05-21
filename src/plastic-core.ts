@@ -950,7 +950,7 @@ const buildRevisionNotFoundGuidance = async (resolvedRevision: string, path: str
         const exactMatchExists = recentBranchNames.includes(branchName);
         if (exactMatchExists)
         {
-            return `Branch '${branchName}' exists, but '${path}' was not found at '${branchSelector}'. The file likely does not exist on that branch. Use a branch or changeset where the file exists (for example, revision='br:/dev/<feature-branch>' or revision='cs:<id>').`;
+            return `Branch '${branchName}' exists, but '${path}' was not found at '${branchSelector}'. The file likely does not exist on that branch. Use a branch or changeset where the file exists, following the current repository's branch and changeset conventions.`;
         }
 
         const childMatches = recentBranchNames
@@ -966,7 +966,7 @@ const buildRevisionNotFoundGuidance = async (resolvedRevision: string, path: str
     }
     catch
     {
-        return `Revision '${branchSelector}' could not be resolved for '${path}'. Use a concrete file-qualified revision (for example, '${path}#cs:<id>' or '${path}#br:/main/feature').`;
+        return `Revision '${branchSelector}' could not be resolved for '${path}'. Use a concrete file-qualified revision such as '<workspace-path>#<revision-spec>'.`;
     }
 };
 
@@ -2024,7 +2024,7 @@ export const diff = tool({
 export const patch = tool({
     description: "Generate a Plastic SCM patch with optional clean/integration filtering (cm patch).",
     args: {
-        source: tool.schema.string().min(1).describe("Source changeset or branch spec (for example, cs:120 or br:/main/task001)."),
+        source: tool.schema.string().min(1).describe("Source changeset or branch spec, for example a changeset spec or branch spec selected from the current workspace."),
         destination: tool.schema.string().optional().describe("Optional second changeset or branch spec for two-spec patch generation."),
         output: tool.schema.string().optional().describe("Optional output file path. If omitted, patch content is printed to stdout."),
         toolPath: tool.schema.string().optional().describe("Optional path to the diff executable used by cm patch."),
@@ -2043,15 +2043,15 @@ export const patch = tool({
 export const diffRevisions = tool({
     description: "Show a text-only diff between two Plastic revisions (cm cat + git diff --no-index).",
     args: {
-        leftRevision: tool.schema.string().min(1).describe("Left Plastic revision spec for cm cat (for example, file.txt#cs:120)."),
-        rightRevision: tool.schema.string().min(1).describe("Right Plastic revision spec for cm cat (for example, file.txt#cs:121)."),
+        leftRevision: tool.schema.string().min(1).describe("Left file-qualified Plastic revision spec for cm cat."),
+        rightRevision: tool.schema.string().min(1).describe("Right file-qualified Plastic revision spec for cm cat."),
         workdir: workdirArg,
     },
     async execute(args)
     {
         if (isUnscopedDiffRevisionSpec(args.leftRevision) || isUnscopedDiffRevisionSpec(args.rightRevision))
         {
-            throw new Error("plastic_diffRevisions requires file-qualified revspecs (for example, Assets/Scripts/Foo.cs#cs:120). For workspace-vs-revision comparisons, use plastic_diffFile(path=..., revision=\"cs:120\").");
+            throw new Error("plastic_diffRevisions requires file-qualified revspecs. For workspace-vs-revision comparisons, use plastic_diffFile(path=..., revision=...).");
         }
 
         const cwd = args.workdir ?? process.cwd();
@@ -2081,7 +2081,7 @@ export const diffFile = tool({
     description: "Show a text-only diff between a workspace file and a Plastic revision (cm cat + git diff --no-index).",
     args: {
         path: tool.schema.string().min(1).describe("Workspace file path to diff."),
-        revision: tool.schema.string().min(1).describe("Plastic revision spec for cm cat (for example, file.txt#br:/main)."),
+        revision: tool.schema.string().min(1).describe("Plastic revision spec for cm cat."),
         workdir: workdirArg,
     },
     async execute(args)
@@ -2133,7 +2133,7 @@ export const diffFile = tool({
 export const branchCreate = tool({
     description: "Create a Plastic SCM branch (cm branch create).",
     args: {
-        branch: tool.schema.string().min(1).describe("Branch name or spec (for example, br:/main/feature-x)."),
+        branch: tool.schema.string().min(1).describe("Branch name or spec selected from the current repository convention."),
         changeset: tool.schema.string().optional().describe("Changeset used as the starting point."),
         label: tool.schema.string().optional().describe("Label used as the starting point."),
         comment: tool.schema.string().optional().describe("Optional branch comment."),
@@ -2186,7 +2186,7 @@ export const branchCreate = tool({
 export const switchBranch = tool({
     description: "Switch the Plastic SCM workspace to a branch (cm switch), handling pending changes when needed.",
     args: {
-        branch: tool.schema.string().min(1).describe("Branch name or spec (for example, br:/main)."),
+        branch: tool.schema.string().min(1).describe("Branch name or spec selected from the current repository convention."),
         pendingChanges: tool.schema.enum(["shelve", "bring", "cancel"]).optional().describe("How to handle pending changes when switching branches. Defaults to cancel. In unattended mode, bring is blocked only when tracked pending changes exist."),
         preflight: tool.schema.boolean().optional().describe("Preview switch strategy without executing switch."),
         format: outputFormatArg,

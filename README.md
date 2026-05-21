@@ -43,10 +43,10 @@ Pi tools and skill guidance for Plastic SCM / Unity Version Control workflows.
 ## Patch generation examples
 
 ```text
-plastic_patch(source="br:/main/task001", integration=true)
-plastic_patch(source="br:/main/task001", clean=true, integration=true, output="review.patch")
-plastic_patch(source="cs:2", destination="cs:4")
-plastic_patch(source="br:/main/task001", toolPath="C:\\gnu\\diff.exe")
+plastic_patch(source="<branch-spec>", integration=true)
+plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<patch-file>")
+plastic_patch(source="<left-spec>", destination="<right-spec>")
+plastic_patch(source="<branch-spec>", toolPath="<path-to-diff-tool>")
 ```
 
 If `output` is omitted, Plastic prints patch content to stdout. If `output` is provided, Plastic writes a new patch file and refuses to overwrite an existing file. Inspect patches before sharing them because they can contain source code, binary content, local paths, or secrets that were present in the changed files.

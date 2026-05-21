@@ -24,21 +24,21 @@
 - Switch to target branch and list recent changesets:
 
 ```bash
-cm find changeset "where branch = '/main/feature-name' order by changesetid desc limit 20" --format="{changesetid} {owner} {date} {comment}" --nototal
+cm find changeset "where branch = '<branch-name>' order by changesetid desc limit 20" --format="{changesetid} {owner} {date} {comment}" --nototal
 ```
 
 - Generate a focused branch-review patch when a whole-branch view is useful:
 
 ```text
-plastic_patch(source="br:/main/feature-name", integration=true)
-plastic_patch(source="br:/main/feature-name", clean=true, integration=true, output="review.patch")
+plastic_patch(source="<branch-spec>", integration=true)
+plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<patch-file>")
 ```
 
 - Inspect specific file content changes with:
 
 ```text
-plastic_diffFile(path="Assets/Scripts/PlayerController.cs", revision="cs:123")
-plastic_diffRevisions(leftRevision="Assets/Scripts/PlayerController.cs#cs:122", rightRevision="Assets/Scripts/PlayerController.cs#cs:123")
+plastic_diffFile(path="<workspace-path>", revision="<revision-spec>")
+plastic_diffRevisions(leftRevision="<left-revspec>", rightRevision="<right-revspec>")
 ```
 
 ## Plan Workflow

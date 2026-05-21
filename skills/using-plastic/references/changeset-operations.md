@@ -15,7 +15,7 @@ plastic_status()
 ## Add Files
 
 ```bash
-cm add Assets/Scripts/PlayerController.cs
+cm add <workspace-path>
 ```
 
 ## Checkin
@@ -60,13 +60,13 @@ Safe checklist:
 Example path-scoped checkin including a deletion:
 
 ```bash
-cm checkin -c="refactor(player): replace legacy dash handler" Assets/Scripts/DashAbility.cs Assets/Scripts/OldDashHandler.cs
+cm checkin -c="<commit-message>" <workspace-path-1> <workspace-path-2>
 ```
 
 Use full-scope checkin when in doubt:
 
 ```bash
-cm checkin -c="refactor(player): replace legacy dash handler"
+cm checkin -c="<commit-message>"
 ```
 
 ## Safe Diff Usage
@@ -76,13 +76,13 @@ Never run `cm diff` in Pi.
 Use one of these safe alternatives:
 
 ```text
-plastic_diffFile(path="Assets/Scripts/PlayerController.cs", revision="cs:123")
-plastic_diffRevisions(leftRevision="Assets/Scripts/PlayerController.cs#cs:122", rightRevision="Assets/Scripts/PlayerController.cs#cs:123")
+plastic_diffFile(path="<workspace-path>", revision="<revision-spec>")
+plastic_diffRevisions(leftRevision="<left-revspec>", rightRevision="<right-revspec>")
 ```
 
 ```bash
-cm cat "Assets/Scripts/PlayerController.cs#cs:122" --file=left.tmp
-cm cat "Assets/Scripts/PlayerController.cs#cs:123" --file=right.tmp
+cm cat "<left-revspec>" --file=left.tmp
+cm cat "<right-revspec>" --file=right.tmp
 git diff --no-index -- left.tmp right.tmp
 ```
 
