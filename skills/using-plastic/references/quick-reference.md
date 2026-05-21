@@ -16,6 +16,7 @@ Note: command examples target current `cm` 11.x CLI syntax; legacy aliases may d
 | Merge | `plastic_merge(source="br:/main/feature")` | `cm merge br:/main/feature --merge --nointeractiveresolution --mergetype=try` | Surfaces `FILE_CONFLICT`; run `plastic_status()` before checkin |
 | Finalize merge metadata | `plastic_finalizeMerge(source="br:/main/feature", strategy="destination")` | `cm merge br:/main/feature --merge --nointeractiveresolution --mergetype=forced --keepdestination` | Use after manual/reviewed resolution when checkin says merge is still in progress |
 | Shelve | `plastic_shelvesetCreate(comment="description")` | `cm shelveset create -c="description"` | Save work temporarily |
+| Patch for review | `plastic_patch(source="br:/main/task001", clean=true, integration=true, output="review.patch")` | `cm patch br:/main/task001 --clean --integration --output=review.patch` | Focused branch-review patch; inspect before sharing |
 | Diff (workspace vs revision) | `plastic_diffFile(path="Assets/Scripts/Foo.cs", revision="cs:123")` | `cm cat <revspec> --file=base.tmp` + `git diff --no-index -- base.tmp <workspace-file>` | Text-only diff |
 | Diff (revision vs revision) | `plastic_diffRevisions(leftRevision="file#cs:122", rightRevision="file#cs:123")` | `cm cat <left> --file=left.tmp` + `cm cat <right> --file=right.tmp` + `git diff --no-index -- left.tmp right.tmp` | Avoids GUI diff |
 

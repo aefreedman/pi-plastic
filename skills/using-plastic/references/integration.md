@@ -27,7 +27,14 @@
 cm find changeset "where branch = '/main/feature-name' order by changesetid desc limit 20" --format="{changesetid} {owner} {date} {comment}" --nototal
 ```
 
-- Inspect file content changes with:
+- Generate a focused branch-review patch when a whole-branch view is useful:
+
+```text
+plastic_patch(source="br:/main/feature-name", integration=true)
+plastic_patch(source="br:/main/feature-name", clean=true, integration=true, output="review.patch")
+```
+
+- Inspect specific file content changes with:
 
 ```text
 plastic_diffFile(path="Assets/Scripts/PlayerController.cs", revision="cs:123")

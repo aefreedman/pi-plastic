@@ -6,6 +6,19 @@ Never run `cm diff` in Pi. It may open a GUI window and block CLI automation.
 
 `plastic_diff` is disabled by design.
 
+## Focused Patch Generation
+
+Use `plastic_patch` when you need a branch-review patch for AI assistance, code review, or sharing outside the Plastic GUI:
+
+```text
+plastic_patch(source="br:/main/task001", integration=true)
+plastic_patch(source="br:/main/task001", clean=true, integration=true, output="review.patch")
+plastic_patch(source="cs:2", destination="cs:4")
+plastic_patch(source="br:/main/task001", toolPath="C:\\gnu\\diff.exe")
+```
+
+`integration=true` shows changes pending merge into the parent branch. `clean=true` strips content that arrived via merges. Use `output` for large patches; Plastic refuses to overwrite an existing output file. Inspect patch contents before sharing because patches can contain source code, binary data, local paths, or secrets present in changed files.
+
 ## Text-Only Diff Options
 
 Prefer tool-first when available:

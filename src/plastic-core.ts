@@ -738,6 +738,72 @@ const canSwitchDirectWithPrivateOnlyPending = (
     return defaultedPolicy;
 };
 
+type PatchCommandArgs = {
+    source: string;
+    destination?: string;
+    output?: string;
+    toolPath?: string;
+    clean?: boolean;
+    integration?: boolean;
+};
+
+const assertRequiredPatchValue = (name: keyof PatchCommandArgs, value: string | undefined): void =>
+{
+    if (value === undefined || value.trim().length === 0)
+    {
+        throw new Error(`${name} must be non-empty.`);
+    }
+};
+
+const assertNonBlankPatchValue = (name: keyof PatchCommandArgs, value: string | undefined): void =>
+{
+    if (value !== undefined && value.trim().length === 0)
+    {
+        throw new Error(`${name} must be non-empty when provided.`);
+    }
+};
+
+const buildPatchCommandArgs = (args: PatchCommandArgs): string[] =>
+{
+    assertRequiredPatchValue("source", args.source);
+    assertNonBlankPatchValue("destination", args.destination);
+    assertNonBlankPatchValue("output", args.output);
+    assertNonBlankPatchValue("toolPath", args.toolPath);
+
+    const cmdArgs: string[] = ["patch", args.source];
+
+    if (args.destination)
+    {
+        cmdArgs.push(args.destination);
+    }
+
+    if (args.output)
+    {
+        cmdArgs.push(`--output=${args.output}`);
+    }
+
+    if (args.toolPath)
+    {
+        cmdArgs.push(`--tool=${args.toolPath}`);
+    }
+
+    if (args.clean)
+    {
+        cmdArgs.push("--clean");
+    }
+
+    if (args.integration)
+    {
+        cmdArgs.push("--integration");
+    }
+
+    return cmdArgs;
+};
+
+export const __plasticPatchInternals = {
+    buildPatchCommandArgs,
+};
+
 export const __plasticCheckinInternals = {
     inferPendingItemKind,
     parseMachineReadablePendingItems,
@@ -1952,6 +2018,25 @@ export const diff = tool({
     async execute(_args)
     {
         throw new Error(`plastic_diff is disabled. ${BLOCKED_CM_DIFF_MESSAGE}`);
+    },
+});
+
+export const patch = tool({
+    description: "Generate a Plastic SCM patch with optional clean/integration filtering (cm patch).",
+    args: {
+        source: tool.schema.string().min(1).describe("Source changeset or branch spec (for example, cs:120 or br:/main/task001)."),
+        destination: tool.schema.string().optional().describe("Optional second changeset or branch spec for two-spec patch generation."),
+        output: tool.schema.string().optional().describe("Optional output file path. If omitted, patch content is printed to stdout."),
+        toolPath: tool.schema.string().optional().describe("Optional path to the diff executable used by cm patch."),
+        clean: tool.schema.boolean().optional().describe("Exclude content that arrived via merges and include only direct checkins."),
+        integration: tool.schema.boolean().optional().describe("Show branch changes pending integration into the parent branch."),
+        workdir: workdirArg,
+    },
+    async execute(args)
+    {
+        const cmdArgs = buildPatchCommandArgs(args);
+        const output = await runCm(cmdArgs, args.workdir);
+        return args.output && output === "(no output)" ? `Patch generated at ${args.output}.` : output;
     },
 });
 

@@ -10,6 +10,7 @@ Pi tools and skill guidance for Plastic SCM / Unity Version Control workflows.
 - `plastic_checkin`
 - `plastic_undo`
 - `plastic_diff`
+- `plastic_patch`
 - `plastic_diffRevisions`
 - `plastic_diffFile`
 - `plastic_branchCreate`
@@ -33,10 +34,22 @@ Pi tools and skill guidance for Plastic SCM / Unity Version Control workflows.
 
 ## Safety behavior
 
-- `plastic_diff` remains a disabled alias by design; use `plastic_diffFile` or `plastic_diffRevisions` for text-only diffs.
+- `plastic_diff` remains a disabled alias by design; use `plastic_diffFile` or `plastic_diffRevisions` for text-only file diffs.
+- `plastic_patch` generates review patches with `cm patch`, including `clean` and `integration` filters for branch review workflows. It does not expose patch apply.
 - Bash safety rails block `cm diff` and unsafe interactive `cm merge --merge` usage.
 - Merge tooling surfaces Plastic `FILE_CONFLICT` records and merge-state metadata from `cm status`.
 - `plastic_finalizeMerge` supports reviewed/manual-resolution flows where Plastic still needs merge metadata finalized before checkin.
+
+## Patch generation examples
+
+```text
+plastic_patch(source="br:/main/task001", integration=true)
+plastic_patch(source="br:/main/task001", clean=true, integration=true, output="review.patch")
+plastic_patch(source="cs:2", destination="cs:4")
+plastic_patch(source="br:/main/task001", toolPath="C:\\gnu\\diff.exe")
+```
+
+If `output` is omitted, Plastic prints patch content to stdout. If `output` is provided, Plastic writes a new patch file and refuses to overwrite an existing file. Inspect patches before sharing them because they can contain source code, binary content, local paths, or secrets that were present in the changed files.
 
 ## Included skill
 
