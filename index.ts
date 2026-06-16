@@ -331,12 +331,146 @@ function toToolName(exportName: string): string {
   return `plastic_${exportName}`;
 }
 
+type TextLikeComponent = {
+  invalidate: () => void;
+  render: (width: number) => string[];
+};
+
+type RenderTheme = {
+  fg?: (color: string, text: string) => string;
+  bold?: (text: string) => string;
+};
+
+type PlasticToolResult = {
+  content?: Array<{ type?: string; text?: string }>;
+  details?: {
+    exportName?: string;
+    rawResult?: unknown;
+  };
+};
+
+const COLLAPSED_RESULT_LINES = 12;
+const ANSI_PATTERN = /\x1b\][^\x07]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]/g;
+
 function toText(result: unknown): string {
   if (typeof result === "string") {
     return result;
   }
 
   return JSON.stringify(result, null, 2);
+}
+
+function visibleLength(value: string): number {
+  return value.replace(ANSI_PATTERN, "").length;
+}
+
+function truncateAnsiLine(value: string, width: number): string {
+  if (width <= 0 || !value) {
+    return "";
+  }
+
+  if (visibleLength(value) <= width) {
+    return value;
+  }
+
+  const target = Math.max(0, width - 1);
+  let visible = 0;
+  let output = "";
+  for (let index = 0; index < value.length;) {
+    const remaining = value.slice(index);
+    const ansi = remaining.match(ANSI_PATTERN);
+    if (ansi && ansi.index === 0) {
+      output += ansi[0];
+      index += ansi[0].length;
+      continue;
+    }
+
+    if (visible >= target) {
+      break;
+    }
+
+    const codePoint = value.codePointAt(index);
+    if (codePoint === undefined) {
+      break;
+    }
+
+    const char = String.fromCodePoint(codePoint);
+    output += char;
+    visible += 1;
+    index += char.length;
+  }
+
+  return `${output}…`;
+}
+
+function textComponent(text: string): TextLikeComponent {
+  return {
+    invalidate() {},
+    render(width: number) {
+      if (!text) {
+        return [];
+      }
+      return text.split(/\r?\n/).map((line) => truncateAnsiLine(line, width));
+    },
+  };
+}
+
+function themed(theme: RenderTheme, color: string, text: string): string {
+  return typeof theme.fg === "function" ? theme.fg(color, text) : text;
+}
+
+function bold(theme: RenderTheme, text: string): string {
+  return typeof theme.bold === "function" ? theme.bold(text) : text;
+}
+
+function extractTextContent(result: PlasticToolResult | undefined): string {
+  return result?.content
+    ?.filter((entry) => entry?.type === "text")
+    .map((entry) => String(entry.text ?? ""))
+    .join("\n") ?? "";
+}
+
+function trimTrailingEmptyLines(lines: string[]): string[] {
+  let end = lines.length;
+  while (end > 0 && lines[end - 1]?.trim() === "") {
+    end -= 1;
+  }
+  return lines.slice(0, end);
+}
+
+function renderPlasticCall(exportName: string, args: Record<string, unknown>, theme: RenderTheme): TextLikeComponent {
+  const target = args.workdir ?? args.branch ?? args.source ?? args.path ?? args.paths ?? args.target ?? args.shelveset ?? args.id ?? "";
+  const targetText = Array.isArray(target) ? target.join(", ") : String(target);
+  const suffix = targetText ? ` ${themed(theme, "accent", targetText)}` : "";
+  return textComponent(`${themed(theme, "toolTitle", bold(theme, toToolName(exportName)))}${suffix}`);
+}
+
+function renderPlasticResult(
+  exportName: string,
+  result: PlasticToolResult | undefined,
+  options: { expanded?: boolean; isPartial?: boolean } | undefined,
+  theme: RenderTheme,
+): TextLikeComponent {
+  if (options?.isPartial) {
+    return textComponent(themed(theme, "warning", `Running ${toToolName(exportName)}...`));
+  }
+
+  const output = extractTextContent(result);
+  const lines = trimTrailingEmptyLines(output.split(/\r?\n/).map((line) => line.replace(/\t/g, "  ")));
+  const maxLines = options?.expanded ? lines.length : COLLAPSED_RESULT_LINES;
+  const displayLines = lines.slice(0, maxLines);
+  const remaining = lines.length - displayLines.length;
+  const rendered = displayLines.map((line) => themed(theme, "toolOutput", line));
+
+  if (remaining > 0) {
+    rendered.push(themed(theme, "muted", `... (${remaining} more lines, ctrl+o to expand)`));
+  }
+
+  if (rendered.length === 0) {
+    rendered.push(themed(theme, "toolOutput", "(no output)"));
+  }
+
+  return textComponent(rendered.join("\n"));
 }
 
 function normalizeArgs(args: unknown): Record<string, unknown> {
@@ -510,6 +644,12 @@ export default function plasticTools(pi: ExtensionAPI) {
       description: coreTool.description ?? toToolName(exportName),
       parameters: buildParameters(coreTool.args),
       prepareArguments: config.prepareArguments,
+      renderCall(args, theme) {
+        return renderPlasticCall(exportName, (args ?? {}) as Record<string, unknown>, theme as RenderTheme);
+      },
+      renderResult(result, options, theme) {
+        return renderPlasticResult(exportName, result as PlasticToolResult | undefined, options, theme as RenderTheme);
+      },
       async execute(_toolCallId, params, signal, _onUpdate, ctx) {
         const normalizedParams = normalizeArgs(params);
         if (normalizedParams.workdir === undefined && ctx?.cwd) {
