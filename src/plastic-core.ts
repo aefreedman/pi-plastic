@@ -1384,6 +1384,32 @@ const buildMergeInProgressCheckinMessage = async (originalMessage: string, workd
     return lines.join("\n");
 };
 
+const resolveBranchParentName = async (branch: string, workdir?: string): Promise<string | undefined> =>
+{
+    const normalizedBranch = normalizeBranchSpecForComparison(branch);
+    const candidates = Array.from(new Set([branch.trim(), normalizedBranch, `br:${normalizedBranch}`]
+        .filter((candidate) => candidate.length > 0)));
+
+    for (const candidate of candidates)
+    {
+        const output = await runCmRaw([
+            "find",
+            "branch",
+            `where ${cmWhereEquals("name", candidate)}`,
+            "--format={parent}",
+            "--nototal",
+        ], workdir).catch(() => "");
+        const lines = normalizeFindOutputLines(output);
+        const parent = lines[0]?.trim();
+        if (parent)
+        {
+            return parent;
+        }
+    }
+
+    return undefined;
+};
+
 const resolveCurrentBranchName = async (workdir?: string): Promise<string> =>
 {
     const statusOutput = await runCmRaw(["status"], workdir);
@@ -2712,7 +2738,7 @@ export const mergeToBranch = tool({
     description: "Merge a source branch into a target branch using safe Plastic update, switch, merge, and checkin steps.",
     args: {
         source: tool.schema.string().optional().describe("Source branch to merge. Defaults to the currently loaded branch."),
-        target: tool.schema.string().optional().describe("Target branch to merge into. Defaults to /dev."),
+        target: tool.schema.string().optional().describe("Target branch to merge into. Defaults to the source branch's Plastic parent branch."),
         cardRef: tool.schema.string().optional().describe("Optional tracker card reference to include in the merge checkin message, for example $4re."),
         message: tool.schema.string().optional().describe("Optional checkin message. Defaults to Merge <source> into <target>."),
         strategy: tool.schema.enum(["auto", "source", "destination"]).optional().describe("Merge conflict strategy. Defaults to auto."),
@@ -2725,9 +2751,14 @@ export const mergeToBranch = tool({
     async execute(args)
     {
         const format = args.format ?? "text";
-        const targetBranch = args.target ?? "/dev";
         const startingBranch = await resolveCurrentBranchName(args.workdir);
         const sourceBranch = args.source ?? startingBranch;
+        const resolvedParentBranch = args.target ? undefined : await resolveBranchParentName(sourceBranch, args.workdir);
+        if (!args.target && !resolvedParentBranch)
+        {
+            throw new Error(`Unable to resolve the parent branch for ${sourceBranch}. Pass target explicitly.`);
+        }
+        const targetBranch = args.target ?? resolvedParentBranch!;
         const strategy: MergeConflictStrategy = args.strategy ?? "auto";
         const updateTarget = args.updateTarget ?? true;
         const includePrivate = args.includePrivate ?? false;
@@ -2761,6 +2792,7 @@ export const mergeToBranch = tool({
                     `- Starting branch: ${startingBranch}`,
                     `- Source branch: ${sourceBranch}`,
                     `- Target branch: ${targetBranch}`,
+                    `- Target source: ${args.target ? "explicit argument" : "source branch parent"}`,
                     `- Update target: ${updateTarget ? "yes" : "no"}`,
                     `- Conflict strategy: ${strategy}`,
                     `- Include private: ${includePrivate ? "yes" : "no"}`,
@@ -2777,6 +2809,8 @@ export const mergeToBranch = tool({
                     startingBranch,
                     sourceBranch,
                     targetBranch,
+                    targetSource: args.target ? "explicit" : "parent",
+                    resolvedParentBranch: resolvedParentBranch ?? null,
                     updateTarget,
                     conflictStrategy: strategy,
                     includePrivate,
@@ -2869,6 +2903,8 @@ export const mergeToBranch = tool({
             {
                 sourceBranch,
                 targetBranch,
+                targetSource: args.target ? "explicit" : "parent",
+                resolvedParentBranch: resolvedParentBranch ?? null,
                 finalBranch,
                 updateTarget,
                 conflictStrategy: strategy,

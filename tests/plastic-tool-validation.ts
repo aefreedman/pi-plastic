@@ -50,6 +50,7 @@ const main = (): void => {
     'command === "diff"',
     "export const merge = tool({",
     "export const mergeToBranch = tool({",
+  "resolveBranchParentName",
     "export const finalizeMerge = tool({",
     "export const resolveDeleteChangeConflict = tool({",
     "export const patch = tool({",
@@ -93,6 +94,7 @@ const main = (): void => {
     "plastic_patch",
     "plastic_merge",
     "plastic_mergeToBranch",
+  "source branch's Plastic parent branch",
   ]);
   failures += checkForbidden(skillText, "pi-plastic/skills/using-plastic/SKILL.md", [
     /^\s*-\s+plastic_diff\s*$/m,
