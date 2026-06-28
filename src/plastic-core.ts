@@ -2708,6 +2708,186 @@ export const merge = tool({
     },
 });
 
+export const mergeToBranch = tool({
+    description: "Merge a source branch into a target branch using safe Plastic update, switch, merge, and checkin steps.",
+    args: {
+        source: tool.schema.string().optional().describe("Source branch to merge. Defaults to the currently loaded branch."),
+        target: tool.schema.string().optional().describe("Target branch to merge into. Defaults to /dev."),
+        cardRef: tool.schema.string().optional().describe("Optional tracker card reference to include in the merge checkin message, for example $4re."),
+        message: tool.schema.string().optional().describe("Optional checkin message. Defaults to Merge <source> into <target>."),
+        strategy: tool.schema.enum(["auto", "source", "destination"]).optional().describe("Merge conflict strategy. Defaults to auto."),
+        updateTarget: tool.schema.boolean().optional().describe("Run plastic_update on the target branch before merging. Defaults to true."),
+        includePrivate: tool.schema.boolean().optional().describe("Include private items in the merge checkin. Defaults to false."),
+        preflight: tool.schema.boolean().optional().describe("Preview the planned closeout merge steps without executing them."),
+        format: outputFormatArg,
+        workdir: workdirArg,
+    },
+    async execute(args)
+    {
+        const format = args.format ?? "text";
+        const targetBranch = args.target ?? "/dev";
+        const startingBranch = await resolveCurrentBranchName(args.workdir);
+        const sourceBranch = args.source ?? startingBranch;
+        const strategy: MergeConflictStrategy = args.strategy ?? "auto";
+        const updateTarget = args.updateTarget ?? true;
+        const includePrivate = args.includePrivate ?? false;
+        const cardLine = args.cardRef?.trim() ? `${args.cardRef.trim()}\n\n` : "";
+        const checkinMessage = args.message?.trim()
+            ? args.message.trim()
+            : `Merge ${sourceBranch} into ${targetBranch}\n\n${cardLine}Co-authored-by: Pi <pi@earendil.works>`;
+
+        if (isSameBranchSpec(sourceBranch, targetBranch))
+        {
+            throw new Error(`Refusing to merge ${sourceBranch} into itself.`);
+        }
+
+        const plannedSteps = [
+            `Resolve source branch: ${sourceBranch}`,
+            `Switch to target branch: ${targetBranch}`,
+            ...(updateTarget ? [`Update target branch safely: ${targetBranch}`] : []),
+            `Merge source into target with strategy=${strategy}: ${sourceBranch}`,
+            "Inspect merge status for unresolved hints.",
+            "Check in merge result.",
+        ];
+
+        if (args.preflight)
+        {
+            const pendingItems = await getMachineReadablePendingItems(args.workdir);
+            const pendingSummary = summarizePendingItems(pendingItems, args.workdir ?? process.cwd());
+            return toStructuredResult(
+                "merge-to-branch-preflight",
+                format,
+                formatPreflightText("## Merge To Branch Preflight", [
+                    `- Starting branch: ${startingBranch}`,
+                    `- Source branch: ${sourceBranch}`,
+                    `- Target branch: ${targetBranch}`,
+                    `- Update target: ${updateTarget ? "yes" : "no"}`,
+                    `- Conflict strategy: ${strategy}`,
+                    `- Include private: ${includePrivate ? "yes" : "no"}`,
+                    `- Pending items before switch: ${pendingSummary.totalPending}`,
+                    "",
+                    "Planned steps:",
+                    ...plannedSteps.map((step) => `- ${step}`),
+                    "",
+                    "Checkin message:",
+                    checkinMessage,
+                ]),
+                {
+                    wouldRun: true,
+                    startingBranch,
+                    sourceBranch,
+                    targetBranch,
+                    updateTarget,
+                    conflictStrategy: strategy,
+                    includePrivate,
+                    pendingSummary,
+                    checkinMessage,
+                    plannedSteps,
+                },
+                args.workdir,
+            );
+        }
+
+        const switchResult = await switchBranch.execute({
+            branch: targetBranch,
+            pendingChanges: "cancel",
+            format: "json",
+            workdir: args.workdir,
+        });
+        const updateResult = updateTarget ? await update.execute({ workdir: args.workdir }) : "(skipped)";
+        const mergeResult = await merge.execute({
+            source: sourceBranch,
+            strategy,
+            format: "json",
+            workdir: args.workdir,
+        });
+
+        const fullStatusAfterMerge = await runCmRaw(["status"], args.workdir).catch(() => "");
+        const mergeStateAfterMerge = analyzeMergeStatusOutput(fullStatusAfterMerge);
+        if (mergeStateAfterMerge.hasMergeInProgress)
+        {
+            return toStructuredResult(
+                "merge-to-branch",
+                format,
+                [
+                    "## Merge To Branch Paused",
+                    "",
+                    `- Source branch: ${sourceBranch}`,
+                    `- Target branch: ${targetBranch}`,
+                    "- Merge completed, but merge-in-progress hints remain.",
+                    "- Do not check in until merge metadata is resolved/finalized.",
+                ].join("\n"),
+                {
+                    sourceBranch,
+                    targetBranch,
+                    switchResult,
+                    updateResult,
+                    mergeResult,
+                    fullStatusAfterMerge,
+                    mergeStateAfterMerge,
+                    checkedIn: false,
+                },
+                args.workdir,
+                ["Merge-in-progress hints remain after merge; checkin skipped."],
+                "Resolve/finalize the merge metadata, validate, then run plastic_checkin for the merge result.",
+            );
+        }
+
+        const preflightResult = await checkin.execute({
+            message: checkinMessage,
+            includeAll: true,
+            includePrivate,
+            preflight: true,
+            format: "json",
+            workdir: args.workdir,
+        });
+        const checkinResult = await checkin.execute({
+            message: checkinMessage,
+            includeAll: true,
+            includePrivate,
+            format: "json",
+            workdir: args.workdir,
+        });
+        const finalBranch = await resolveCurrentBranchName(args.workdir);
+        const finalShortStatus = await runCmRaw(["status", "--short"], args.workdir).catch(() => "");
+        const finalPendingSummary = summarizeShortStatus(finalShortStatus);
+
+        return toStructuredResult(
+            "merge-to-branch",
+            format,
+            [
+                "## Merge To Branch Complete",
+                "",
+                `- Source branch: ${sourceBranch}`,
+                `- Target branch: ${targetBranch}`,
+                `- Final branch: ${finalBranch}`,
+                `- Update target: ${updateTarget ? "yes" : "no"}`,
+                `- Conflict strategy: ${strategy}`,
+                `- Merge checkin completed: yes`,
+                `- Pending items after checkin: ${finalPendingSummary.totalPending}`,
+            ].join("\n"),
+            {
+                sourceBranch,
+                targetBranch,
+                finalBranch,
+                updateTarget,
+                conflictStrategy: strategy,
+                includePrivate,
+                checkinMessage,
+                switchResult,
+                updateResult,
+                mergeResult,
+                preflightResult,
+                checkinResult,
+                finalShortStatus,
+                finalPendingSummary,
+                checkedIn: true,
+            },
+            args.workdir,
+        );
+    },
+});
+
 export const finalizeMerge = tool({
     description: "Finalize Plastic merge metadata after manual conflict resolution using an explicit non-interactive source/destination policy.",
     args: {

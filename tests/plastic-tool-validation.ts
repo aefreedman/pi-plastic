@@ -49,6 +49,7 @@ const main = (): void => {
     "ensureCmCommandAllowed(args);",
     'command === "diff"',
     "export const merge = tool({",
+    "export const mergeToBranch = tool({",
     "export const finalizeMerge = tool({",
     "export const resolveDeleteChangeConflict = tool({",
     "export const patch = tool({",
@@ -91,6 +92,7 @@ const main = (): void => {
     "plastic_diffRevisions",
     "plastic_patch",
     "plastic_merge",
+    "plastic_mergeToBranch",
   ]);
   failures += checkForbidden(skillText, "pi-plastic/skills/using-plastic/SKILL.md", [
     /^\s*-\s+plastic_diff\s*$/m,

@@ -54,6 +54,7 @@ const PLASTIC_EXPORTS = [
   "branchCreate",
   "switchBranch",
   "merge",
+  "mergeToBranch",
   "finalizeMerge",
   "currentBranch",
   "branchList",
@@ -189,6 +190,18 @@ const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       const input = normalizeOutputFormatAlias(normalizeArgs(args));
       normalizeWorkdirAliases(input);
       assignAlias(input, "cherrypicking", ["cherry_picking", "cherryPicking"]);
+      return input;
+    },
+  },
+  mergeToBranch: {
+    prepareArguments(args) {
+      const input = normalizeOutputFormatAlias(normalizeArgs(args));
+      normalizeWorkdirAliases(input);
+      assignAlias(input, "source", ["sourceBranch", "source_branch", "branch"]);
+      assignAlias(input, "target", ["targetBranch", "target_branch", "destination", "destinationBranch", "destination_branch"]);
+      assignAlias(input, "cardRef", ["card", "cardCode", "card_code", "codecksCard", "codecks_card"]);
+      assignAlias(input, "updateTarget", ["update_target", "update"]);
+      assignAlias(input, "includePrivate", ["include_private"]);
       return input;
     },
   },
