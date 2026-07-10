@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn } from "node:child_process";
 import { tool } from "./pi-tool-compat";
-import { promises as fs } from "fs";
+import { promises as fs, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "os";
 import { dirname, isAbsolute, join, relative, resolve } from "path";
 
@@ -13,6 +13,37 @@ type SpawnResult = {
 };
 
 const abortSignalStorage = new AsyncLocalStorage<AbortSignal | undefined>();
+
+type ExecutableEnvironment = Record<string, string | undefined>;
+
+const resolveExecutable = (environment: ExecutableEnvironment, overrideVariable: string, fallback: string): string =>
+{
+    const override = environment[overrideVariable]?.trim();
+    return override || fallback;
+};
+
+const getCmExecutable = (): string => resolveExecutable(process.env, "PI_PLASTIC_CM_EXECUTABLE", "cm");
+const getGitExecutable = (): string => resolveExecutable(process.env, "PI_PLASTIC_GIT_EXECUTABLE", "git");
+
+const executableNotFoundError = (command: string, error: Error): Error =>
+{
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT")
+    {
+        return error;
+    }
+
+    if (command === getCmExecutable())
+    {
+        return new Error(`Unable to launch Plastic SCM executable '${command}' (ENOENT). Set PI_PLASTIC_CM_EXECUTABLE to the full path to cm, or add cm to PATH.`);
+    }
+
+    if (command === getGitExecutable())
+    {
+        return new Error(`Unable to launch Git executable '${command}' (ENOENT). Set PI_PLASTIC_GIT_EXECUTABLE to the full path to git, or add git to PATH.`);
+    }
+
+    return new Error(`Unable to launch executable '${command}' (ENOENT). Verify that it is installed and available on PATH.`);
+};
 
 const getActiveAbortSignal = (): AbortSignal | undefined => abortSignalStorage.getStore();
 
@@ -57,52 +88,124 @@ const readStream = async (stream: NodeJS.ReadableStream | null | undefined): Pro
     return output;
 };
 
-const spawnAndCollect = async (command: string, args: string[], cwd: string, input?: string, signal?: AbortSignal): Promise<SpawnResult> =>
+type SpawnAndCollectDependencies = {
+    spawn?: typeof spawn;
+    setTimeout?: (callback: () => void, delay: number) => NodeJS.Timeout;
+    clearTimeout?: (timeout: NodeJS.Timeout) => void;
+    abortKillDelayMs?: number;
+};
+
+const spawnAndCollect = async (
+    command: string,
+    args: string[],
+    cwd: string,
+    input?: string,
+    signal?: AbortSignal,
+    dependencies: SpawnAndCollectDependencies = {},
+): Promise<SpawnResult> =>
 {
     if (signal?.aborted)
     {
         throw new Error(`cm ${args.join(" ")} aborted before start.`);
     }
 
-    const proc = spawn(command, args, {
-        cwd,
-        stdio: [input ? "pipe" : "ignore", "pipe", "pipe"],
-        shell: false,
-    });
+    let proc: ReturnType<typeof spawn>;
+    try
+    {
+        proc = (dependencies.spawn ?? spawn)(command, args, {
+            cwd,
+            stdio: [input ? "pipe" : "ignore", "pipe", "pipe"],
+            shell: false,
+        });
+    }
+    catch (error)
+    {
+        throw executableNotFoundError(command, error instanceof Error ? error : new Error(String(error)));
+    }
 
+    const scheduleTimeout = dependencies.setTimeout ?? setTimeout;
+    const cancelTimeout = dependencies.clearTimeout ?? clearTimeout;
     const stdoutPromise = readStream(proc.stdout);
     const stderrPromise = readStream(proc.stderr);
     let aborted = false;
-
+    let terminalSettled = false;
     let killTimeout: NodeJS.Timeout | undefined;
+
+    let resolveExit: (exitCode: number) => void;
+    let rejectExit: (error: Error) => void;
+    const exitPromise = new Promise<number>((resolvePromise, rejectPromise) =>
+    {
+        resolveExit = resolvePromise;
+        rejectExit = rejectPromise;
+    });
+    const onProcessError = (error: Error) =>
+    {
+        if (terminalSettled)
+        {
+            return;
+        }
+
+        terminalSettled = true;
+        rejectExit(executableNotFoundError(command, error));
+    };
+    const onProcessClose = (code: number | null) =>
+    {
+        if (terminalSettled)
+        {
+            return;
+        }
+
+        terminalSettled = true;
+        resolveExit(code ?? 1);
+    };
+
+    // Register terminal listeners before any asynchronous stdin work can cause an error or close.
+    proc.once("error", onProcessError);
+    proc.once("close", onProcessClose);
+
     const onAbort = () =>
     {
-        aborted = true;
-        proc.kill("SIGTERM");
-        killTimeout = setTimeout(() =>
+        if (terminalSettled)
         {
-            if (!proc.killed)
+            return;
+        }
+
+        aborted = true;
+        try
+        {
+            proc.kill("SIGTERM");
+        }
+        catch
+        {
+            // The process may have settled between the state check and signal.
+        }
+        killTimeout = scheduleTimeout(() =>
+        {
+            // ChildProcess.killed only means a signal was sent. It does not mean the process settled.
+            if (!terminalSettled)
             {
-                proc.kill("SIGKILL");
+                try
+                {
+                    proc.kill("SIGKILL");
+                }
+                catch
+                {
+                    // The process may have settled between the state check and signal.
+                }
             }
-        }, 5000);
+        }, dependencies.abortKillDelayMs ?? 5000);
     };
 
     signal?.addEventListener("abort", onAbort, { once: true });
 
     try
     {
-        if (input)
-        {
-            await writeInput(proc.stdin, input);
-        }
-
-        const exitCode = await new Promise<number>((resolvePromise, rejectPromise) =>
-        {
-            proc.once("error", rejectPromise);
-            proc.once("close", (code) => resolvePromise(code ?? 1));
-        });
-
+        const exitCode = input
+            ? await Promise.race([
+                exitPromise,
+                writeInput(proc.stdin, input).then(() => exitPromise),
+            ])
+            : await exitPromise;
         const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise]);
         return {
             stdout,
@@ -114,9 +217,11 @@ const spawnAndCollect = async (command: string, args: string[], cwd: string, inp
     finally
     {
         signal?.removeEventListener("abort", onAbort);
+        proc.removeListener("error", onProcessError);
+        proc.removeListener("close", onProcessClose);
         if (killTimeout)
         {
-            clearTimeout(killTimeout);
+            cancelTimeout(killTimeout);
         }
     }
 };
@@ -136,7 +241,7 @@ const runCm = async (args: string[], workdir?: string, input?: string, signal: A
 {
     ensureCmCommandAllowed(args);
     const cwd = workdir ?? process.cwd();
-    const { stdout, stderr, exitCode, aborted } = await spawnAndCollect("cm", args, cwd, input, signal);
+    const { stdout, stderr, exitCode, aborted } = await spawnAndCollect(getCmExecutable(), args, cwd, input, signal);
     const output = [stdout, stderr].filter(Boolean).join("\n").trim();
 
     if (aborted)
@@ -156,7 +261,7 @@ const runCmRaw = async (args: string[], workdir?: string, input?: string, signal
 {
     ensureCmCommandAllowed(args);
     const cwd = workdir ?? process.cwd();
-    const { stdout, stderr, exitCode, aborted } = await spawnAndCollect("cm", args, cwd, input, signal);
+    const { stdout, stderr, exitCode, aborted } = await spawnAndCollect(getCmExecutable(), args, cwd, input, signal);
 
     if (aborted)
     {
@@ -220,12 +325,134 @@ const toNormalizedAbsolutePath = (pathValue: string, cwd: string): string =>
     return absolutePath.replace(/\\/g, "/");
 };
 
-const isCaseInsensitiveAbsolutePath = (absolutePath: string): boolean => /^[A-Za-z]:\//.test(absolutePath) || absolutePath.startsWith("//");
+const isWindowsStyleAbsolutePath = (absolutePath: string): boolean => /^[A-Za-z]:\//.test(absolutePath) || absolutePath.startsWith("//");
 
-const toPathComparisonKeyFromAbsolutePath = (absolutePath: string): string =>
+const darwinVolumeCaseSensitivity = new Map<string, boolean>();
+const isSameFilesystemDevice = (volumeDevice: number | bigint, candidateDevice: number | bigint): boolean =>
+    volumeDevice === candidateDevice;
+
+const findCanonicalExistingAncestor = (absolutePath: string): string | null =>
+{
+    let candidate = absolutePath;
+    while (true)
+    {
+        try
+        {
+            return realpathSync.native(candidate).replace(/\\/g, "/");
+        }
+        catch
+        {
+            const parent = dirname(candidate);
+            if (parent === candidate)
+            {
+                return null;
+            }
+
+            candidate = parent;
+        }
+    }
+};
+
+const toggleFirstAsciiLetterCase = (value: string): string | null =>
+{
+    const index = value.search(/[A-Za-z]/);
+    if (index < 0)
+    {
+        return null;
+    }
+
+    const letter = value[index];
+    const toggled = letter === letter.toLowerCase() ? letter.toUpperCase() : letter.toLowerCase();
+    return `${value.slice(0, index)}${toggled}${value.slice(index + 1)}`;
+};
+
+// APFS may be formatted case-sensitive or case-insensitive, so Darwin must probe the
+// canonical existing ancestor on the target volume instead of assuming a platform policy.
+const isDarwinCaseInsensitiveVolume = (absolutePath: string): boolean =>
+{
+    const canonicalAncestor = findCanonicalExistingAncestor(absolutePath);
+    if (!canonicalAncestor)
+    {
+        return false;
+    }
+
+    try
+    {
+        const volumeDevice = statSync(canonicalAncestor).dev;
+        const volumeKey = String(volumeDevice);
+        const cached = darwinVolumeCaseSensitivity.get(volumeKey);
+        if (cached !== undefined)
+        {
+            return cached;
+        }
+
+        let probePath = canonicalAncestor;
+        while (true)
+        {
+            const parent = dirname(probePath);
+            if (parent === probePath)
+            {
+                darwinVolumeCaseSensitivity.set(volumeKey, false);
+                return false;
+            }
+
+            // A mount point's parent belongs to a different filesystem. Do not
+            // infer the mounted volume's case policy from the parent/root volume.
+            if (!isSameFilesystemDevice(volumeDevice, statSync(parent).dev))
+            {
+                darwinVolumeCaseSensitivity.set(volumeKey, false);
+                return false;
+            }
+
+            const alternateName = toggleFirstAsciiLetterCase(probePath.slice(parent.length + 1));
+            if (alternateName)
+            {
+                try
+                {
+                    const canonicalAlternate = realpathSync.native(join(parent, alternateName)).replace(/\\/g, "/");
+                    const isCaseInsensitive = canonicalAlternate === probePath;
+                    darwinVolumeCaseSensitivity.set(volumeKey, isCaseInsensitive);
+                    return isCaseInsensitive;
+                }
+                catch
+                {
+                    darwinVolumeCaseSensitivity.set(volumeKey, false);
+                    return false;
+                }
+            }
+
+            probePath = parent;
+        }
+    }
+    catch
+    {
+        // A failed probe must preserve distinct paths rather than risk conflating files.
+        return false;
+    }
+};
+
+type PathComparisonPolicy = {
+    platform?: NodeJS.Platform;
+    isDarwinCaseInsensitiveVolume?: (absolutePath: string) => boolean;
+};
+
+const toPathComparisonKeyFromAbsolutePath = (absolutePath: string, policy: PathComparisonPolicy = {}): string =>
 {
     const normalizedPath = absolutePath.replace(/\\/g, "/");
-    return isCaseInsensitiveAbsolutePath(normalizedPath) ? normalizedPath.toLowerCase() : normalizedPath;
+    // Keep Windows and UNC behavior regardless of the host platform, including when parsing
+    // status captured from a Windows workspace on another machine.
+    if (isWindowsStyleAbsolutePath(normalizedPath))
+    {
+        return normalizedPath.toLowerCase();
+    }
+
+    if ((policy.platform ?? process.platform) === "darwin"
+        && (policy.isDarwinCaseInsensitiveVolume ?? isDarwinCaseInsensitiveVolume)(normalizedPath))
+    {
+        return normalizedPath.toLowerCase();
+    }
+
+    return normalizedPath;
 };
 
 const toPathComparisonKey = (pathValue: string, cwd: string): string => toPathComparisonKeyFromAbsolutePath(toNormalizedAbsolutePath(pathValue, cwd));
@@ -800,11 +1027,20 @@ const buildPatchCommandArgs = (args: PatchCommandArgs): string[] =>
     return cmdArgs;
 };
 
+export const __plasticProcessInternals = {
+    resolveCmExecutable: (environment: ExecutableEnvironment = process.env): string => resolveExecutable(environment, "PI_PLASTIC_CM_EXECUTABLE", "cm"),
+    resolveGitExecutable: (environment: ExecutableEnvironment = process.env): string => resolveExecutable(environment, "PI_PLASTIC_GIT_EXECUTABLE", "git"),
+    spawnAndCollect,
+};
+
 export const __plasticPatchInternals = {
     buildPatchCommandArgs,
 };
 
 export const __plasticCheckinInternals = {
+    // Optional policy injection makes path-case behavior deterministic in focused tests.
+    toPathComparisonKeyFromAbsolutePath,
+    isSameFilesystemDevice,
     inferPendingItemKind,
     parseMachineReadablePendingItems,
     summarizePendingItems,
@@ -840,7 +1076,7 @@ type GitDiffResult = {
 
 const runGitDiffNoIndexOnce = async (args: string[], cwd: string): Promise<GitDiffResult> =>
 {
-    const { stdout, stderr, exitCode } = await spawnAndCollect("git", args, cwd);
+    const { stdout, stderr, exitCode } = await spawnAndCollect(getGitExecutable(), args, cwd);
     const output = [stdout, stderr].filter(Boolean).join("\n").trim();
 
     return {

@@ -1,7 +1,7 @@
 {
   "name": "@aefree/pi-plastic",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "keywords": [
     "pi-package"
@@ -17,7 +17,7 @@
     ]
   },
   "scripts": {
-    "test": "npx --yes tsx tests/plastic-tool-validation.ts && npx --yes tsx tests/plastic-checkin-path-resolution.ts && npx --yes tsx tests/plastic-patch-command.test.ts && npx --yes tsx tests/plastic-extension-registration.test.ts && npx --yes tsx tests/plastic-tool-rendering.test.ts && npx --yes tsx tests/bash-cm-diff-guard-validation.ts"
+    "test": "npx --yes tsx tests/plastic-tool-validation.ts && npx --yes tsx tests/plastic-checkin-path-resolution.ts && npx --yes tsx tests/plastic-process-lifecycle.test.ts && npx --yes tsx tests/plastic-patch-command.test.ts && npx --yes tsx tests/plastic-extension-registration.test.ts && npx --yes tsx tests/plastic-tool-rendering.test.ts && npx --yes tsx tests/bash-cm-diff-guard-validation.ts"
   },
   "peerDependencies": {
     "@mariozechner/pi-ai": "*",

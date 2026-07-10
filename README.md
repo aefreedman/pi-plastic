@@ -79,7 +79,8 @@ pi install -l <path-to-pi-plastic>
 
 ## Requirements
 
-- Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`
+- Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`, or `PI_PLASTIC_CM_EXECUTABLE` set to its full executable path
+- Git available on `PATH`, or `PI_PLASTIC_GIT_EXECUTABLE` set to its full executable path, for text-only diff tools
 - A configured Plastic workspace for workspace-scoped operations
 
 ## Testing

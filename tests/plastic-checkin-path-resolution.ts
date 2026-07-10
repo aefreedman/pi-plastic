@@ -101,6 +101,25 @@ const main = (): void =>
     ], windowsPendingItems, windowsCwd);
     assert(windowsDuplicateScope.includedPaths.length === 1, "Expected Windows duplicate scopes that differ only by case to dedupe to one command path.");
 
+    assert(__plasticCheckinInternals.isSameFilesystemDevice(100, 100), "Expected Darwin case probing to remain on the target filesystem device.");
+    assert(!__plasticCheckinInternals.isSameFilesystemDevice(100, 200), "Expected Darwin case probing to stop before crossing a mount-device boundary.");
+
+    const comparisonPath = "/Volumes/Workspace/Assets/Player.cs";
+    const darwinInsensitiveKey = __plasticCheckinInternals.toPathComparisonKeyFromAbsolutePath(comparisonPath, {
+        platform: "darwin",
+        isDarwinCaseInsensitiveVolume: () => true,
+    });
+    const darwinSensitiveKey = __plasticCheckinInternals.toPathComparisonKeyFromAbsolutePath(comparisonPath, {
+        platform: "darwin",
+        isDarwinCaseInsensitiveVolume: () => false,
+    });
+    assert(darwinInsensitiveKey === comparisonPath.toLowerCase(), "Expected a detected case-insensitive Darwin volume to normalize comparison keys.");
+    assert(darwinSensitiveKey === comparisonPath, "Expected a case-sensitive APFS volume to preserve comparison-key casing.");
+    assert(__plasticCheckinInternals.toPathComparisonKeyFromAbsolutePath("C:/Workspace/Assets/Player.cs", {
+        platform: "darwin",
+        isDarwinCaseInsensitiveVolume: () => false,
+    }) === "c:/workspace/assets/player.cs", "Expected Windows drive paths to remain case-insensitive on every host platform.");
+
     const gameplayScope = pendingItems.find((item) => item.workspacePath.endsWith("Movement.cs"))?.normalizedPath.replace(/\/Movement\.cs$/, "") ?? "";
     const scopedPendingItems = __plasticCheckinInternals.filterPendingItemsByScope(
         pendingItems,
