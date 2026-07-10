@@ -11,6 +11,10 @@ and this project follows semantic versioning for public package releases.
 
 - Migrated Pi extension imports and peer dependencies to the `@earendil-works` package scope, and removed the unused `pi-ai` peer dependency.
 
+### Fixed
+
+- Normalize Windows-style absolute and relative checkin paths with Windows path semantics even when validation runs on another operating system.
+
 ## [0.2.2] - 2026-07-09
 
 ### Fixed

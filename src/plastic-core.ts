@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { tool } from "./pi-tool-compat";
 import { promises as fs, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "os";
-import { dirname, isAbsolute, join, relative, resolve } from "path";
+import { dirname, isAbsolute, join, relative, resolve, win32 } from "path";
 
 type SpawnResult = {
     stdout: string;
@@ -319,13 +319,25 @@ type ResolvedCheckinPaths = {
     matchedPendingCount: number;
 };
 
+const isWindowsStyleAbsolutePath = (absolutePath: string): boolean => /^[A-Za-z]:\//.test(absolutePath) || absolutePath.startsWith("//");
+
 const toNormalizedAbsolutePath = (pathValue: string, cwd: string): string =>
 {
+    const normalizedPathValue = pathValue.replace(/\\/g, "/");
+    const normalizedCwd = cwd.replace(/\\/g, "/");
+    if (isWindowsStyleAbsolutePath(normalizedPathValue))
+    {
+        return win32.normalize(normalizedPathValue).replace(/\\/g, "/");
+    }
+
+    if (isWindowsStyleAbsolutePath(normalizedCwd))
+    {
+        return win32.resolve(normalizedCwd, normalizedPathValue).replace(/\\/g, "/");
+    }
+
     const absolutePath = isAbsolute(pathValue) ? resolve(pathValue) : resolve(cwd, pathValue);
     return absolutePath.replace(/\\/g, "/");
 };
-
-const isWindowsStyleAbsolutePath = (absolutePath: string): boolean => /^[A-Za-z]:\//.test(absolutePath) || absolutePath.startsWith("//");
 
 const darwinVolumeCaseSensitivity = new Map<string, boolean>();
 const isSameFilesystemDevice = (volumeDevice: number | bigint, candidateDevice: number | bigint): boolean =>
@@ -459,7 +471,10 @@ const toPathComparisonKey = (pathValue: string, cwd: string): string => toPathCo
 
 const toCommandPath = (absolutePath: string, cwd: string): string =>
 {
-    const relativePath = relative(cwd, absolutePath);
+    const relativePath = isWindowsStyleAbsolutePath(absolutePath.replace(/\\/g, "/"))
+        && isWindowsStyleAbsolutePath(cwd.replace(/\\/g, "/"))
+        ? win32.relative(cwd, absolutePath)
+        : relative(cwd, absolutePath);
     if (relativePath.length === 0)
     {
         return ".";
