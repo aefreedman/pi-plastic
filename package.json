@@ -17,7 +17,8 @@
     ]
   },
   "scripts": {
-    "test": "npx --yes tsx tests/plastic-tool-validation.ts && npx --yes tsx tests/plastic-checkin-path-resolution.ts && npx --yes tsx tests/plastic-process-lifecycle.test.ts && npx --yes tsx tests/plastic-patch-command.test.ts && npx --yes tsx tests/plastic-extension-registration.test.ts && npx --yes tsx tests/plastic-tool-rendering.test.ts && npx --yes tsx tests/bash-cm-diff-guard-validation.ts"
+    "test": "npx --yes tsx tests/plastic-tool-validation.ts && npx --yes tsx tests/plastic-checkin-path-resolution.ts && npx --yes tsx tests/plastic-process-lifecycle.test.ts && npx --yes tsx tests/plastic-patch-command.test.ts && npx --yes tsx tests/plastic-extension-registration.test.ts && npx --yes tsx tests/plastic-tool-rendering.test.ts && npx --yes tsx tests/plastic-branch-query.test.ts && npx --yes tsx tests/plastic-constrained-sampling.test.ts && npx --yes tsx tests/bash-cm-diff-guard-validation.ts",
+    "test:live": "npx --yes tsx tests/plastic-live-smoke.test.ts"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

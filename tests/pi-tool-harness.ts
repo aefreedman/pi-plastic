@@ -1,6 +1,16 @@
-type RegisteredTool = {
+export type RegisteredTool = {
   name: string;
   parameters?: unknown;
+  constrainedSampling?: false | {
+    type: "json_schema";
+    strict: "prefer" | "require";
+  } | {
+    type: "grammar";
+    variants: {
+      openai_lark?: string;
+      openai_regex?: string;
+    };
+  };
   prepareArguments?: (args: unknown) => Record<string, unknown>;
   execute: (...args: any[]) => Promise<any> | any;
 };

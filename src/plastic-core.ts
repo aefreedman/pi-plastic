@@ -946,6 +946,13 @@ const isSameBranchSpec = (left: string, right: string): boolean =>
     return normalizeBranchSpecForComparison(left) === normalizeBranchSpecForComparison(right);
 };
 
+const getBranchLeafName = (branch: string): string =>
+{
+    const normalized = normalizeBranchSpecForComparison(branch);
+    const segments = normalized.split("/").filter((segment) => segment.length > 0);
+    return segments.at(-1) ?? normalized;
+};
+
 const buildSwitchPendingProfile = (summary: PendingItemSummary): SwitchPendingProfile =>
 {
     return {
@@ -1080,6 +1087,10 @@ export const __plasticSwitchInternals = {
     buildSwitchPendingProfile,
     isSwitchBringBlockedForUnattended,
     canSwitchDirectWithPrivateOnlyPending,
+};
+
+export const __plasticBranchInternals = {
+    getBranchLeafName,
 };
 
 let gitNoIndexSupportsLabel: boolean | null = null;
@@ -3377,14 +3388,18 @@ export const branchExists = tool({
     },
     async execute(args)
     {
+        // Plastic's `name` query field contains only the leaf segment even though
+        // `{name}` renders the full branch path. Query by leaf, then compare the
+        // returned full paths so identical leaf names under other parents do not
+        // produce a false positive.
         const output = await runCmRaw([
             "find",
             "branch",
-            `where ${cmWhereEquals("name", args.branch)}`,
+            `where ${cmWhereEquals("name", getBranchLeafName(args.branch))}`,
             "--format={name}",
             "--nototal",
         ], args.workdir);
-        const exists = normalizeFindOutputLines(output).length > 0;
+        const exists = normalizeFindOutputLines(output).some((branch) => isSameBranchSpec(branch, args.branch));
         return exists ? "true" : "false";
     },
 });

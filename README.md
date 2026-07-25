@@ -89,7 +89,23 @@ pi install -l <path-to-pi-plastic>
 npm test
 ```
 
-The test suite covers tool validation, path-resolution regressions, extension registration, and bash guard behavior. Real smoke validation should be run against a local Plastic workspace before relying on mutation tools in a new environment.
+The default suite is credential-free and covers tool validation, path-resolution regressions, extension registration, OpenAI strict-schema compatibility classification, and bash guard behavior.
+
+Run the opt-in read-only live smoke test against a dedicated clean sandbox workspace:
+
+```bash
+PI_PLASTIC_TEST_WORKSPACE=/absolute/path/to/sandbox npm run test:live
+```
+
+The live test requires `/main`, no pending changes, and no merge in progress. It does not mutate the repository. Mutation tools should still be rehearsed manually in a disposable sandbox before relying on them in a new environment.
+
+## Constrained sampling compatibility
+
+Pi 0.82 introduced provider-side constrained sampling for tools. `pi-plastic` does not currently opt in: every public Plastic schema includes optional fields (at minimum `workdir`), while OpenAI strict function schemas require closed objects and all declared properties to be required. Pi forwards the registered schema without converting those optional fields.
+
+Enabling `strict: "prefer"` now would therefore either produce invalid strict OpenAI requests or require a breaking redesign of the ordinary tool arguments. The test suite audits all registered tools and prevents accidental opt-in until a schema is genuinely strict-compatible. Existing TypeBox validation and Plastic runtime safety checks remain authoritative.
+
+OpenAI Codex models may advertise grammar tools without advertising strict JSON-schema tools. Grammar sampling is not used here because Plastic operations have structured multi-field arguments rather than a single bounded string language.
 
 ## Implementation notes
 

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows semantic versioning for public package releases.
 
+## Unreleased
+
+### Added
+
+- Added an opt-in, read-only live smoke test for dedicated Plastic sandbox workspaces.
+- Added a compatibility audit that prevents JSON-schema constrained sampling from being enabled on schemas that OpenAI strict tools would reject.
+
+### Fixed
+
+- Fixed full-path branch existence checks by querying Plastic's leaf-name field and validating the returned full branch path.
 
 ## [0.2.4] - 2026-07-24
 
