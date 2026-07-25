@@ -16,14 +16,14 @@ Use the detected parent branch from the repository instead of copying a branch n
 
 ## Create Branch
 
-Normal work branches must be children of the current branch. If the workspace is on `/main`, create `/main/foo`, not `/foo`. A bare `/foo` is a root/sibling branch and does not inherit `/main`'s branch hierarchy.
+Normal work branches must be children of the current branch. Create `<current-branch>/<new-branch>`, not `/<new-branch>`. A bare `/<new-branch>` is a root/sibling branch and does not inherit the current branch's hierarchy.
 
 Preferred tool-first flow (a leaf name is expanded under the current branch):
 
 ```text
-plastic_currentBranch() # /main
-plastic_branchCreate(branch="foo", comment="<branch-description>") # creates /main/foo
-plastic_switchBranch(branch="/main/foo")
+plastic_currentBranch() # <current-branch>
+plastic_branchCreate(branch="<new-branch>", comment="<branch-description>") # creates <current-branch>/<new-branch>
+plastic_switchBranch(branch="<current-branch>/<new-branch>")
 ```
 
 A full descendant path is also accepted. Creating a root or sibling branch is rare and requires `allowNonDescendant=true`; use that override only when the user explicitly intends the different hierarchy.
@@ -31,8 +31,8 @@ A full descendant path is also accepted. Creating a root or sibling branch is ra
 Manual shell fallback requires constructing the descendant path explicitly:
 
 ```bash
-cm branch create /main/foo -c="<branch-description>"
-cm switch --silent --noinput /main/foo
+cm branch create "<current-branch>/<new-branch>" -c="<branch-description>"
+cm switch --silent --noinput "<current-branch>/<new-branch>"
 ```
 
 Agent preference: use runtime `plastic_*` methods first; keep shell commands as manual fallback
@@ -68,7 +68,7 @@ plastic_merge(source="<source-branch-spec>", strategy="source")
 
 - Prefer a leaf name with `plastic_branchCreate`; the tool expands it beneath the current branch.
 - For full paths and manual `cm` commands, start with `/` and include the current branch as the parent.
-- Never shorten `/main/foo` to `/foo`; that creates a root/sibling branch.
+- Never shorten `<current-branch>/<new-branch>` to `/<new-branch>`; that creates a root/sibling branch.
 - Use lowercase and hyphens
 - Follow repository conventions
 - Check for issue-tracker conventions in branch names like issue ID prefixes

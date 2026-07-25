@@ -20,7 +20,7 @@ For the common closeout flow of merging a finished source branch into its parent
 
 Prefer runtime `plastic_*` tools first. Keep `cm` shell commands as manual fallback.
 
-Create normal work branches as children of the current branch. From `/main`, create `/main/foo`, not `/foo`; the latter is a rare root/sibling branch detached from `/main`'s hierarchy. `plastic_branchCreate(branch="foo")` safely expands a leaf under the current branch, while non-descendant creation requires the explicit `allowNonDescendant=true` override.
+Create normal work branches as children of the current branch: use `<current-branch>/<new-branch>`, not `/<new-branch>`. The latter is a rare root/sibling branch detached from the current branch's hierarchy. `plastic_branchCreate(branch="<new-branch>")` safely expands a leaf under the current branch, while non-descendant creation requires the explicit `allowNonDescendant=true` override.
 
 ## External File Loading
 
