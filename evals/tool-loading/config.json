@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "piVersion": "0.82.0",
+  "sandboxCwdEnv": "PI_PLASTIC_EVAL_SANDBOX",
+  "sandboxMarkerFile": ".pi-plastic-eval-sandbox",
+  "sandboxMarkerContent": "pi-plastic-eval-sandbox\n",
+  "sandboxAuthorizationEnv": "PI_PLASTIC_EVAL_ALLOW",
+  "sandboxAuthorizationValue": "dedicated-sandbox",
+  "timeoutMs": 90000,
+  "maxToolCalls": 12,
+  "maxOutputChars": 2097152,
+  "conditions": ["all-active", "balanced", "loader-only"],
+  "destructiveTools": [
+    "plastic_add", "plastic_checkin", "plastic_undo", "plastic_resolveDeleteChangeConflict",
+    "plastic_branchCreate", "plastic_switchBranch", "plastic_merge", "plastic_mergeToBranch",
+    "plastic_finalizeMerge", "plastic_branchDelete", "plastic_shelvesetCreate", "plastic_shelvesetApply",
+    "plastic_shelvesetDelete", "plastic_codeReviewCreate", "plastic_codeReviewUpdate", "plastic_codeReviewDelete",
+    "plastic_workspaceCreate"
+  ]
+}

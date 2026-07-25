@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "id": "status-inspection",
+      "prompt": "In the dedicated Plastic sandbox, inspect the workspace status now. Call plastic_status exactly once, do not call any other Plastic operation unless plastic_tool_search is required to make plastic_status available, then reply with a one-sentence status summary.",
+      "requiredTools": ["plastic_status"],
+      "minimalActivatedTools": ["plastic_status"],
+      "forbiddenTools": []
+    },
+    {
+      "id": "branch-listing",
+      "prompt": "In the dedicated Plastic sandbox, list the available branches. Call plastic_branchList exactly once. If it is not active, first call plastic_tool_search exactly once and activate only plastic_branchList. Do not mutate the workspace; then give a short result.",
+      "requiredTools": ["plastic_branchList"],
+      "minimalActivatedTools": ["plastic_branchList"],
+      "forbiddenTools": []
+    },
+    {
+      "id": "preflight-branch-switch",
+      "prompt": "Preview, but do not perform, switching the dedicated Plastic sandbox to /main. Call plastic_switchBranch exactly once with branch /main, pendingChanges cancel, preflight true, and the sandbox workdir. If the tool is inactive, first call plastic_tool_search exactly once to activate only plastic_switchBranch. Do not call any other Plastic operation, then summarize the preview.",
+      "requiredTools": ["plastic_switchBranch"],
+      "minimalActivatedTools": ["plastic_switchBranch"],
+      "requiredPreflightTools": ["plastic_switchBranch"],
+      "forbiddenTools": ["plastic_status", "plastic_currentBranch", "plastic_branchCreate", "plastic_merge"]
+    },
+    {
+      "id": "preflight-checkin",
+      "prompt": "Preview, but do not perform, a checkin in the dedicated Plastic sandbox. Call plastic_checkin exactly once with message 'dynamic-loader eval preflight', preflight true, includeAll true, and the sandbox workdir. If the tool is inactive, first call plastic_tool_search exactly once to activate only plastic_checkin. Do not add, undo, or otherwise mutate anything, then summarize the preview.",
+      "requiredTools": ["plastic_checkin"],
+      "minimalActivatedTools": ["plastic_checkin"],
+      "requiredPreflightTools": ["plastic_checkin"],
+      "forbiddenTools": ["plastic_add", "plastic_undo"]
+    },
+    {
+      "id": "compound-list-branches-verify-main",
+      "prompt": "In the dedicated Plastic sandbox, list branches and verify whether /main exists. Call plastic_branchList and plastic_branchExists once each; use /main as the branch-existence argument. If either is inactive, make exactly one plastic_tool_search call that activates both exact tools together. Do not mutate the workspace, then give a short answer.",
+      "requiredTools": ["plastic_branchList", "plastic_branchExists"],
+      "minimalActivatedTools": ["plastic_branchList", "plastic_branchExists"],
+      "forbiddenTools": []
+    },
+    {
+      "id": "negative-no-operation",
+      "prompt": "No Plastic operation is requested. Do not call plastic_tool_search or any plastic_* tool. Reply exactly: NO_OPERATION.",
+      "requiredTools": [],
+      "minimalActivatedTools": [],
+      "forbiddenTools": []
+    },
+    {
+      "id": "ambiguous-branch-discovery",
+      "prompt": "In the dedicated Plastic sandbox, safely discover branch information for a later decision. Prefer a read-only branch listing and call plastic_branchList exactly once. If it is inactive, call plastic_tool_search exactly once with a branch discovery request and activate only read-only branch tools. Do not create, switch, merge, or delete branches; then give a short answer.",
+      "requiredTools": ["plastic_branchList"],
+      "minimalActivatedTools": ["plastic_branchList"],
+      "forbiddenTools": ["plastic_branchCreate", "plastic_switchBranch", "plastic_merge", "plastic_mergeToBranch", "plastic_branchDelete"]
+    },
+    {
+      "id": "contextual-branch-inspection",
+      "prompt": "Before choosing a branch for later work, inspect all available branches in the dedicated sandbox exactly once and give a short read-only summary. Use only the smallest sufficient capability; do not change anything.",
+      "requiredTools": ["plastic_branchList"],
+      "minimalActivatedTools": ["plastic_branchList"],
+      "forbiddenTools": ["plastic_branchCreate", "plastic_switchBranch", "plastic_merge", "plastic_mergeToBranch", "plastic_branchDelete"]
+    },
+    {
+      "id": "contextual-review-discovery",
+      "prompt": "Before planning follow-up work, find the existing code reviews in the dedicated sandbox exactly once and summarize them briefly. Use only the smallest sufficient read-only capability; do not change anything.",
+      "requiredTools": ["plastic_codeReviewFind"],
+      "minimalActivatedTools": ["plastic_codeReviewFind"],
+      "forbiddenTools": ["plastic_codeReviewCreate", "plastic_codeReviewUpdate", "plastic_codeReviewDelete"]
+    }
+  ]
+}

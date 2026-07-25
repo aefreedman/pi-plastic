@@ -1,6 +1,18 @@
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { type TSchema, Type } from "typebox";
 import * as core from "./src/plastic-core";
+import {
+  getEffectivePlasticToolOwnership,
+  getInitiallyInactivePlasticTools,
+  getPlasticToolLoadingMode,
+  getRestoredPlasticToolNames,
+  getUnknownExactPlasticToolNames,
+  isPlasticToolBrowseRequest,
+  PLASTIC_TOOL_BROWSE_TEXT,
+  PLASTIC_TOOL_SEARCH_NAME,
+  searchPlasticTools,
+} from "./src/plastic-tool-loading";
 
 type CoreSchemaNode = {
   kind: string;
@@ -25,6 +37,7 @@ type ToolConfig = {
   prepareArguments?: (args: unknown) => Record<string, unknown>;
 };
 
+const EXTENSION_SOURCE_PATH = fileURLToPath(import.meta.url);
 const EMPTY_PARAMETERS = Type.Object({});
 const enumSchema = <T extends readonly [string, ...string[]]>(values: T, description: string): TSchema =>
   Type.Union(values.map((value) => Type.Literal(value)) as [TSchema, TSchema, ...TSchema[]], { description });
@@ -648,6 +661,12 @@ function buildParameters(args: Record<string, unknown> | undefined): TSchema {
 }
 
 export default function plasticTools(pi: ExtensionAPI) {
+  const coreDescriptions = new Map<string, string>();
+  for (const exportName of PLASTIC_EXPORTS) {
+    const coreTool = getCoreTool(exportName);
+    coreDescriptions.set(toToolName(exportName), coreTool.description ?? toToolName(exportName));
+  }
+
   for (const exportName of PLASTIC_EXPORTS) {
     const coreTool = getCoreTool(exportName);
     const config = TOOL_CONFIG[exportName] ?? {};
@@ -680,4 +699,90 @@ export default function plasticTools(pi: ExtensionAPI) {
       },
     });
   }
+
+  pi.registerTool({
+    name: PLASTIC_TOOL_SEARCH_NAME,
+    label: "Plastic Tool Search",
+    description: "Search and enable Plastic SCM / Unity Version Control tools for workspace status and sync, changes and checkins, text-only diffs and patches, branches and merges, shelvesets, code reviews, and workspaces.",
+    promptSnippet: "Use plastic_tool_search to find and enable Plastic SCM capabilities that are not active.",
+    promptGuidelines: [
+      "Use plastic_tool_search before a Plastic SCM action when an appropriate plastic_* tool is not active. Inspect targets and confirm destructive mutations before executing them.",
+    ],
+    parameters: Type.Object({
+      query: Type.Optional(Type.String({ description: "Capability or workflow to search for." })),
+      toolNames: Type.Optional(Type.Array(Type.String({ description: "Exact public Plastic tool name." }), { maxItems: 4, description: "Optional exact tool names to enable." })),
+      limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 4, description: "Maximum matching tools to enable. Defaults to the single best keyword match, except generic diff loads both safe text-only alternatives; exact toolNames requests may enable up to four." })),
+    }),
+    async execute(_toolCallId, params) {
+      if (isPlasticToolBrowseRequest(params)) {
+        return {
+          content: [{ type: "text", text: PLASTIC_TOOL_BROWSE_TEXT }],
+          details: { browse: true, matches: [], added: [], alreadyActive: [], guidance: [] },
+        };
+      }
+
+      const ownership = getEffectivePlasticToolOwnership(pi.getAllTools(), EXTENSION_SOURCE_PATH);
+      const unknownToolNames = getUnknownExactPlasticToolNames(params.toolNames);
+      const active = pi.getActiveTools();
+      // Never infer ownership without Pi 0.82 canonical sourceInfo. In that
+      // compatibility mode we may describe known tools that are already active,
+      // but cannot safely activate an inactive same-named definition.
+      const matches = searchPlasticTools(params, coreDescriptions).filter((match) =>
+        ownership.usesSourceInfo ? ownership.ownedToolNames.has(match.name) : active.includes(match.name),
+      );
+      const requestedExactToolNames = Array.isArray(params.toolNames)
+        ? [...new Set(params.toolNames.filter((name): name is string => typeof name === "string" && name.trim().length > 0).map((name) => name.trim()))]
+        : [];
+      const unavailableToolNames = requestedExactToolNames.filter((name) => !matches.some((match) => match.name.toLowerCase() === name.toLowerCase()));
+      if (matches.length === 0) {
+        const unavailable = unavailableToolNames.length > 0
+          ? ` Unknown or unavailable exact tool names: ${unavailableToolNames.join(", ")}.`
+          : "";
+        return {
+          content: [{ type: "text", text: `No executable Plastic tools matched. Try a capability, workflow term, or exact public plastic_* tool name.${unavailable}` }],
+          details: { matches: [], added: [], alreadyActive: [], guidance: [], unknownToolNames, unavailableToolNames },
+        };
+      }
+
+      const matchNames = matches.map((match) => match.name);
+      const added = matchNames.filter((name) => !active.includes(name));
+      const alreadyActive = matchNames.filter((name) => active.includes(name));
+      if (added.length > 0) pi.setActiveTools([...new Set([...active, ...added])]);
+
+      const guidance = matches.flatMap((match) => match.guidance);
+      const unknownText = unavailableToolNames.length > 0 ? `\nUnknown or unavailable exact tool names: ${unavailableToolNames.join(", ")}.` : "";
+      const loadedText = added.length > 0 ? `Activated: ${added.join(", ")}.` : "All matching tools were already active.";
+      return {
+        content: [{
+          type: "text",
+          text: `${loadedText}\nMatches: ${matchNames.join(", ")}.\nGuidance: ${guidance.join(" ")}${unknownText}`,
+        }],
+        details: { matches: matchNames, added, alreadyActive, guidance, unknownToolNames, unavailableToolNames },
+      };
+    },
+  });
+
+  pi.on("session_start", (_event, ctx) => {
+    const ownership = getEffectivePlasticToolOwnership(pi.getAllTools(), EXTENSION_SOURCE_PATH);
+    const active = pi.getActiveTools();
+    const mode = getPlasticToolLoadingMode();
+    // Fail safe when provenance is unavailable or the effective loader is a
+    // foreign first-registration-wins collision. Preserve the active set
+    // exactly; even adding the public loader name could activate foreign code.
+    if (!ownership.usesSourceInfo) return;
+
+    // The all-active eval mode represents the untouched legacy 29-tool
+    // baseline, so keep every original Plastic tool active but omit the new
+    // loader from the provider surface.
+    if (mode === "all-active") {
+      pi.setActiveTools(active.filter((name) => name !== PLASTIC_TOOL_SEARCH_NAME));
+      return;
+    }
+
+    const initiallyInactive = getInitiallyInactivePlasticTools(mode);
+    const ownedInitiallyInactive = new Set([...initiallyInactive].filter((name) => ownership.ownedToolNames.has(name)));
+    const restored = getRestoredPlasticToolNames(ctx.sessionManager.getBranch(), ownership.ownedToolNames);
+    const preserved = active.filter((name) => !ownedInitiallyInactive.has(name));
+    pi.setActiveTools([...new Set([...preserved, PLASTIC_TOOL_SEARCH_NAME, ...restored])]);
+  });
 }

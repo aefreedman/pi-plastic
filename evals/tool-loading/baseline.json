@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "measurement": "serializedSchemaChars is JSON.stringify of public registered tool metadata (name, description, parameters, prompt metadata, constrainedSampling); estimated tokens are chars / 4 rounded up. Live provider payload tool serialization is recorded separately by the eval runner.",
+  "legacyBaseline": {
+    "label": "untouched legacy public Plastic tools",
+    "toolCount": 29,
+    "serializedSchemaChars": 21192,
+    "estimatedTokens": 5298,
+    "promptMetadataChars": 0
+  },
+  "implementedConditions": {
+    "all-active": {
+      "toolCount": 29,
+      "serializedSchemaChars": 21192,
+      "estimatedTokens": 5298,
+      "promptMetadataChars": 0,
+      "legacySchemaReductionPercent": 0
+    },
+    "balanced": {
+      "toolCount": 3,
+      "serializedSchemaChars": 2117,
+      "estimatedTokens": 530,
+      "promptMetadataChars": 266,
+      "legacySchemaReductionPercent": 90.01
+    },
+    "loader-only": {
+      "toolCount": 1,
+      "serializedSchemaChars": 1105,
+      "estimatedTokens": 277,
+      "promptMetadataChars": 266,
+      "legacySchemaReductionPercent": 94.79
+    }
+  }
+}

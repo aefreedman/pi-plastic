@@ -9,6 +9,10 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Added `plastic_tool_search`, a bounded package-owned dynamic loader with explicit Plastic aliases, tags, and selected-tool safety guidance.
+- Added balanced, loader-only, and all-active initial tool-loading modes through `PI_PLASTIC_TOOL_LOADING_MODE`, plus active-branch restoration of valid historical loader additions.
+- Added harness coverage for dynamic tool composition, search, additive activation, restoration, and deferred prompt-metadata behavior.
+- Added a package-local dynamic tool-loading behavioral eval with fresh Pi JSON subprocesses, bounded configured cases, implicit discovery coverage, exact smallest-sufficient activation checks, preflight-only mutation guarding, sandbox attestations, provider-schema capture hygiene, and ignored sanitized result summaries.
 - Added an opt-in, read-only live smoke test for dedicated Plastic sandbox workspaces.
 - Added a compatibility audit that prevents JSON-schema constrained sampling from being enabled on schemas that OpenAI strict tools would reject.
 
@@ -18,6 +22,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Fixed
 
+- Fail safe when canonical Pi `sourceInfo` provenance or effective loader ownership is unavailable: preserve the active set exactly and never activate or defer an unproven `plastic_*` name.
 - Fixed full-path branch existence checks by querying Plastic's leaf-name field and validating the returned full branch path.
 
 ## [0.2.4] - 2026-07-24

@@ -4,11 +4,13 @@ Pi tools and skill guidance for Plastic SCM / Unity Version Control workflows.
 
 ## Tools
 
+- `plastic_tool_search` (dynamic capability search and loader)
 - `plastic_status`
 - `plastic_update`
 - `plastic_add`
 - `plastic_checkin`
 - `plastic_undo`
+- `plastic_resolveDeleteChangeConflict`
 - `plastic_diff`
 - `plastic_patch`
 - `plastic_diffRevisions`
@@ -32,6 +34,22 @@ Pi tools and skill guidance for Plastic SCM / Unity Version Control workflows.
 - `plastic_codeReviewFind`
 - `plastic_workspaceCreate`
 - `plastic_workspaceList`
+
+## Dynamic tool loading
+
+All 29 existing public `plastic_*` tools retain their names and behavior. `plastic_tool_search` is an additional package-owned loader that searches the explicit Plastic capability catalog, reports bounded matches and safety guidance, and additively enables selected tools for the next model request.
+
+The default **balanced** session set keeps `plastic_tool_search`, `plastic_status`, and `plastic_currentBranch` active. The other Plastic tools remain registered but inactive until selected; built-in and other-extension tools are not removed. Previous loader additions on the active session branch are restored on startup, resume, fork, and reload.
+
+For controlled comparisons, set `PI_PLASTIC_TOOL_LOADING_MODE` before starting Pi:
+
+```bash
+PI_PLASTIC_TOOL_LOADING_MODE=balanced    # default production candidate
+PI_PLASTIC_TOOL_LOADING_MODE=loader-only # maximum initial schema reduction
+PI_PLASTIC_TOOL_LOADING_MODE=all-active  # legacy 29-tool baseline; loader omitted
+```
+
+Pi 0.82 uses canonical `sourceInfo` provenance to identify this package's effective tools before deferring, restoring, or activating them. If canonical provenance or ownership of the effective loader cannot be proven, `pi-plastic` fails safe: it preserves the complete current active set exactly, does not defer, remove, or activate any `plastic_*` name, and an effective package loader can only report known tools that are already active rather than activating inactive names. On sourceInfo-capable Pi instances, providers without native deferred definitions still receive the complete current active set after a loader call. Reload or restart Pi after source edits; source files are not watched automatically.
 
 ## Safety behavior
 
@@ -98,6 +116,17 @@ PI_PLASTIC_TEST_WORKSPACE=/absolute/path/to/sandbox npm run test:live
 ```
 
 The live test requires `/main`, no pending changes, and no merge in progress. It does not mutate the repository. Mutation tools should still be rehearsed manually in a disposable sandbox before relying on them in a new environment.
+
+### Dynamic tool-loading eval
+
+The package-local behavioral eval uses fresh Pi 0.82 JSON subprocesses against an explicitly attested dedicated Plastic sandbox and is not a skill eval. It compares all-active, balanced, and loader-only mode behavior, checks exact smallest-sufficient loader activations, blocks destructive calls unless they are supported `preflight: true` previews, captures tool calls and sanitized provider-schema measurements, and deletes raw provider payload captures by default.
+
+```bash
+npm run eval:tool-loading -- --dry-run
+PI_PLASTIC_EVAL_SANDBOX=/absolute/path/to/sandbox PI_PLASTIC_EVAL_ALLOW=dedicated-sandbox npm run eval:tool-loading -- --model openai-codex/gpt-5.6-luna --condition balanced
+```
+
+See [`evals/tool-loading/README.md`](evals/tool-loading/README.md) for approved model restrictions, cases, measurements, and result hygiene.
 
 ## Constrained sampling compatibility
 
