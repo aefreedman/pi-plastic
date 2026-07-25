@@ -12,6 +12,10 @@ and this project follows semantic versioning for public package releases.
 - Added an opt-in, read-only live smoke test for dedicated Plastic sandbox workspaces.
 - Added a compatibility audit that prevents JSON-schema constrained sampling from being enabled on schemas that OpenAI strict tools would reject.
 
+### Changed
+
+- Declared Pi 0.82 and TypeBox development dependencies so the expanded test suite installs reproducibly while keeping runtime peers optional.
+
 ### Fixed
 
 - Fixed full-path branch existence checks by querying Plastic's leaf-name field and validating the returned full branch path.
