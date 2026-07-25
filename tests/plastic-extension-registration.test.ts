@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 
 function main(): void {
   const indexText = readFileSync(new URL("../index.ts", import.meta.url), "utf8");
+  const packageManifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  const branchStatusText = readFileSync(new URL("../extensions/plastic-branch-status.ts", import.meta.url), "utf8");
 
   assert.match(indexText, /parameters:\s*buildParameters\(coreTool\.args\)/, "plastic tools should derive schemas from core args");
   assert.match(indexText, /prepareArguments:\s*config\.prepareArguments/, "plastic tools should wire prepareArguments");
@@ -21,6 +23,8 @@ function main(): void {
   assert.match(indexText, /assignAlias\(input, "source", \["mergeSource", "merge_source"\]\);/, "plastic_finalizeMerge should normalize merge source aliases");
   assert.match(indexText, /assignAlias\(input, "workdir", \["cwd", "workingDirectory", "working_directory"\]\);/, "plastic tools should normalize workdir aliases");
   assert.match(indexText, /const enumSchema =/, "plastic tools should expose explicit enum schemas");
+  assert.ok(packageManifest.pi.extensions.includes("./extensions/plastic-branch-status.ts"), "package should register the Plastic branch status extension");
+  assert.doesNotMatch(branchStatusText, /\.setFooter\s*\(/, "Plastic branch status must compose through setStatus rather than replace the footer");
 
   console.log("PASS: plastic extension registration test succeeded");
 }

@@ -1,0 +1,3 @@
+repository sanitized-repository@sanitized-server
+  path /
+    smartbranch /main/feature/footer

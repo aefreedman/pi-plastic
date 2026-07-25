@@ -1,0 +1,1 @@
+/main/feature/footer@sanitized-repository@sanitized-server (cs:42 - head)
