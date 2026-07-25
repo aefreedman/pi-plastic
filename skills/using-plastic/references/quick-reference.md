@@ -8,7 +8,7 @@ Note: command examples target current `cm` 11.x CLI syntax; legacy aliases may d
 |-----------|------------------------|----------------|-------|
 | Status | `plastic_status()` | `cm status` | Pending changes |
 | Current branch | `plastic_currentBranch()` | `cm status | head -1 | cut -d@ -f1 | xargs` | Reads active branch |
-| Create child branch | `plastic_branchCreate(branch="<leaf-name>")` | `cm branch create <current-branch>/<leaf-name>` | Defaults to a child of the current branch; root/sibling creation requires explicit override |
+| Create child branch | `plastic_branchCreate(branch="<new-branch>", parent="<parent-branch>")` | `cm branch create <parent-branch>/<new-branch>` | Parent may differ from the loaded branch; top-level creation requires explicit override |
 | Switch branch | `plastic_switchBranch(branch="<branch-spec>")` | `cm switch --silent --noinput <branch-spec>` | `pendingChanges="shelve"` for tracked pending changes; private-only pending changes switch directly unattended |
 | Add files | `plastic_add(paths=[...])` | `cm add <files>` | Stage for checkin |
 | Checkin | `plastic_checkin(message="...")` | `cm checkin -c="message"` | Commit changes (`includeAll` excludes private unless added/`includePrivate`) |

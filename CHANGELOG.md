@@ -15,7 +15,7 @@ and this project follows semantic versioning for public package releases.
 ### Changed
 
 - Shared Plastic status branch parsing with `plastic_currentBranch` while preserving its `cm`-authoritative source policy.
-- Made `plastic_branchCreate` expand relative names beneath the current branch and reject accidental root/sibling branches unless `allowNonDescendant=true` is explicitly supplied.
+- Made `plastic_branchCreate` support an explicit parent branch independent of the loaded workspace branch, default relative names to the current branch when omitted, and reject accidental top-level branches unless `allowRootBranch=true` is explicitly supplied.
 
 ## [0.3.0] - 2026-07-25
 

@@ -59,7 +59,7 @@ Pi 0.82 uses canonical `sourceInfo` provenance to identify this package's effect
 
 ## Safety behavior
 
-- `plastic_branchCreate` expands relative names beneath the current branch and rejects non-descendant root/sibling paths unless `allowNonDescendant=true` is explicitly supplied.
+- `plastic_branchCreate` supports an explicit parent branch independent of the loaded workspace branch, defaults relative names to the current branch when no parent is supplied, and rejects top-level paths unless `allowRootBranch=true` is explicit.
 - `plastic_diff` remains a disabled alias by design; use `plastic_diffFile` or `plastic_diffRevisions` for text-only file diffs.
 - `plastic_patch` generates review patches with `cm patch`, including `clean` and `integration` filters for branch review workflows. It does not expose patch apply.
 - Bash safety rails block `cm diff` and unsafe interactive `cm merge --merge` usage.

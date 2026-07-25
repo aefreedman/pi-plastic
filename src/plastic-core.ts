@@ -954,11 +954,14 @@ const getBranchLeafName = (branch: string): string =>
     return segments.at(-1) ?? normalized;
 };
 
-const resolveSafeBranchCreationTarget = (requestedBranch: string, currentBranch: string): string =>
+const resolveBranchCreationTarget = (
+    requestedBranch: string,
+    parentBranch?: string,
+    allowRootBranch = false,
+): string =>
 {
     const requested = requestedBranch.trim();
     const normalizedRequested = normalizeBranchSpecForComparison(requested);
-    const normalizedCurrent = normalizeBranchSpecForComparison(currentBranch).replace(/\/$/, "");
 
     if (normalizedRequested.length === 0)
     {
@@ -967,19 +970,30 @@ const resolveSafeBranchCreationTarget = (requestedBranch: string, currentBranch:
 
     if (!normalizedRequested.startsWith("/"))
     {
-        return `${normalizedCurrent}/${normalizedRequested}`;
+        if (!parentBranch)
+        {
+            throw new Error("A relative branch name requires a parent branch.");
+        }
+
+        const normalizedParent = normalizeBranchSpecForComparison(parentBranch).replace(/\/$/, "");
+        if (!normalizedParent.startsWith("/") || normalizedParent === "/")
+        {
+            throw new Error(`Parent branch must be a hierarchical branch path, received ${parentBranch}.`);
+        }
+        return `${normalizedParent}/${normalizedRequested}`;
     }
 
-    if (normalizedRequested.startsWith(`${normalizedCurrent}/`))
+    const segments = normalizedRequested.split("/").filter((segment) => segment.length > 0);
+    if (segments.length === 1 && !allowRootBranch)
     {
-        return requested;
+        throw new Error(
+            `Refusing to create top-level branch ${requested}. ` +
+            "Create <parent-branch>/<new-branch>, pass parent with a relative branch name, " +
+            "or set allowRootBranch=true when top-level branch creation is intentional.",
+        );
     }
 
-    throw new Error(
-        `Refusing to create non-descendant branch ${requested} while the workspace is on ${normalizedCurrent}. ` +
-        `Create a child such as ${normalizedCurrent}/${getBranchLeafName(requested)}, pass only a leaf name to expand it under the current branch, ` +
-        "or set allowNonDescendant=true when root/sibling branch creation is intentional.",
-    );
+    return requested;
 };
 
 const buildSwitchPendingProfile = (summary: PendingItemSummary): SwitchPendingProfile =>
@@ -1121,7 +1135,7 @@ export const __plasticSwitchInternals = {
 export const __plasticBranchInternals = {
     getBranchLeafName,
     parsePlasticStatusBranch,
-    resolveSafeBranchCreationTarget,
+    resolveBranchCreationTarget,
 };
 
 let gitNoIndexSupportsLabel: boolean | null = null;
@@ -2426,14 +2440,15 @@ export const diffFile = tool({
 });
 
 export const branchCreate = tool({
-    description: "Create a child Plastic SCM branch from the current branch by default (cm branch create).",
+    description: "Create a hierarchical Plastic SCM branch, guarding rare top-level branch creation (cm branch create).",
     args: {
-        branch: tool.schema.string().min(1).describe("Child leaf name or full descendant branch path. Non-descendant root/sibling paths require allowNonDescendant=true."),
-        changeset: tool.schema.string().optional().describe("Changeset used as the starting point."),
+        branch: tool.schema.string().min(1).describe("Relative new-branch name or full hierarchical branch path. A relative name uses parent, or the current branch when parent is omitted."),
+        parent: tool.schema.string().optional().describe("Parent branch for a relative branch name. May differ from the workspace branch; Plastic uses the parent's latest changeset by default."),
+        changeset: tool.schema.string().optional().describe("Changeset used as the starting point instead of the parent branch's latest changeset."),
         label: tool.schema.string().optional().describe("Label used as the starting point."),
         comment: tool.schema.string().optional().describe("Optional branch comment."),
         commentsFile: tool.schema.string().optional().describe("File path containing the branch comment."),
-        allowNonDescendant: tool.schema.boolean().optional().describe("Allow intentional root or sibling branch creation instead of requiring a child of the current branch. Defaults to false."),
+        allowRootBranch: tool.schema.boolean().optional().describe("Allow intentional top-level branch creation such as /<new-branch>. Defaults to false."),
         workdir: workdirArg,
     },
     async execute(args)
@@ -2458,9 +2473,12 @@ export const branchCreate = tool({
             throw new Error("Comment must be non-empty when provided.");
         }
 
-        const targetBranch = args.allowNonDescendant
-            ? args.branch.trim()
-            : resolveSafeBranchCreationTarget(args.branch, await resolveCurrentBranchName(args.workdir));
+        const normalizedRequested = normalizeBranchSpecForComparison(args.branch);
+        const needsParent = !normalizedRequested.startsWith("/");
+        const parentBranch = needsParent
+            ? args.parent ?? await resolveCurrentBranchName(args.workdir)
+            : args.parent;
+        const targetBranch = resolveBranchCreationTarget(args.branch, parentBranch, args.allowRootBranch);
         const cmdArgs: string[] = ["branch", "create", targetBranch];
 
         if (args.changeset)
