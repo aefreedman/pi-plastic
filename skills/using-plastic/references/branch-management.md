@@ -16,18 +16,23 @@ Use the detected parent branch from the repository instead of copying a branch n
 
 ## Create Branch
 
-Preferred tool-first flow:
+Normal work branches must be children of the current branch. If the workspace is on `/main`, create `/main/foo`, not `/foo`. A bare `/foo` is a root/sibling branch and does not inherit `/main`'s branch hierarchy.
+
+Preferred tool-first flow (a leaf name is expanded under the current branch):
 
 ```text
-plastic_branchCreate(branch="<branch-spec>", comment="<branch-description>")
-plastic_switchBranch(branch="<branch-spec>")
+plastic_currentBranch() # /main
+plastic_branchCreate(branch="foo", comment="<branch-description>") # creates /main/foo
+plastic_switchBranch(branch="/main/foo")
 ```
 
-Manual shell fallback:
+A full descendant path is also accepted. Creating a root or sibling branch is rare and requires `allowNonDescendant=true`; use that override only when the user explicitly intends the different hierarchy.
+
+Manual shell fallback requires constructing the descendant path explicitly:
 
 ```bash
-cm branch create <branch-spec> -c="<branch-description>"
-cm switch --silent --noinput <branch-spec>
+cm branch create /main/foo -c="<branch-description>"
+cm switch --silent --noinput /main/foo
 ```
 
 Agent preference: use runtime `plastic_*` methods first; keep shell commands as manual fallback
@@ -61,7 +66,9 @@ plastic_merge(source="<source-branch-spec>", strategy="source")
 
 ## Naming Guidelines
 
-- Start with `/`.
+- Prefer a leaf name with `plastic_branchCreate`; the tool expands it beneath the current branch.
+- For full paths and manual `cm` commands, start with `/` and include the current branch as the parent.
+- Never shorten `/main/foo` to `/foo`; that creates a root/sibling branch.
 - Use lowercase and hyphens
 - Follow repository conventions
 - Check for issue-tracker conventions in branch names like issue ID prefixes
