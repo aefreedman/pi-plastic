@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 export const PLASTIC_TOOL_LOADING_MODE_ENV = "PI_PLASTIC_TOOL_LOADING_MODE";
 export const PLASTIC_TOOL_SEARCH_NAME = "plastic_tool_search";
 export const BALANCED_ACTIVE_PLASTIC_TOOL_NAMES = ["plastic_status", "plastic_currentBranch"] as const;
@@ -90,9 +92,13 @@ function normalizeSourcePath(value: string): string {
   return /^[a-z]:\//i.test(normalized) ? normalized.toLowerCase() : normalized;
 }
 
+function resolveSourcePath(sourceInfo: ToolSourceInfo): string {
+  return normalizeSourcePath(resolve(sourceInfo.baseDir ?? process.cwd(), sourceInfo.path));
+}
+
 function hasSourcePath(tool: PlasticToolInfo, expectedSourcePath: string): boolean {
   const sourceInfo = asSourceInfo(tool.sourceInfo);
-  return Boolean(sourceInfo && normalizeSourcePath(sourceInfo.path) === normalizeSourcePath(expectedSourcePath));
+  return Boolean(sourceInfo && resolveSourcePath(sourceInfo) === normalizeSourcePath(resolve(expectedSourcePath)));
 }
 
 /**

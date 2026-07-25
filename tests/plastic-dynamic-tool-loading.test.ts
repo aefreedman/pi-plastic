@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PiToolHarness, type RegisteredTool, type ToolSourceInfo } from "./pi-tool-harness.ts";
 import {
   BALANCED_ACTIVE_PLASTIC_TOOL_NAMES,
@@ -47,6 +49,21 @@ async function main(): Promise<void> {
   await withMode("all-active", async () => {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
     assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", ...publicToolNames]), "all-active should reproduce the legacy 29-tool surface without the new loader");
+  });
+
+  await withMode("balanced", async () => {
+    const extensionPath = fileURLToPath(new URL("../index.ts", import.meta.url));
+    const relativeSource: ToolSourceInfo = {
+      path: "./index.ts",
+      source: "local",
+      scope: "project",
+      origin: "cli",
+      baseDir: dirname(extensionPath),
+    };
+    const harness = await loadHarness(["read", ...publicToolNames], [], { extensionSourceInfo: relativeSource });
+    assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", PLASTIC_TOOL_SEARCH_NAME, ...BALANCED_ACTIVE_PLASTIC_TOOL_NAMES]), "relative configured extension paths should resolve to the package-owned source");
+    const result = await harness.registry.get(PLASTIC_TOOL_SEARCH_NAME)!.execute("loader", { toolNames: ["plastic_branchList"] });
+    assert.deepEqual(result.details.added, ["plastic_branchList"], "relative-path provenance should still allow deferred activation");
   });
 
   assert.deepEqual(searchPlasticTools({ toolNames: ["plastic_branchDelete"] }).map((match) => match.name), ["plastic_branchDelete"], "exact public names should select one known tool");

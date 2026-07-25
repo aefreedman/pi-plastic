@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows semantic versioning for public package releases.
 
-## Unreleased
+## [0.3.0] - 2026-07-25
 
 ### Added
 
@@ -22,6 +22,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Fixed
 
+- Resolve relative Pi extension provenance paths against their canonical extension base directory so standard relative `--extension` loading retains dynamic activation.
 - Fail safe when canonical Pi `sourceInfo` provenance or effective loader ownership is unavailable: preserve the active set exactly and never activate or defer an unproven `plastic_*` name.
 - Fixed full-path branch existence checks by querying Plastic's leaf-name field and validating the returned full branch path.
 
