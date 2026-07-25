@@ -954,6 +954,48 @@ const getBranchLeafName = (branch: string): string =>
     return segments.at(-1) ?? normalized;
 };
 
+const resolveBranchCreationTarget = (
+    requestedBranch: string,
+    parentBranch?: string,
+    allowRootBranch = false,
+): string =>
+{
+    const requested = requestedBranch.trim();
+    const normalizedRequested = normalizeBranchSpecForComparison(requested);
+
+    if (normalizedRequested.length === 0)
+    {
+        throw new Error("Branch must be non-empty.");
+    }
+
+    if (!normalizedRequested.startsWith("/"))
+    {
+        if (!parentBranch)
+        {
+            throw new Error("A relative branch name requires a parent branch.");
+        }
+
+        const normalizedParent = normalizeBranchSpecForComparison(parentBranch).replace(/\/$/, "");
+        if (!normalizedParent.startsWith("/") || normalizedParent === "/")
+        {
+            throw new Error(`Parent branch must be a hierarchical branch path, received ${parentBranch}.`);
+        }
+        return `${normalizedParent}/${normalizedRequested}`;
+    }
+
+    const segments = normalizedRequested.split("/").filter((segment) => segment.length > 0);
+    if (segments.length === 1 && !allowRootBranch)
+    {
+        throw new Error(
+            `Refusing to create top-level branch ${requested}. ` +
+            "Create <parent-branch>/<new-branch>, pass parent with a relative branch name, " +
+            "or set allowRootBranch=true when top-level branch creation is intentional.",
+        );
+    }
+
+    return requested;
+};
+
 const buildSwitchPendingProfile = (summary: PendingItemSummary): SwitchPendingProfile =>
 {
     return {
@@ -1093,6 +1135,7 @@ export const __plasticSwitchInternals = {
 export const __plasticBranchInternals = {
     getBranchLeafName,
     parsePlasticStatusBranch,
+    resolveBranchCreationTarget,
 };
 
 let gitNoIndexSupportsLabel: boolean | null = null;
@@ -2397,17 +2440,24 @@ export const diffFile = tool({
 });
 
 export const branchCreate = tool({
-    description: "Create a Plastic SCM branch (cm branch create).",
+    description: "Create a hierarchical Plastic SCM branch, guarding rare top-level branch creation (cm branch create).",
     args: {
-        branch: tool.schema.string().min(1).describe("Branch name or spec selected from the current repository convention."),
-        changeset: tool.schema.string().optional().describe("Changeset used as the starting point."),
+        branch: tool.schema.string().min(1).describe("Relative new-branch name or full hierarchical branch path. A relative name uses parent, or the current branch when parent is omitted."),
+        parent: tool.schema.string().optional().describe("Parent branch for a relative branch name. May differ from the workspace branch; Plastic uses the parent's latest changeset by default."),
+        changeset: tool.schema.string().optional().describe("Changeset used as the starting point instead of the parent branch's latest changeset."),
         label: tool.schema.string().optional().describe("Label used as the starting point."),
         comment: tool.schema.string().optional().describe("Optional branch comment."),
         commentsFile: tool.schema.string().optional().describe("File path containing the branch comment."),
+        allowRootBranch: tool.schema.boolean().optional().describe("Allow intentional top-level branch creation such as /<new-branch>. Defaults to false."),
         workdir: workdirArg,
     },
     async execute(args)
     {
+        if (args.branch.trim().length === 0)
+        {
+            throw new Error("Branch must be non-empty.");
+        }
+
         if (args.changeset && args.label)
         {
             throw new Error("Provide either changeset or label, not both.");
@@ -2423,7 +2473,13 @@ export const branchCreate = tool({
             throw new Error("Comment must be non-empty when provided.");
         }
 
-        const cmdArgs: string[] = ["branch", "create", args.branch];
+        const normalizedRequested = normalizeBranchSpecForComparison(args.branch);
+        const needsParent = !normalizedRequested.startsWith("/");
+        const parentBranch = needsParent
+            ? args.parent ?? await resolveCurrentBranchName(args.workdir)
+            : args.parent;
+        const targetBranch = resolveBranchCreationTarget(args.branch, parentBranch, args.allowRootBranch);
+        const cmdArgs: string[] = ["branch", "create", targetBranch];
 
         if (args.changeset)
         {

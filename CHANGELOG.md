@@ -11,10 +11,12 @@ and this project follows semantic versioning for public package releases.
 
 - Added a composable `plastic-branch` footer status with nearest-workspace discovery, selector fallback, bounded `cm` confirmation, and debounced same-workspace refresh.
 - Added credential-free workspace, selector/status parser, footer composition, and lifecycle cleanup coverage using sanitized fixtures.
+- Added an opt-in, local-only branch-creation test for contributor-authenticated disposable Plastic repositories.
 
 ### Changed
 
 - Shared Plastic status branch parsing with `plastic_currentBranch` while preserving its `cm`-authoritative source policy.
+- Made `plastic_branchCreate` support an explicit parent branch independent of the loaded workspace branch, default relative names to the current branch when omitted, and reject accidental top-level branches unless `allowRootBranch=true` is explicitly supplied.
 
 ## [0.3.0] - 2026-07-25
 

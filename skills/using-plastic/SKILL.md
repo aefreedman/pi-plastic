@@ -20,6 +20,8 @@ For the common closeout flow of merging a finished source branch into its parent
 
 Prefer runtime `plastic_*` tools first. Keep `cm` shell commands as manual fallback.
 
+Create normal work branches beneath an intended parent: use `<parent-branch>/<new-branch>`, not `/<new-branch>`. The parent does not need to be the branch loaded in the workspace. Prefer `plastic_branchCreate(branch="<new-branch>", parent="<parent-branch>")`; omitting `parent` uses the current branch only as a convenience. Rare top-level branch creation requires the explicit `allowRootBranch=true` override.
+
 ## External File Loading
 
 CRITICAL: Use relative path references and load files only when needed for the current step.
