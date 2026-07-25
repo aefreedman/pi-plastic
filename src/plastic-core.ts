@@ -4,6 +4,7 @@ import { tool } from "./pi-tool-compat";
 import { promises as fs, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "os";
 import { dirname, isAbsolute, join, relative, resolve, win32 } from "path";
+import { parsePlasticStatusBranch } from "./plastic-workspace";
 
 type SpawnResult = {
     stdout: string;
@@ -1091,6 +1092,7 @@ export const __plasticSwitchInternals = {
 
 export const __plasticBranchInternals = {
     getBranchLeafName,
+    parsePlasticStatusBranch,
 };
 
 let gitNoIndexSupportsLabel: boolean | null = null;
@@ -1675,55 +1677,25 @@ const resolveBranchParentName = async (branch: string, workdir?: string): Promis
 const resolveCurrentBranchName = async (workdir?: string): Promise<string> =>
 {
     const statusOutput = await runCmRaw(["status"], workdir);
-    const lines = normalizeFindOutputLines(statusOutput);
-
-    if (lines.length > 0)
+    const statusBranch = parsePlasticStatusBranch(statusOutput);
+    if (statusBranch.kind === "found" && statusBranch.value.branch)
     {
-        const firstLine = lines[0];
-        const branchFromWorkspaceLine = firstLine.match(/^([^@\s]+)@/);
-        if (branchFromWorkspaceLine)
-        {
-            return branchFromWorkspaceLine[1].trim();
-        }
-
-        const branchSpecMatch = firstLine.match(/\bbr:[^\s)]+/i);
-        if (branchSpecMatch)
-        {
-            return branchSpecMatch[0];
-        }
+        return statusBranch.value.branch;
     }
 
     const compactOutput = await runCmRaw(["status", "--compact"], workdir);
-    const trimmed = compactOutput.trim();
-
-    if (trimmed.length === 0)
+    const compactBranch = parsePlasticStatusBranch(compactOutput);
+    if (compactBranch.kind === "found" && compactBranch.value.branch)
     {
-        throw new Error("Unable to determine current branch from empty status output.");
+        return compactBranch.value.branch;
     }
 
-    const branchSpecMatch = trimmed.match(/\bbr:[^\s)]+/i);
-    if (branchSpecMatch)
-    {
-        return branchSpecMatch[0];
-    }
-
-    const compactLines = normalizeFindOutputLines(trimmed);
-    for (const line of compactLines)
-    {
-        const branchLineMatch = line.match(/^branch\s*[:=]\s*(.+)$/i);
-        if (branchLineMatch)
-        {
-            return branchLineMatch[1].trim();
-        }
-    }
-
-    const changesetMatch = trimmed.match(/\bcs:(\d+)/i);
-    if (changesetMatch)
+    if (compactBranch.kind === "found" && compactBranch.value.changesetId)
     {
         const changesetBranchOutput = await runCmRaw([
             "find",
             "changeset",
-            `where changesetid=${changesetMatch[1]}`,
+            `where changesetid=${compactBranch.value.changesetId}`,
             "--format={branch}",
             "--nototal",
         ], workdir);
@@ -1732,6 +1704,12 @@ const resolveCurrentBranchName = async (workdir?: string): Promise<string> =>
         {
             return branchLines[0];
         }
+    }
+
+    const trimmed = compactOutput.trim();
+    if (trimmed.length === 0)
+    {
+        throw new Error("Unable to determine current branch from empty status output.");
     }
 
     throw new Error(`Unable to parse current branch from status output: ${trimmed}`);

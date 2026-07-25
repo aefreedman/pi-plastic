@@ -1,6 +1,12 @@
 # Pi Plastic
 
-Pi tools and skill guidance for Plastic SCM / Unity Version Control workflows.
+Pi tools, footer status, and skill guidance for Plastic SCM / Unity Version Control workflows.
+
+## Plastic branch footer status
+
+When Pi starts inside a Plastic workspace, this package adds a themed `Plastic <branch>` status to Pi's built-in footer. It discovers the nearest enclosing `.plastic/plastic.workspace`, reads the local selector as a fast credential-free fallback, and confirms the branch with a bounded `cm status` call. Selector changes and successful same-workspace `plastic_*` tools refresh the status; sibling workspaces are ignored.
+
+The extension owns only the `plastic-branch` status key. It does not replace Pi's footer or suppress Pi's Git branch display, so Git and Plastic information can appear together in nested workspaces. If the Plastic marker exists but neither the selector nor `cm` yields a branch, the footer shows `Plastic branch unavailable`. Non-Plastic directories show no Plastic status.
 
 ## Tools
 
@@ -153,7 +159,9 @@ OpenAI Codex models may advertise grammar tools without advertising strict JSON-
 ## Implementation notes
 
 - The core implementation lives in `src/plastic-core.ts`.
-- `index.ts` is the Pi registration layer.
+- Shared workspace discovery and branch parsing live in `src/plastic-workspace.ts`.
+- `extensions/plastic-branch-status.ts` owns the additive footer status and its session-scoped refresh lifecycle.
+- `index.ts` is the Pi tool registration layer.
 - Output shapes are intentionally stable for prompt and workflow compatibility.
 
 ## License
