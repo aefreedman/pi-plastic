@@ -3,8 +3,27 @@
   "private": true,
   "version": "0.3.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "keywords": [
-    "pi-package"
+    "pi-package",
+    "plastic-scm",
+    "unity-version-control",
+    "developer-tools"
+  ],
+  "files": [
+    "index.ts",
+    "extensions/",
+    "src/",
+    "skills/",
+    "evals/tool-loading/",
+    "tests/",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md"
   ],
   "pi": {
     "extensions": [

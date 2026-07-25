@@ -1,0 +1,85 @@
+name: GitHub release
+
+on:
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: Create the GitHub release as a draft
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+      - name: Verify main, package version, changelog, and unused tag
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" != "branch" || "${GITHUB_REF_NAME}" != "main" ]]; then
+            echo "Run this workflow from the main branch." >&2
+            exit 1
+          fi
+          git fetch --force origin main:refs/remotes/origin/main --tags
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+          version="$(node -p "require('./package.json').version")"
+          tag="v${version}"
+          if git show-ref --verify --quiet "refs/tags/${tag}"; then
+            echo "Tag ${tag} already exists." >&2
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "Remote tag ${tag} already exists." >&2
+            exit 1
+          fi
+          grep -F "## [${version}]" CHANGELOG.md
+          awk -v heading="## [${version}]" '
+            $0 == heading || index($0, heading " - ") == 1 { capture=1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md > release-notes.md
+          test -s release-notes.md
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test
+      - run: npm run eval:tool-loading -- --dry-run
+      - run: npm pack --dry-run
+      - name: Create and push annotated tag
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "refs/tags/${TAG}"
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          DRAFT: ${{ inputs.draft }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=("${TAG}" --verify-tag --title "${TAG}" --notes-file release-notes.md)
+          if [[ "${DRAFT}" == "true" ]]; then
+            args+=(--draft)
+          fi
+          gh release create "${args[@]}"

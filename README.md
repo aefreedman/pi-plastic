@@ -77,10 +77,22 @@ If `output` is omitted, Plastic prints patch content to stdout. If `output` is p
 
 ## Install
 
-From GitHub:
+Install the stable GitHub release over HTTPS:
 
 ```bash
-pi install git:git@github.com:aefreedman/pi-plastic.git
+pi install git:github.com/aefreedman/pi-plastic@v0.3.0
+```
+
+Equivalent SSH install:
+
+```bash
+pi install git:git@github.com:aefreedman/pi-plastic@v0.3.0
+```
+
+To intentionally track the moving default branch instead of a release tag:
+
+```bash
+pi install https://github.com/aefreedman/pi-plastic
 ```
 
 Local development install:
@@ -97,6 +109,8 @@ pi install -l <path-to-pi-plastic>
 
 ## Requirements
 
+- Node.js 22.19.0 or newer
+- Pi 0.82.0 or newer; provenance-aware dynamic loading and restoration are validated on Pi 0.82
 - Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`, or `PI_PLASTIC_CM_EXECUTABLE` set to its full executable path
 - Git available on `PATH`, or `PI_PLASTIC_GIT_EXECUTABLE` set to its full executable path, for text-only diff tools
 - A configured Plastic workspace for workspace-scoped operations

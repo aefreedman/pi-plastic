@@ -15,10 +15,13 @@ and this project follows semantic versioning for public package releases.
 - Added a package-local dynamic tool-loading behavioral eval with fresh Pi JSON subprocesses, bounded configured cases, implicit discovery coverage, exact smallest-sufficient activation checks, preflight-only mutation guarding, sandbox attestations, provider-schema capture hygiene, and ignored sanitized result summaries.
 - Added an opt-in, read-only live smoke test for dedicated Plastic sandbox workspaces.
 - Added a compatibility audit that prevents JSON-schema constrained sampling from being enabled on schemas that OpenAI strict tools would reject.
+- Added cross-platform Windows, macOS, and Linux validation plus a manually dispatched, tag-verified GitHub Release workflow.
+- Added Dependabot configuration, contribution and security policies, and repository-wide text/ignore conventions.
 
 ### Changed
 
 - Declared Pi 0.82 and TypeBox development dependencies so the expanded test suite installs reproducibly while keeping runtime peers optional.
+- Declared the supported Node.js engine, expanded package metadata, added an explicit tarball allowlist and reproducible development lockfile, and documented pinned HTTPS and SSH installs.
 
 ### Fixed
 
