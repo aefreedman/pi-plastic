@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -24,12 +24,12 @@ try {
 
   const nested = await discoverPlasticWorkspace(cwd);
   assert.equal(nested.kind, "found");
-  if (nested.kind === "found") assert.equal(nested.value.root, inner);
+  if (nested.kind === "found") assert.equal(nested.value.root, await realpath(inner));
 
   await rm(join(inner, ".plastic", "plastic.workspace"));
   const outerResult = await discoverPlasticWorkspace(cwd);
   assert.equal(outerResult.kind, "found");
-  if (outerResult.kind === "found") assert.equal(outerResult.value.root, outer);
+  if (outerResult.kind === "found") assert.equal(outerResult.value.root, await realpath(outer));
 
   const gitOnly = join(root, "git-only", ".git");
   await mkdir(gitOnly, { recursive: true });
