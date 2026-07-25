@@ -25,6 +25,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Fixed
 
+- Allow eval validation on compatible Pi 0.82 patch releases instead of rejecting every version except 0.82.0.
 - Resolve relative Pi extension provenance paths against their canonical extension base directory so standard relative `--extension` loading retains dynamic activation.
 - Fail safe when canonical Pi `sourceInfo` provenance or effective loader ownership is unavailable: preserve the active set exactly and never activate or defer an unproven `plastic_*` name.
 - Fixed full-path branch existence checks by querying Plastic's leaf-name field and validating the returned full branch path.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "piVersion": "0.82.0",
+  "piVersionPrefix": "0.82.",
   "sandboxCwdEnv": "PI_PLASTIC_EVAL_SANDBOX",
   "sandboxMarkerFile": ".pi-plastic-eval-sandbox",
   "sandboxMarkerContent": "pi-plastic-eval-sandbox\n",
