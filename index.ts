@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { type TSchema, Type } from "typebox";
 import * as core from "./src/plastic-core";
+import type { PlasticMutationAuthorizationContext } from "./src/mutation-authorization";
 import {
   getEffectivePlasticToolOwnership,
   getInitiallyInactivePlasticTools,
@@ -39,6 +40,7 @@ type ToolConfig = {
 
 const EXTENSION_SOURCE_PATH = fileURLToPath(import.meta.url);
 const EMPTY_PARAMETERS = Type.Object({});
+const AUTHORIZATION_TOKEN_SCHEMA = Type.Optional(Type.String({ description: "Opaque one-use token bound to this session, mapped Plastic mutation action, and exact canonical Plastic command target. Never include it in logs or user-visible output." }));
 const enumSchema = <T extends readonly [string, ...string[]]>(values: T, description: string): TSchema =>
   Type.Union(values.map((value) => Type.Literal(value)) as [TSchema, TSchema, ...TSchema[]], { description });
 
@@ -86,6 +88,11 @@ const PLASTIC_EXPORTS = [
 ] as const;
 
 type PlasticExportName = (typeof PLASTIC_EXPORTS)[number];
+const MUTATING_PLASTIC_EXPORTS = new Set<PlasticExportName>([
+  "update", "add", "checkin", "undo", "resolveDeleteChangeConflict", "branchCreate", "switchBranch", "merge",
+  "mergeToBranch", "finalizeMerge", "branchDelete", "shelvesetCreate", "shelvesetApply", "shelvesetDelete",
+  "codeReviewCreate", "codeReviewUpdate", "codeReviewDelete", "workspaceCreate",
+]);
 
 const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
   status: {
@@ -648,7 +655,7 @@ function metadataDescription(node: CoreSchemaNode): string {
   return node.metadata?.description ?? "Allowed values.";
 }
 
-function buildParameters(args: Record<string, unknown> | undefined): TSchema {
+function buildParameters(args: Record<string, unknown> | undefined, includeAuthorizationToken = false): TSchema {
   if (!args || Object.keys(args).length === 0) {
     return EMPTY_PARAMETERS;
   }
@@ -657,6 +664,7 @@ function buildParameters(args: Record<string, unknown> | undefined): TSchema {
   for (const [key, value] of Object.entries(args)) {
     properties[key] = convertCoreSchema(value);
   }
+  if (includeAuthorizationToken) properties.authorizationToken = AUTHORIZATION_TOKEN_SCHEMA;
   return Type.Object(properties);
 }
 
@@ -674,7 +682,7 @@ export default function plasticTools(pi: ExtensionAPI) {
       name: toToolName(exportName),
       label: toToolName(exportName),
       description: coreTool.description ?? toToolName(exportName),
-      parameters: buildParameters(coreTool.args),
+      parameters: buildParameters(coreTool.args, MUTATING_PLASTIC_EXPORTS.has(exportName)),
       prepareArguments: config.prepareArguments,
       renderCall(args, theme) {
         return renderPlasticCall(exportName, (args ?? {}) as Record<string, unknown>, theme as RenderTheme);
@@ -687,13 +695,32 @@ export default function plasticTools(pi: ExtensionAPI) {
         if (normalizedParams.workdir === undefined && ctx?.cwd) {
           normalizedParams.workdir = ctx.cwd;
         }
-        const result = await core.runWithAbortSignal(signal, async () => coreTool.execute(normalizedParams));
+        const authorizationToken = typeof normalizedParams.authorizationToken === "string" ? normalizedParams.authorizationToken : undefined;
+        delete normalizedParams.authorizationToken;
+        const tokenUnsafeCompound = exportName === "mergeToBranch"
+          || (exportName === "switchBranch" && normalizedParams.pendingChanges === "shelve");
+        if (authorizationToken !== undefined && tokenUnsafeCompound) {
+          throw new Error(`${toToolName(exportName)} can reach multiple differently mapped Plastic mutation sinks and cannot use one authorizationToken. Run preflight first, then omit the token in TUI/RPC so each exact sink receives direct confirmation.`);
+        }
+        const mutationAuthorization: PlasticMutationAuthorizationContext | undefined = ctx?.sessionManager && typeof ctx.sessionManager === "object"
+          ? {
+              sessionManager: ctx.sessionManager,
+              mode: ctx.mode,
+              hasUI: ctx.hasUI,
+              ...(authorizationToken === undefined ? {} : { authorizationToken }),
+              ...(ctx.hasUI && ctx.ui ? { confirm: ctx.ui.confirm.bind(ctx.ui) } : {}),
+            }
+          : undefined;
+        const result = await core.runWithAbortSignal(signal, async () => coreTool.execute(normalizedParams), mutationAuthorization);
         const text = toText(result);
         return {
           content: [{ type: "text", text }],
           details: {
             exportName,
             rawResult: result,
+            ...(mutationAuthorization?.authorizationProvenance?.length
+              ? { authorizationProvenance: Object.freeze([...mutationAuthorization.authorizationProvenance]) }
+              : {}),
           },
         };
       },
@@ -706,7 +733,7 @@ export default function plasticTools(pi: ExtensionAPI) {
     description: "Search and enable Plastic SCM / Unity Version Control tools for workspace status and sync, changes and checkins, text-only diffs and patches, branches and merges, shelvesets, code reviews, and workspaces.",
     promptSnippet: "Use plastic_tool_search to find and enable Plastic SCM capabilities that are not active.",
     promptGuidelines: [
-      "Use plastic_tool_search before a Plastic SCM action when an appropriate plastic_* tool is not active. Inspect targets and confirm destructive mutations before executing them.",
+      "Use plastic_tool_search before a Plastic SCM action when an appropriate plastic_* tool is not active. Mutating plastic_* tools enforce authorization at the final cm spawn: pass the matching authorizationToken to the actual tool, or use direct exact-target TUI/RPC confirmation. workflow_execute only inspects tokens.",
     ],
     parameters: Type.Object({
       query: Type.Optional(Type.String({ description: "Capability or workflow to search for." })),

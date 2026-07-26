@@ -5,6 +5,11 @@ import { promises as fs, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "os";
 import { dirname, isAbsolute, join, relative, resolve, win32 } from "path";
 import { parsePlasticStatusBranch } from "./plastic-workspace";
+import {
+    authorizePlasticMutationSinkV1,
+    classifyPlasticCommandAuthorizationV1,
+    type PlasticMutationAuthorizationContext,
+} from "./mutation-authorization";
 
 type SpawnResult = {
     stdout: string;
@@ -14,6 +19,8 @@ type SpawnResult = {
 };
 
 const abortSignalStorage = new AsyncLocalStorage<AbortSignal | undefined>();
+const mutationAuthorizationStorage = new AsyncLocalStorage<PlasticMutationAuthorizationContext | undefined>();
+const commandExecutionStorage = new AsyncLocalStorage<SpawnAndCollectDependencies | undefined>();
 
 type ExecutableEnvironment = Record<string, string | undefined>;
 
@@ -48,8 +55,15 @@ const executableNotFoundError = (command: string, error: Error): Error =>
 
 const getActiveAbortSignal = (): AbortSignal | undefined => abortSignalStorage.getStore();
 
-export const runWithAbortSignal = async <T>(signal: AbortSignal | undefined, fn: () => Promise<T>): Promise<T> =>
-    abortSignalStorage.run(signal, fn);
+export const runWithAbortSignal = async <T>(
+    signal: AbortSignal | undefined,
+    fn: () => Promise<T>,
+    mutationAuthorization?: PlasticMutationAuthorizationContext,
+    commandExecution?: SpawnAndCollectDependencies,
+): Promise<T> => abortSignalStorage.run(signal, () => mutationAuthorizationStorage.run(
+    mutationAuthorization,
+    () => commandExecutionStorage.run(commandExecution, fn),
+));
 
 const writeInput = async (stdin: NodeJS.WritableStream | null | undefined, input: string): Promise<void> =>
 {
@@ -242,7 +256,11 @@ const runCm = async (args: string[], workdir?: string, input?: string, signal: A
 {
     ensureCmCommandAllowed(args);
     const cwd = workdir ?? process.cwd();
-    const { stdout, stderr, exitCode, aborted } = await spawnAndCollect(getCmExecutable(), args, cwd, input, signal);
+    await authorizePlasticMutationSinkV1(
+        mutationAuthorizationStorage.getStore(),
+        classifyPlasticCommandAuthorizationV1(args, cwd),
+    );
+    const { stdout, stderr, exitCode, aborted } = await spawnAndCollect(getCmExecutable(), args, cwd, input, signal, commandExecutionStorage.getStore());
     const output = [stdout, stderr].filter(Boolean).join("\n").trim();
 
     if (aborted)
@@ -262,7 +280,11 @@ const runCmRaw = async (args: string[], workdir?: string, input?: string, signal
 {
     ensureCmCommandAllowed(args);
     const cwd = workdir ?? process.cwd();
-    const { stdout, stderr, exitCode, aborted } = await spawnAndCollect(getCmExecutable(), args, cwd, input, signal);
+    await authorizePlasticMutationSinkV1(
+        mutationAuthorizationStorage.getStore(),
+        classifyPlasticCommandAuthorizationV1(args, cwd),
+    );
+    const { stdout, stderr, exitCode, aborted } = await spawnAndCollect(getCmExecutable(), args, cwd, input, signal, commandExecutionStorage.getStore());
 
     if (aborted)
     {
@@ -1096,6 +1118,8 @@ export const __plasticProcessInternals = {
     resolveCmExecutable: (environment: ExecutableEnvironment = process.env): string => resolveExecutable(environment, "PI_PLASTIC_CM_EXECUTABLE", "cm"),
     resolveGitExecutable: (environment: ExecutableEnvironment = process.env): string => resolveExecutable(environment, "PI_PLASTIC_GIT_EXECUTABLE", "git"),
     spawnAndCollect,
+    runCm,
+    runCmRaw,
 };
 
 export const __plasticPatchInternals = {

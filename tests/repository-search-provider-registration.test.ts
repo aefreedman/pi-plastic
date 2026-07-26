@@ -1,0 +1,31 @@
+import assert from "node:assert/strict";
+import register from "../extensions/repository-search-provider.ts";
+import { createRepositoryPolicyRegistryV1 } from "@aefree/pi-repo-search/contracts/v1";
+import { createWorkflowProviderRegistryV1 } from "@aefree/pi-workflow/contracts/v1";
+import { createCapabilityRegistry } from "@aefree/pi-capability-registry";
+import { LEGACY_REFERENCE_SERVICE_REGISTRY_KEY_V1, PLASTIC_LEGACY_REFERENCE_PATHS } from "../src/legacy-reference-provider.ts";
+
+const handlers = new Map<string, Array<(_event: unknown, ctx: any) => Promise<void> | void>>();
+const pi = { on(event: string, handler: (_event: unknown, ctx: any) => Promise<void> | void) { handlers.set(event, [...(handlers.get(event) ?? []), handler]); } };
+register(pi as any);
+const scope = {}; const ctx = { sessionManager: scope };
+assert.equal(createCapabilityRegistry<any>({ registryKey: LEGACY_REFERENCE_SERVICE_REGISTRY_KEY_V1, contractVersion: 1 }).snapshotCompatible(scope).length, 0, "consumer-before-provider starts missing");
+for (const handler of handlers.get("session_start") ?? []) await handler({}, ctx);
+assert.deepEqual(createRepositoryPolicyRegistryV1().snapshotCompatible(scope).map((item) => item.id), ["plastic.ignore-files"]);
+assert.deepEqual(createWorkflowProviderRegistryV1().snapshotCompatible(scope).map((item) => item.id), ["vcs.plastic"]);
+const references = createCapabilityRegistry<any>({ registryKey: LEGACY_REFERENCE_SERVICE_REGISTRY_KEY_V1, contractVersion: 1, compatibleVersions: [1] }).snapshotCompatible(scope);
+assert.equal(references.length, 1);
+assert.deepEqual(references[0].legacyPaths, PLASTIC_LEGACY_REFERENCE_PATHS);
+const signal = new AbortController().signal;
+const read = await references[0].read({ cwd: process.cwd(), signal }, { legacyPath: PLASTIC_LEGACY_REFERENCE_PATHS[0], offset: 1, limit: 2, signal });
+assert.equal(read.lines <= 2, true);
+assert.equal(read.provenance.packageName, "@aefree/pi-plastic");
+assert.equal(read.provenance.packageVersion, "0.3.0");
+await assert.rejects(references[0].read({ cwd: process.cwd(), signal }, { legacyPath: PLASTIC_LEGACY_REFERENCE_PATHS[0], limit: 2001, signal }), /limit/);
+// A replacement registration has a fresh nonce; stale cleanup must not erase it.
+for (const handler of handlers.get("session_start") ?? []) await handler({}, ctx);
+for (const handler of handlers.get("session_shutdown") ?? []) await handler({}, ctx);
+assert.equal(createRepositoryPolicyRegistryV1().snapshotCompatible(scope).length, 0);
+assert.equal(createWorkflowProviderRegistryV1().snapshotCompatible(scope).length, 0);
+assert.equal(createCapabilityRegistry<any>({ registryKey: LEGACY_REFERENCE_SERVICE_REGISTRY_KEY_V1, contractVersion: 1 }).snapshotCompatible(scope).length, 0);
+console.log("PASS: Plastic repository providers register and clean up by session scope");

@@ -8,6 +8,22 @@ When Pi starts inside a Plastic workspace, this package adds a themed `Plastic <
 
 The extension owns only the `plastic-branch` status key. It does not replace Pi's footer or suppress Pi's Git branch display, so Git and Plastic information can appear together in nested workspaces. If the Plastic marker exists but neither the selector nor `cm` yields a branch, the footer shows `Plastic branch unavailable`. Non-Plastic directories show no Plastic status.
 
+## Repository-search and workflow providers
+
+When `@aefree/pi-repo-search` and/or `@aefree/pi-workflow` contracts are installed, Pi session startup registers `plastic.ignore-files` and `vcs.plastic`. The search policy is marker-based and discovers readable `ignore.conf` and `cloaked.conf` only from the nearest Plastic workspace to each requested root. It adds them as ripgrep ignore files without replacing native ripgrep/Git-ignore behavior.
+
+`vcs.plastic` detects ownership from `.plastic/plastic.workspace` alone. It intentionally does not invoke `cm` while detecting. Preflight then re-detects the target, verifies that its canonical workspace still equals the selected root, and runs bounded/cancellable `cm status --machinereadable`. A missing CLI, authentication/readiness failure, timeout, root change, or oversized command output blocks Plastic and must not cause fallback to an enclosing Git workspace. It exposes bounded package-owned guidance resource IDs `repository-search-ignore-policy` and `vcs-workflow` for selected workflow consumers.
+
+The same extension registers bounded legacy-reference services for exactly the four pi-plastic paths in the compatibility map. Reads use byte-exact pinned 0.6.4 legacy payload copies, remain package-contained and capped at 50 KiB/2,000 lines, and return package/version/resource provenance. Owner roots and versions are derived from the physical package copy at session startup rather than hardcoded.
+
+## Mutation authorization
+
+Every mutating `cm` spawn reached through a registered `plastic_*` tool is guarded after command/workdir canonicalization and before process creation. Mutating tools accept optional `authorizationToken` without echoing it in renderers or results. Checkin maps to `commit`; code-review and remote branch/shelveset/workspace metadata writes map to `publish`; workspace update/add/undo/remove/switch/merge/shelveset-apply map to `vcs_mutation`. Exact target IDs use `plastic:<encoded-canonical-workdir>:<operation>:<entity>`.
+
+`workflow_execute` may inspect a token for readiness but never consumes it. Pass that same token to the final Plastic mutation tool, where the command sink consumes it once. One token or direct confirmation permits exactly one mutating `cm` process spawn; authorization is not cached across retries or separate spawns. After an ambiguous side-effecting failure, inspect Plastic status and obtain fresh direct confirmation or a fresh exact-target token before retrying. A noninteractive retry with the consumed token blocks before process creation and reports that remediation. Without a token, TUI/RPC obtains direct `ctx.ui.confirm` bound to the exact action/target and issues/consumes internally; print/JSON blocks. Wrong-session, wrong-action, wrong-target, expired, replayed, and empty-target tokens fail before spawn. Unknown low-level command methods require direct TUI/RPC confirmation instead of token-only classification. Compound `plastic_mergeToBranch` and `plastic_switchBranch(pendingChanges="shelve")` calls cannot safely use one token across differently mapped sinks; preview them, then omit the token in TUI/RPC so each sink is confirmed directly.
+
+This enforcement covers registered `plastic_*` tool process sinks. The package's existing bash guards still block specific unsafe `cm diff` and interactive merge patterns, but this token contract does **not** claim general shell, arbitrary `cm`, Git, or bash-command enforcement.
+
 ## Tools
 
 - `plastic_tool_search` (dynamic capability search and loader)
@@ -121,6 +137,7 @@ pi install -l <path-to-pi-plastic>
 - Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`, or `PI_PLASTIC_CM_EXECUTABLE` set to its full executable path
 - Git available on `PATH`, or `PI_PLASTIC_GIT_EXECUTABLE` set to its full executable path, for text-only diff tools
 - A configured Plastic workspace for workspace-scoped operations
+- `@aefree/pi-capability-registry`, `@aefree/pi-repo-search`, and `@aefree/pi-workflow` are normal semver runtime dependencies. The pi-plastic tarball does not embed linked sibling workspaces or `node_modules` paths.
 
 ## Testing
 

@@ -20,6 +20,12 @@ For the common closeout flow of merging a finished source branch into its parent
 
 Prefer runtime `plastic_*` tools first. Keep `cm` shell commands as manual fallback.
 
+## Mutation authorization
+
+Every mutating `plastic_*` command is authorized at the final `cm` spawn. Pass an exact-target `authorizationToken` to the actual Plastic tool; `workflow_execute` only inspects it. Checkin uses action `commit`, code-review and remote metadata writes use `publish`, and workspace-state commands use `vcs_mutation`. One token or direct confirmation permits one mutating process spawn and is never cached for a retry. After an ambiguous failure, inspect status and obtain fresh direct confirmation/token; noninteractive reuse blocks before spawn. Without a token, only TUI/RPC direct confirmation may authorize the exact command target; print/JSON blocks. Never reuse or expose tokens. For `plastic_mergeToBranch` and `plastic_switchBranch(pendingChanges="shelve")`, run preflight and omit the token in TUI/RPC because these compound tools can reach multiple differently mapped sinks that each require direct confirmation.
+
+This contract covers registered `plastic_*` tools only. Manual shell snippets are not token-enforced; the separate bash guards cover only their documented unsafe diff/interactive-merge patterns.
+
 Create normal work branches beneath an intended parent: use `<parent-branch>/<new-branch>`, not `/<new-branch>`. The parent does not need to be the branch loaded in the workspace. Prefer `plastic_branchCreate(branch="<new-branch>", parent="<parent-branch>")`; omitting `parent` uses the current branch only as a convenience. Rare top-level branch creation requires the explicit `allowRootBranch=true` override.
 
 ## External File Loading
