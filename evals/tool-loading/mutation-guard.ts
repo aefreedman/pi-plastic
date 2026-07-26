@@ -9,7 +9,6 @@ const DESTRUCTIVE_PLASTIC_TOOLS = new Set([
   "plastic_branchCreate", "plastic_switchBranch", "plastic_merge", "plastic_mergeToBranch",
   "plastic_finalizeMerge", "plastic_branchDelete", "plastic_shelvesetCreate", "plastic_shelvesetApply",
   "plastic_shelvesetDelete", "plastic_codeReviewCreate", "plastic_codeReviewUpdate", "plastic_codeReviewDelete",
-  "plastic_workspaceCreate",
 ]);
 
 function supportsPreflight(parameters: unknown): boolean {

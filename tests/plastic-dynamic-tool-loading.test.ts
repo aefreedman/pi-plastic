@@ -36,7 +36,7 @@ async function loadHarness(activeTools: string[], branchEntries: unknown[] = [],
 async function main(): Promise<void> {
   await withMode(undefined, async () => {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
-    assert.equal(harness.registry.size, 30, "all 29 compatibility Plastic tools plus the loader should be registered");
+    assert.equal(harness.registry.size, 29, "all 28 public Plastic tools plus the loader should be registered");
     assert(harness.registry.has(PLASTIC_TOOL_SEARCH_NAME));
     assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", PLASTIC_TOOL_SEARCH_NAME, ...BALANCED_ACTIVE_PLASTIC_TOOL_NAMES]));
   });
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
 
   await withMode("all-active", async () => {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
-    assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", ...publicToolNames]), "all-active should reproduce the legacy 29-tool surface without the new loader");
+    assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", ...publicToolNames]), "all-active should expose all 28 current Plastic tools without the new loader");
   });
 
   await withMode("balanced", async () => {
@@ -77,6 +77,7 @@ async function main(): Promise<void> {
   assert(!diffMatches.includes("plastic_diff"), "the disabled compatibility diff alias must never be executable through search");
   assert.deepEqual(diffMatches.slice(0, 2), ["plastic_diffRevisions", "plastic_diffFile"], "generic diff searches should prefer safe text-only alternatives");
   assert.deepEqual(searchPlasticTools({ toolNames: ["plastic_diff"] }).map((match) => match.name), [], "the disabled diff alias must not be exactly selectable");
+  assert.deepEqual(searchPlasticTools({ toolNames: ["plastic_workspaceCreate"] }).map((match) => match.name), [], "workspace creation must not be discoverable until paired cleanup is available");
   assert.deepEqual(searchPlasticTools({ toolNames: ["foreign_tool"] }).map((match) => match.name), [], "unknown names must not be selectable");
   assert.equal(searchPlasticTools({ toolNames: ["plastic_branchDelete", "plastic_branchCreate", "plastic_branchList", "plastic_currentBranch"] }).length, 4, "up to four exact names should all be selected when no limit is supplied");
 

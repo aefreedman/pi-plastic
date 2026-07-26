@@ -101,7 +101,7 @@ function validate(config: EvalConfig, cases: EvalCase[], baseline: JsonObject, o
   const legacy = baseline.legacyBaseline as JsonObject | undefined;
   const conditions = baseline.implementedConditions as JsonObject | undefined;
   if (legacy?.toolCount !== 29 || legacy.serializedSchemaChars !== 21192 || legacy.estimatedTokens !== 5298 || legacy.promptMetadataChars !== 0) fail("baseline.json legacy measurement does not match the untouched baseline");
-  if (!conditions || (conditions.balanced as JsonObject)?.toolCount !== 3 || (conditions["loader-only"] as JsonObject)?.toolCount !== 1 || (conditions["all-active"] as JsonObject)?.toolCount !== 29) fail("baseline.json implemented condition metadata is incomplete");
+  if (!conditions || (conditions.balanced as JsonObject)?.toolCount !== 3 || (conditions["loader-only"] as JsonObject)?.toolCount !== 1 || (conditions["all-active"] as JsonObject)?.toolCount !== 28) fail("baseline.json implemented condition metadata is incomplete");
 }
 
 function isInitiallyActive(condition: Condition, tool: string): boolean {

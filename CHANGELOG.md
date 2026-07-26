@@ -20,6 +20,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Changed
 
+- Stopped registering or dynamically advertising `plastic_workspaceCreate` until workspace creation has a paired, safe cleanup capability.
 - Plastic workflow preflight now re-detects and verifies the selected canonical workspace and requires a bounded, cancellable `cm status` readiness check; missing CLI, authentication/readiness failures, timeouts, root changes, and oversized output block Plastic without Git fallback.
 - Plastic repository policy outputs now declare the canonical marker-owned `policyOwnedRoot` boundary used by repo-search physical ignore-file containment.
 - Canonical contract packages are normal semver dependencies rather than bundled local links, preventing sibling/`node_modules` path leakage in packed tarballs.

@@ -9,7 +9,7 @@ This package-local eval compares `all-active`, `balanced`, and `loader-only` Pla
 - Tool errors, assistant errors, call/output/time bounds, maximum four activation results, and no destructive activation in negative or ambiguous discovery cases. An eval-only extension blocks every destructive Plastic call unless that tool's registered schema supports `preflight` and the call supplies `preflight: true`.
 - JSONL events, assistant usage/cache totals, wall time, initial provider `tools` serialization size, and native `tool_search_call` / `tool_search_output` markers when Pi/provider payloads expose them.
 
-`baseline.json` preserves the legacy 29-tool measurement. All-active intentionally omits the new loader to reproduce that `29 / 21192` baseline; balanced records `3 / 2117` (90.01% legacy reduction), and loader-only records `1 / 1105` (94.79%). The loader's prompt metadata is 266 characters; the untouched legacy baseline has none.
+`baseline.json` preserves the legacy 29-tool measurement for comparison. The current all-active mode omits the loader and exposes `28 / 21071` after withholding workspace creation; balanced records `3 / 2133` (89.93% legacy reduction), and loader-only records `1 / 1121` (94.71%). The loader's prompt metadata is 278 characters; the untouched legacy baseline has none.
 
 ## Run
 

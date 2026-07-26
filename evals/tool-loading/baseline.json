@@ -10,25 +10,25 @@
   },
   "implementedConditions": {
     "all-active": {
-      "toolCount": 29,
-      "serializedSchemaChars": 21192,
-      "estimatedTokens": 5298,
+      "toolCount": 28,
+      "serializedSchemaChars": 21071,
+      "estimatedTokens": 5268,
       "promptMetadataChars": 0,
-      "legacySchemaReductionPercent": 0
+      "legacySchemaReductionPercent": 0.57
     },
     "balanced": {
       "toolCount": 3,
-      "serializedSchemaChars": 2117,
-      "estimatedTokens": 530,
-      "promptMetadataChars": 266,
-      "legacySchemaReductionPercent": 90.01
+      "serializedSchemaChars": 2133,
+      "estimatedTokens": 534,
+      "promptMetadataChars": 278,
+      "legacySchemaReductionPercent": 89.93
     },
     "loader-only": {
       "toolCount": 1,
-      "serializedSchemaChars": 1105,
-      "estimatedTokens": 277,
-      "promptMetadataChars": 266,
-      "legacySchemaReductionPercent": 94.79
+      "serializedSchemaChars": 1121,
+      "estimatedTokens": 281,
+      "promptMetadataChars": 278,
+      "legacySchemaReductionPercent": 94.71
     }
   }
 }

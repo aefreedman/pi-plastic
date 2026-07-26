@@ -15,6 +15,7 @@ function main(): void {
   assert.match(indexText, /assignAlias\(input, "pendingChanges", \["pending_changes"\]\);/, "plastic_switchBranch should normalize pending_changes");
   assert.match(indexText, /"patch",/, "plastic_patch should be included in registered exports");
   assert.match(indexText, /"mergeToBranch",/, "plastic_mergeToBranch should be included in registered exports");
+  assert.doesNotMatch(indexText, /"workspaceCreate",/, "plastic_workspaceCreate should remain unregistered until paired cleanup is available");
   assert.match(indexText, /assignAlias\(input, "toolPath", \["tool_path", "tool"\]\);/, "plastic_patch should normalize toolPath aliases");
   assert.match(indexText, /assignAlias\(input, "output", \["output_file", "outputFile"\]\);/, "plastic_patch should normalize output aliases");
   assert.match(indexText, /assignAlias\(input, "titleLike", \["title_like"\]\);/, "plastic_codeReviewFind should normalize title_like");

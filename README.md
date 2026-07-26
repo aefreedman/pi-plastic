@@ -52,12 +52,11 @@ Removing the approval layer does not relax Plastic safety guards. Command allowl
 - `plastic_codeReviewUpdate`
 - `plastic_codeReviewDelete`
 - `plastic_codeReviewFind`
-- `plastic_workspaceCreate`
 - `plastic_workspaceList`
 
 ## Dynamic tool loading
 
-All 29 existing public `plastic_*` tools retain their names and behavior. `plastic_tool_search` is an additional package-owned loader that searches the explicit Plastic capability catalog, reports bounded matches and safety guidance, and additively enables selected tools for the next model request.
+The package exposes 28 public `plastic_*` tools. `plastic_workspaceCreate` is intentionally not registered or discoverable until the package provides a paired, safe workspace-cleanup capability. `plastic_tool_search` is a package-owned loader that searches the explicit Plastic capability catalog, reports bounded matches and safety guidance, and additively enables selected tools for the next model request.
 
 The default **balanced** session set keeps `plastic_tool_search`, `plastic_status`, and `plastic_currentBranch` active. The other Plastic tools remain registered but inactive until selected; built-in and other-extension tools are not removed. Previous loader additions on the active session branch are restored on startup, resume, fork, and reload.
 
@@ -66,7 +65,7 @@ For controlled comparisons, set `PI_PLASTIC_TOOL_LOADING_MODE` before starting P
 ```bash
 PI_PLASTIC_TOOL_LOADING_MODE=balanced    # default production candidate
 PI_PLASTIC_TOOL_LOADING_MODE=loader-only # maximum initial schema reduction
-PI_PLASTIC_TOOL_LOADING_MODE=all-active  # legacy 29-tool baseline; loader omitted
+PI_PLASTIC_TOOL_LOADING_MODE=all-active  # all 28 currently exposed tools; loader omitted
 ```
 
 Pi 0.82 uses canonical `sourceInfo` provenance to identify this package's effective tools before deferring, restoring, or activating them. If canonical provenance or ownership of the effective loader cannot be proven, `pi-plastic` fails safe: it preserves the complete current active set exactly, does not defer, remove, or activate any `plastic_*` name, and an effective package loader can only report known tools that are already active rather than activating inactive names. On sourceInfo-capable Pi instances, providers without native deferred definitions still receive the complete current active set after a loader call. Reload or restart Pi after source edits; source files are not watched automatically.

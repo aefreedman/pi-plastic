@@ -46,7 +46,6 @@ export const PLASTIC_SEARCH_CATALOG: readonly PlasticSearchCatalogEntry[] = [
   { name: "plastic_codeReviewUpdate", aliases: ["update code review", "edit review"], tags: ["review", "code review", "mutation"], guidance: ["Confirm the review ID and requested fields before updating a code review."] },
   { name: "plastic_codeReviewDelete", aliases: ["delete code review", "remove review"], tags: ["review", "code review", "mutation", "destructive"], guidance: ["Confirm review IDs before deleting code reviews."] },
   { name: "plastic_codeReviewFind", aliases: ["find code review", "list reviews", "search reviews"], tags: ["review", "code review", "inspect", "query"], guidance: ["Use filters to identify the intended review before changing or deleting it."] },
-  { name: "plastic_workspaceCreate", aliases: ["create workspace", "new workspace"], tags: ["workspace", "mutation", "setup"], guidance: ["Confirm repository, path, and selector inputs before creating a workspace."] },
   { name: "plastic_workspaceList", aliases: ["list workspaces", "find workspace", "workspaces"], tags: ["workspace", "inspect", "query"], guidance: ["Inspect workspace paths and repository identity before using a workspace in a mutation."] },
 ] as const;
 

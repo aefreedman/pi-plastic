@@ -81,7 +81,6 @@ const PLASTIC_EXPORTS = [
   "codeReviewUpdate",
   "codeReviewDelete",
   "codeReviewFind",
-  "workspaceCreate",
   "workspaceList",
 ] as const;
 
@@ -331,15 +330,6 @@ const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       assignAlias(input, "orderBy", ["order_by"]);
       assignAlias(input, "dateFormat", ["date_format"]);
       assignAlias(input, "output", ["output_format", "response_format"]);
-      return input;
-    },
-  },
-  workspaceCreate: {
-    prepareArguments(args) {
-      const input = normalizeArgs(args);
-      normalizeWorkdirAliases(input);
-      assignAlias(input, "repositorySpec", ["repository_spec"]);
-      assignAlias(input, "selectorFile", ["selector_file"]);
       return input;
     },
   },
@@ -771,9 +761,8 @@ export default function plasticTools(pi: ExtensionAPI) {
     // exactly; even adding the public loader name could activate foreign code.
     if (!ownership.usesSourceInfo) return;
 
-    // The all-active eval mode represents the untouched legacy 29-tool
-    // baseline, so keep every original Plastic tool active but omit the new
-    // loader from the provider surface.
+    // The all-active eval mode keeps every currently exposed Plastic tool
+    // active while omitting the dynamic loader from the provider surface.
     if (mode === "all-active") {
       pi.setActiveTools(active.filter((name) => name !== PLASTIC_TOOL_SEARCH_NAME));
       return;
