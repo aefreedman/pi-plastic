@@ -20,7 +20,7 @@ This file contains Plastic-specific operations for setting up, executing, and sh
 
 Agent workflow preference: use `plastic_*` tools first (`plastic_status`, `plastic_branchCreate`, `plastic_switchBranch`, `plastic_checkin`, `plastic_mergeToBranch`, etc.); keep `cm ...` snippets as manual fallback.
 
-Every mutating `plastic_*` sink requires a matching session/action/exact-target token or direct TUI/RPC confirmation immediately before its `cm` spawn. `workflow_execute` readiness inspection does not consume or replace that sink check. `plastic_checkin` maps to `commit`; other workspace mutations use `vcs_mutation`; code-review and remote metadata writes use `publish`. The token boundary does not enforce manual shell/Git/bash commands.
+Mutating `plastic_*` tools run directly after their command, workspace, exact-target, and path-safety checks; they do not require package-owned approval tokens or UI confirmation. Inspect status before manually retrying an ambiguous side-effecting failure.
 
 Note: examples target current Plastic CLI syntax; legacy variants may differ.
 

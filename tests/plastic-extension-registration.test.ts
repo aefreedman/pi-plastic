@@ -6,9 +6,10 @@ function main(): void {
   const packageManifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   const branchStatusText = readFileSync(new URL("../extensions/plastic-branch-status.ts", import.meta.url), "utf8");
 
-  assert.match(indexText, /parameters:\s*buildParameters\(coreTool\.args, MUTATING_PLASTIC_EXPORTS\.has\(exportName\)\)/, "plastic tools should derive schemas from core args and add sink authorization only to mutators");
+  assert.match(indexText, /parameters:\s*buildParameters\(coreTool\.args\)/, "plastic tools should derive schemas from core args without approval-only parameters");
   assert.match(indexText, /prepareArguments:\s*config\.prepareArguments/, "plastic tools should wire prepareArguments");
-  assert.match(indexText, /core\.runWithAbortSignal\(signal, async \(\) => coreTool\.execute\(normalizedParams\), mutationAuthorization\)/, "plastic tools should propagate abort signals and sink authorization context into core execution");
+  assert.match(indexText, /core\.runWithAbortSignal\(signal, async \(\) => coreTool\.execute\(normalizedParams\)\)/, "plastic tools should propagate abort signals into core execution");
+  assert.doesNotMatch(indexText, /authorizationToken|authorizationProvenance|ctx\.ui\.confirm/, "Plastic tool registration must not implement token or UI-confirmation approvals");
 
   assert.match(indexText, /assignAlias\(input, "message", \["comment", "comments"\]\);/, "plastic_checkin should normalize comment aliases");
   assert.match(indexText, /assignAlias\(input, "pendingChanges", \["pending_changes"\]\);/, "plastic_switchBranch should normalize pending_changes");

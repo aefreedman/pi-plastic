@@ -12,7 +12,7 @@ and this project follows semantic versioning for public package releases.
 - Added session-scoped generic repository-search policy and specialized `vcs.plastic` workflow provider registration. Marker applicability is distinct from `cm` readiness; the policy safely discovers bounded `ignore.conf`/`cloaked.conf` chains and provider-owned guidance resources.
 - Added exact, bounded `LegacyReferenceServiceV1` registrations for the four pi-plastic rows in the compatibility map, backed by byte-exact pinned 0.6.4 payload copies with package/resource provenance and load-order/lifecycle coverage.
 - Added actual package-root/version owner discovery at the extension boundary and packed-copy owner-conflict coverage.
-- Added exhaustive centralized Plastic mutation-command inventory tests with spawn spies, exact matching success, direct TUI/RPC confirmation, and fail-before-spawn replay/action/target/session/expiry cases.
+- Added direct mutation execution coverage proving one exact `cm` process attempt with no approval context and no implicit retry.
 
 - Added a composable `plastic-branch` footer status with nearest-workspace discovery, selector fallback, bounded `cm` confirmation, and debounced same-workspace refresh.
 - Added credential-free workspace, selector/status parser, footer composition, and lifecycle cleanup coverage using sanitized fixtures.
@@ -25,8 +25,7 @@ and this project follows semantic versioning for public package releases.
 - Canonical contract packages are normal semver dependencies rather than bundled local links, preventing sibling/`node_modules` path leakage in packed tarballs.
 - Shared Plastic status branch parsing with `plastic_currentBranch` while preserving its `cm`-authoritative source policy.
 - Made `plastic_branchCreate` support an explicit parent branch independent of the loaded workspace branch, default relative names to the current branch when omitted, and reject accidental top-level branches unless `allowRootBranch=true` is explicitly supplied.
-- All registered Plastic mutation sinks now consume shared `@aefree/pi-workflow` session/action/exact-target tokens immediately before `cm` spawn, or obtain direct exact-target TUI/RPC confirmation. Checkin maps to `commit`, remote metadata to `publish`, and workspace state changes to `vcs_mutation`; no general shell/Git/bash enforcement is claimed.
-- Mutation authorization is no longer cached across `cm` process spawns. One token or direct confirmation permits one attempt; ambiguous retries require fresh authority and consumed-token retries block before spawn with status-inspection remediation.
+- Removed package-owned token and UI-confirmation approval from Plastic mutations. Direct calls now proceed through the existing command, workspace-readiness, exact-target, path-containment, and process-safety checks to one `cm` process attempt without implicit retry.
 
 ## [0.3.0] - 2026-07-25
 

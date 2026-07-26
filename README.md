@@ -16,13 +16,11 @@ When `@aefree/pi-repo-search` and/or `@aefree/pi-workflow` contracts are install
 
 The same extension registers bounded legacy-reference services for exactly the four pi-plastic paths in the compatibility map. Reads use byte-exact pinned 0.6.4 legacy payload copies, remain package-contained and capped at 50 KiB/2,000 lines, and return package/version/resource provenance. Owner roots and versions are derived from the physical package copy at session startup rather than hardcoded.
 
-## Mutation authorization
+## Mutation execution
 
-Every mutating `cm` spawn reached through a registered `plastic_*` tool is guarded after command/workdir canonicalization and before process creation. Mutating tools accept optional `authorizationToken` without echoing it in renderers or results. Checkin maps to `commit`; code-review and remote branch/shelveset/workspace metadata writes map to `publish`; workspace update/add/undo/remove/switch/merge/shelveset-apply map to `vcs_mutation`. Exact target IDs use `plastic:<encoded-canonical-workdir>:<operation>:<entity>`.
+Directly invoked mutating `plastic_*` tools do not require approval tokens or package-owned UI confirmation. After the tool's existing argument, command, workspace-readiness, exact-target, and path-containment checks pass, each command attempt proceeds to its intended `cm` spawn. The process layer makes one attempt and does not retry implicitly; inspect Plastic status before manually retrying an ambiguous side-effecting failure.
 
-`workflow_execute` may inspect a token for readiness but never consumes it. Pass that same token to the final Plastic mutation tool, where the command sink consumes it once. One token or direct confirmation permits exactly one mutating `cm` process spawn; authorization is not cached across retries or separate spawns. After an ambiguous side-effecting failure, inspect Plastic status and obtain fresh direct confirmation or a fresh exact-target token before retrying. A noninteractive retry with the consumed token blocks before process creation and reports that remediation. Without a token, TUI/RPC obtains direct `ctx.ui.confirm` bound to the exact action/target and issues/consumes internally; print/JSON blocks. Wrong-session, wrong-action, wrong-target, expired, replayed, and empty-target tokens fail before spawn. Unknown low-level command methods require direct TUI/RPC confirmation instead of token-only classification. Compound `plastic_mergeToBranch` and `plastic_switchBranch(pendingChanges="shelve")` calls cannot safely use one token across differently mapped sinks; preview them, then omit the token in TUI/RPC so each sink is confirmed directly.
-
-This enforcement covers registered `plastic_*` tool process sinks. The package's existing bash guards still block specific unsafe `cm diff` and interactive merge patterns, but this token contract does **not** claim general shell, arbitrary `cm`, Git, or bash-command enforcement.
+Removing the approval layer does not relax Plastic safety guards. Command allowlists, exact mutation targets, workspace/path containment, non-interactive process selection, blocked `cm diff`, safe merge flags, and operation-specific preflight behavior remain authoritative. Compound tools may intentionally execute multiple validated command steps.
 
 ## Tools
 

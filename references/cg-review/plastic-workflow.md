@@ -4,7 +4,7 @@ This file contains Plastic-specific operations for code review setup and context
 
 **Load the `using-plastic` skill** for Plastic operations.
 
-Agent workflow preference: use `plastic_*` tools first (`plastic_status`, `plastic_switchBranch`, `plastic_diff`, etc.); keep `cm ...` snippets as manual fallback. Any mutating `plastic_*` call still requires a matching token consumed at its final `cm` spawn or direct exact-target TUI/RPC confirmation; read-only review does not grant that authority, and manual shell commands are outside this token boundary.
+Agent workflow preference: use `plastic_*` tools first (`plastic_status`, `plastic_switchBranch`, `plastic_diff`, etc.); keep `cm ...` snippets as manual fallback. Mutating tools run directly after their existing command, workspace, exact-target, and path-safety checks; inspect status before manually retrying an ambiguous failure.
 
 Note: examples target current Plastic CLI syntax; legacy variants may differ.
 
