@@ -20,6 +20,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Changed
 
+- Made the `vcs.plastic` workflow-provider registration an optional `@aefree/pi-workflow` peer integration. Repository-search policy and legacy-reference registrations remain available without it; absent contracts skip only `vcs.plastic`, while broken installed contracts still fail visibly and session cleanup is scoped to its matching session manager.
 - Stopped registering or dynamically advertising `plastic_workspaceCreate` until workspace creation has a paired, safe cleanup capability.
 - Plastic workflow preflight now re-detects and verifies the selected canonical workspace and requires a bounded, cancellable `cm status` readiness check; missing CLI, authentication/readiness failures, timeouts, root changes, and oversized output block Plastic without Git fallback.
 - Plastic repository policy outputs now declare the canonical marker-owned `policyOwnedRoot` boundary used by repo-search physical ignore-file containment.

@@ -10,7 +10,7 @@ The extension owns only the `plastic-branch` status key. It does not replace Pi'
 
 ## Repository-search and workflow providers
 
-When `@aefree/pi-repo-search` and/or `@aefree/pi-workflow` contracts are installed, Pi session startup registers `plastic.ignore-files` and `vcs.plastic`. The search policy is marker-based and discovers readable `ignore.conf` and `cloaked.conf` only from the nearest Plastic workspace to each requested root. It adds them as ripgrep ignore files without replacing native ripgrep/Git-ignore behavior.
+Pi session startup always registers the `plastic.ignore-files` repository-search policy and bounded legacy-reference services. When the optional `@aefree/pi-workflow` contract is installed and compatible, it additionally registers `vcs.plastic`; when it is absent, only that workflow-provider registration is skipped. A broken installed workflow contract is reported rather than treated as absent. The search policy is marker-based and discovers readable `ignore.conf` and `cloaked.conf` only from the nearest Plastic workspace to each requested root. It adds them as ripgrep ignore files without replacing native ripgrep/Git-ignore behavior.
 
 `vcs.plastic` detects ownership from `.plastic/plastic.workspace` alone. It intentionally does not invoke `cm` while detecting. Preflight then re-detects the target, verifies that its canonical workspace still equals the selected root, and runs bounded/cancellable `cm status --machinereadable`. A missing CLI, authentication/readiness failure, timeout, root change, or oversized command output blocks Plastic and must not cause fallback to an enclosing Git workspace. It exposes bounded package-owned guidance resource IDs `repository-search-ignore-policy` and `vcs-workflow` for selected workflow consumers.
 
@@ -134,7 +134,7 @@ pi install -l <path-to-pi-plastic>
 - Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`, or `PI_PLASTIC_CM_EXECUTABLE` set to its full executable path
 - Git available on `PATH`, or `PI_PLASTIC_GIT_EXECUTABLE` set to its full executable path, for text-only diff tools
 - A configured Plastic workspace for workspace-scoped operations
-- `@aefree/pi-capability-registry`, `@aefree/pi-repo-search`, and `@aefree/pi-workflow` are normal semver runtime dependencies. The pi-plastic tarball does not embed linked sibling workspaces or `node_modules` paths.
+- `@aefree/pi-capability-registry` and `@aefree/pi-repo-search` are normal semver runtime dependencies. `@aefree/pi-workflow` is an optional peer dependency used only for `vcs.plastic` composition; core Plastic tools, repository policy, and legacy references do not require it. The pi-plastic tarball does not embed linked sibling workspaces or `node_modules` paths.
 
 ## Testing
 
