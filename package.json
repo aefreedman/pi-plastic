@@ -17,7 +17,6 @@
     "extensions/",
     "src/",
     "references/",
-    "compatibility/",
     "skills/",
     "evals/tool-loading/",
     "tests/",
@@ -46,7 +45,6 @@
     "eval:tool-loading": "npx --yes tsx evals/tool-loading/run-eval.ts"
   },
   "dependencies": {
-    "@aefree/pi-capability-registry": "^0.1.0",
     "@aefree/pi-repo-search": "^0.1.0"
   },
   "devDependencies": {

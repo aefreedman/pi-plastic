@@ -1,6 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createRepositoryPolicyRegistryV1 } from "@aefree/pi-repo-search/contracts/v1";
-import { registerPlasticLegacyReferencesV1 } from "../src/legacy-reference-provider.ts";
 import { createPlasticRepositorySearchPolicyV1, createPlasticWorkflowProviderV1, loadPlasticOwnerV1 } from "../src/repository-search-provider.ts";
 
 const WORKFLOW_PROVIDER_CONTRACT_MODULE = "@aefree/pi-workflow/contracts/v1";
@@ -14,7 +13,6 @@ type ModuleImporter = (specifier: string) => Promise<unknown>;
 type ScopeRegistrations = Readonly<{
   policyToken: ReturnType<ReturnType<typeof createRepositoryPolicyRegistryV1>["register"]>;
   workflowRegistration?: Readonly<{ registry: WorkflowRegistryV1; token: unknown }>;
-  referenceRegistration: ReturnType<typeof registerPlasticLegacyReferencesV1>;
 }>;
 
 /**
@@ -52,7 +50,7 @@ export async function loadWorkflowProviderRegistryV1(importer: ModuleImporter = 
   return registry as WorkflowRegistryV1;
 }
 
-/** Session-scoped, side-effect-free policy, optional VCS-provider, and bounded legacy-reference registration. */
+/** Session-scoped, side-effect-free repository-search policy and optional VCS-provider registration. */
 export function createPlasticRepositoryProviderExtension(loadWorkflowRegistry: WorkflowRegistryLoader = loadWorkflowProviderRegistryV1): (pi: ExtensionAPI) => void {
   return (pi) => {
     const registrations = new WeakMap<object, ScopeRegistrations>();
@@ -60,7 +58,6 @@ export function createPlasticRepositoryProviderExtension(loadWorkflowRegistry: W
       if (current === undefined) return;
       createRepositoryPolicyRegistryV1().unregister(current.policyToken);
       current.workflowRegistration?.registry.unregister(current.workflowRegistration.token);
-      current.referenceRegistration.unregister();
     };
 
     pi.on("session_start", async (_event, ctx) => {
@@ -71,11 +68,10 @@ export function createPlasticRepositoryProviderExtension(loadWorkflowRegistry: W
       const scope = ctx.sessionManager;
       unregisterScope(registrations.get(scope));
       const policyToken = createRepositoryPolicyRegistryV1().register(scope, createPlasticRepositorySearchPolicyV1(owner));
-      const referenceRegistration = registerPlasticLegacyReferencesV1(scope, owner);
       const workflowRegistration = workflowRegistry === undefined
         ? undefined
         : Object.freeze({ registry: workflowRegistry, token: workflowRegistry.register(scope, createPlasticWorkflowProviderV1(owner)) });
-      registrations.set(scope, Object.freeze({ policyToken, workflowRegistration, referenceRegistration }));
+      registrations.set(scope, Object.freeze({ policyToken, workflowRegistration }));
     });
     pi.on("session_shutdown", (_event, ctx) => {
       const scope = ctx.sessionManager;

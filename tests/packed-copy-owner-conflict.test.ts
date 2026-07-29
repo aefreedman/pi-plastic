@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
-import { isRegistryError } from "@aefree/pi-capability-registry";
 import { createRepositoryPolicyRegistryV1, REPOSITORY_POLICY_REGISTRY_KEY_V1 } from "@aefree/pi-repo-search/contracts/v1";
 import { createPlasticRepositorySearchPolicyV1, loadPlasticOwnerV1 } from "../src/repository-search-provider.ts";
 
@@ -27,7 +26,9 @@ try {
   assert.equal(ownerOne.packageVersion, ownerTwo.packageVersion);
   const scope = {};
   createRepositoryPolicyRegistryV1().register(scope, createPlasticRepositorySearchPolicyV1(ownerOne));
-  assert.throws(() => createRepositoryPolicyRegistryV1().register(scope, createPlasticRepositorySearchPolicyV1(ownerTwo)), (error) => isRegistryError(error, "PROVIDER_ID_CONFLICT"));
+  assert.throws(() => createRepositoryPolicyRegistryV1().register(scope, createPlasticRepositorySearchPolicyV1(ownerTwo)), (error) => (
+    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "PROVIDER_ID_CONFLICT"
+  ));
   delete globalThis[Symbol.for(REPOSITORY_POLICY_REGISTRY_KEY_V1)];
 } finally { await rm(temp, { recursive: true, force: true }); }
 console.log("PASS: two packed physical pi-plastic copies retain distinct roots and conflict");

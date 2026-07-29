@@ -10,7 +10,6 @@ and this project follows semantic versioning for public package releases.
 ### Added
 
 - Added session-scoped generic repository-search policy and specialized `vcs.plastic` workflow provider registration. Marker applicability is distinct from `cm` readiness; the policy safely discovers bounded `ignore.conf`/`cloaked.conf` chains and provider-owned guidance resources.
-- Added exact, bounded `LegacyReferenceServiceV1` registrations for the four pi-plastic rows in the compatibility map, backed by byte-exact pinned 0.6.4 payload copies with package/resource provenance and load-order/lifecycle coverage.
 - Added actual package-root/version owner discovery at the extension boundary and packed-copy owner-conflict coverage.
 - Added direct mutation execution coverage proving one exact `cm` process attempt with no approval context and no implicit retry.
 
@@ -20,7 +19,8 @@ and this project follows semantic versioning for public package releases.
 
 ### Changed
 
-- Made the `vcs.plastic` workflow-provider registration an optional `@aefree/pi-workflow` peer integration. Repository-search policy and legacy-reference registrations remain available without it; absent contracts skip only `vcs.plastic`, while broken installed contracts still fail visibly and session cleanup is scoped to its matching session manager.
+- Removed retired legacy-reference registration and copied compatibility payloads; repository-search policy and `vcs.plastic` workflow-provider behavior are unchanged.
+- Made the `vcs.plastic` workflow-provider registration an optional `@aefree/pi-workflow` peer integration. Repository-search policy remains available without it; absent contracts skip only `vcs.plastic`, while broken installed contracts still fail visibly and session cleanup is scoped to its matching session manager.
 - Stopped registering or dynamically advertising `plastic_workspaceCreate` until workspace creation has a paired, safe cleanup capability.
 - Plastic workflow preflight now re-detects and verifies the selected canonical workspace and requires a bounded, cancellable `cm status` readiness check; missing CLI, authentication/readiness failures, timeouts, root changes, and oversized output block Plastic without Git fallback.
 - Plastic repository policy outputs now declare the canonical marker-owned `policyOwnedRoot` boundary used by repo-search physical ignore-file containment.
