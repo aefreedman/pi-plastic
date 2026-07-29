@@ -9,7 +9,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
-- Added session-scoped generic repository-search policy and specialized `vcs.plastic` workflow provider registration. Marker applicability is distinct from `cm` readiness; the policy safely discovers bounded `ignore.conf`/`cloaked.conf` chains and provider-owned guidance resources.
+- Added session-scoped generic repository-search policy. The policy safely discovers bounded `ignore.conf`/`cloaked.conf` chains.
 - Added actual package-root/version owner discovery at the extension boundary and packed-copy owner-conflict coverage.
 - Added direct mutation execution coverage proving one exact `cm` process attempt with no approval context and no implicit retry.
 
@@ -19,10 +19,8 @@ and this project follows semantic versioning for public package releases.
 
 ### Changed
 
-- Removed retired legacy-reference registration and copied compatibility payloads; repository-search policy and `vcs.plastic` workflow-provider behavior are unchanged.
-- Made the `vcs.plastic` workflow-provider registration an optional `@aefree/pi-workflow` peer integration. Repository-search policy remains available without it; absent contracts skip only `vcs.plastic`, while broken installed contracts still fail visibly and session cleanup is scoped to its matching session manager.
+- Removed the `vcs.plastic` workflow provider, its marker/readiness/preflight/guidance integration, and the unused optional `@aefree/pi-workflow` dependency. Repository-search policy remains independently registered and Plastic tools retain operation-specific validation.
 - Stopped registering or dynamically advertising `plastic_workspaceCreate` until workspace creation has a paired, safe cleanup capability.
-- Plastic workflow preflight now re-detects and verifies the selected canonical workspace and requires a bounded, cancellable `cm status` readiness check; missing CLI, authentication/readiness failures, timeouts, root changes, and oversized output block Plastic without Git fallback.
 - Plastic repository policy outputs now declare the canonical marker-owned `policyOwnedRoot` boundary used by repo-search physical ignore-file containment.
 - Canonical contract packages are normal semver dependencies rather than bundled local links, preventing sibling/`node_modules` path leakage in packed tarballs.
 - Shared Plastic status branch parsing with `plastic_currentBranch` while preserving its `cm`-authoritative source policy.
