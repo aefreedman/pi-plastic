@@ -19,6 +19,8 @@ and this project follows semantic versioning for public package releases.
 
 ### Changed
 
+- Updated the Pi development baseline to 0.83.0.
+
 - Removed the `vcs.plastic` workflow provider, its marker/readiness/preflight/guidance integration, and the unused optional `@aefree/pi-workflow` dependency. Repository-search policy remains independently registered and Plastic tools retain operation-specific validation.
 - Stopped registering or dynamically advertising `plastic_workspaceCreate` until workspace creation has a paired, safe cleanup capability.
 - Plastic repository policy outputs now declare the canonical marker-owned `policyOwnedRoot` boundary used by repo-search physical ignore-file containment.
