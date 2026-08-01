@@ -56,7 +56,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/aefreedman/pi-plastic.git"
+    "url": "git+https://github.com/aefreedman/pi-plastic.git"
   },
   "bugs": {
     "url": "https://github.com/aefreedman/pi-plastic/issues"
