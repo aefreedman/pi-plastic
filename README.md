@@ -65,7 +65,7 @@ PI_PLASTIC_TOOL_LOADING_MODE=loader-only # maximum initial schema reduction
 PI_PLASTIC_TOOL_LOADING_MODE=all-active  # all 28 currently exposed tools; loader omitted
 ```
 
-Pi 0.82 uses canonical `sourceInfo` provenance to identify this package's effective tools before deferring, restoring, or activating them. If canonical provenance or ownership of the effective loader cannot be proven, `pi-plastic` fails safe: it preserves the complete current active set exactly, does not defer, remove, or activate any `plastic_*` name, and an effective package loader can only report known tools that are already active rather than activating inactive names. On sourceInfo-capable Pi instances, providers without native deferred definitions still receive the complete current active set after a loader call. Reload or restart Pi after source edits; source files are not watched automatically.
+Pi 0.82 and newer use canonical `sourceInfo` provenance to identify this package's effective tools before deferring, restoring, or activating them. If canonical provenance or ownership of the effective loader cannot be proven, `pi-plastic` fails safe: it preserves the complete current active set exactly, does not defer, remove, or activate any `plastic_*` name, and an effective package loader can only report known tools that are already active rather than activating inactive names. On sourceInfo-capable Pi instances, providers without native deferred definitions still receive the complete current active set after a loader call. Reload or restart Pi after source edits; source files are not watched automatically.
 
 ## Safety behavior
 
@@ -97,13 +97,13 @@ If `output` is omitted, Plastic prints patch content to stdout. If `output` is p
 Install the stable GitHub release over HTTPS:
 
 ```bash
-pi install git:github.com/aefreedman/pi-plastic@v0.3.0
+pi install git:github.com/aefreedman/pi-plastic@v0.4.0
 ```
 
 Equivalent SSH install:
 
 ```bash
-pi install git:git@github.com:aefreedman/pi-plastic@v0.3.0
+pi install git:git@github.com:aefreedman/pi-plastic@v0.4.0
 ```
 
 To intentionally track the moving default branch instead of a release tag:
@@ -127,9 +127,9 @@ pi install -l <path-to-pi-plastic>
 ## Requirements
 
 - Node.js 22.19.0 or newer
-- Pi 0.82.0 or newer; provenance-aware dynamic loading and restoration are validated on Pi 0.82
+- Pi 0.82.0 or newer; the current development and eval baseline is Pi 0.83
 - Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`, or `PI_PLASTIC_CM_EXECUTABLE` set to its full executable path
-- Git available on `PATH`, or `PI_PLASTIC_GIT_EXECUTABLE` set to its full executable path, for text-only diff tools
+- A compatible `diff` executable available on `PATH`, or `PI_PLASTIC_DIFF_EXECUTABLE` set to its full executable path, for text-only diff and patch tools
 - A configured Plastic workspace for workspace-scoped operations
 - `@aefree/pi-repo-search` is an optional peer. When installed, it receives the Plastic ignore/cloak policy; when absent, `pi-plastic` loads without repository-search integration. The tarball does not embed linked sibling workspaces or `node_modules` paths.
 
@@ -151,7 +151,7 @@ The live test requires `/main`, no pending changes, and no merge in progress. It
 
 ### Dynamic tool-loading eval
 
-The package-local behavioral eval uses fresh Pi 0.82 JSON subprocesses against an explicitly attested dedicated Plastic sandbox and is not a skill eval. It compares all-active, balanced, and loader-only mode behavior, checks exact smallest-sufficient loader activations, blocks destructive calls unless they are supported `preflight: true` previews, captures tool calls and sanitized provider-schema measurements, and deletes raw provider payload captures by default.
+The package-local behavioral eval uses fresh Pi 0.83 JSON subprocesses against an explicitly attested dedicated Plastic sandbox and is not a skill eval. It compares all-active, balanced, and loader-only mode behavior, checks exact smallest-sufficient loader activations, blocks destructive calls unless they are supported `preflight: true` previews, captures tool calls and sanitized provider-schema measurements, and deletes raw provider payload captures by default.
 
 ```bash
 npm run eval:tool-loading -- --dry-run

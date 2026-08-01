@@ -83,7 +83,7 @@ function parseOptions(argv: string[]): Options {
 }
 
 function validate(config: EvalConfig, cases: EvalCase[], baseline: JsonObject, options: Options): void {
-  if (config.piVersionPrefix !== "0.82.") fail("config piVersionPrefix must select the validated Pi 0.82 patch line");
+  if (config.piVersionPrefix !== "0.83.") fail("config piVersionPrefix must select the validated Pi 0.83 patch line");
   if (config.sandboxCwdEnv !== "PI_PLASTIC_EVAL_SANDBOX") fail("config sandboxCwdEnv must use the dedicated eval environment variable");
   if (config.sandboxMarkerFile !== ".pi-plastic-eval-sandbox" || config.sandboxMarkerContent !== "pi-plastic-eval-sandbox\n") fail("config sandbox marker attestation is invalid");
   if (config.sandboxAuthorizationEnv !== "PI_PLASTIC_EVAL_ALLOW" || config.sandboxAuthorizationValue !== "dedicated-sandbox") fail("config sandbox authorization attestation is invalid");
@@ -335,12 +335,12 @@ async function main(): Promise<void> {
 
   const piPackagePath = join(PACKAGE_ROOT, "node_modules", "@earendil-works", "pi-coding-agent", "package.json");
   const piVersion = existsSync(piPackagePath) ? (readJson<{ version?: string }>(piPackagePath).version ?? "unknown") : "missing";
-  if (!piVersion.startsWith(config.piVersionPrefix)) fail(`This eval requires the Pi 0.82 patch line; found ${piVersion}`);
+  if (!piVersion.startsWith(config.piVersionPrefix)) fail(`This eval requires the Pi ${config.piVersionPrefix.slice(0, -1)} patch line; found ${piVersion}`);
   const piCli = join(PACKAGE_ROOT, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js");
   const baseArgs = ["--mode", "json", "--no-session", "--no-approve", "--no-context-files", "--no-extensions", "-e", join(PACKAGE_ROOT, "index.ts"), "-e", join(HERE, "mutation-guard.ts"), "-e", join(HERE, "provider-capture.ts"), "--no-skills", "--no-prompt-templates", "--no-builtin-tools"];
   if (options.dryRun) {
     console.log(`VALID: ${selectedCases.length} cases × ${options.conditions.length} conditions × ${options.trials} trial(s)`);
-    console.log(`Pi 0.82 subprocess: ${process.execPath} ${piCli} ${baseArgs.join(" ")} --model <approved-model> <case-prompt>`);
+    console.log(`Pi ${config.piVersionPrefix.slice(0, -1)} subprocess: ${process.execPath} ${piCli} ${baseArgs.join(" ")} --model <approved-model> <case-prompt>`);
     console.log(`cwd: ${sandboxCwd}`);
     return;
   }

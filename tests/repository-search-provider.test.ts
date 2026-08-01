@@ -11,7 +11,7 @@ try {
   await mkdir(source, { recursive: true }); await writeFile(join(plastic, "ignore.conf"), "ignored.txt\n"); await writeFile(join(plastic, "Assets", "cloaked.conf"), "cache/**\n");
   await mkdir(join(gitOnly, ".git"), { recursive: true });
   const owner = await loadPlasticOwnerV1(new URL("../extensions/repository-search-provider.ts", import.meta.url).href);
-  assert.equal(owner.packageVersion, "0.3.0");
+  assert.equal(owner.packageVersion, "0.4.0");
   assert.equal(owner.packageRoot, await realpath(join(import.meta.dirname, "..")));
   const policy = createPlasticRepositorySearchPolicyV1(owner);
   const result = await policy.evaluate({ cwd: root, signal: new AbortController().signal }, { workspaceRoot: root, roots: [source], includeHidden: false, signal: new AbortController().signal });
