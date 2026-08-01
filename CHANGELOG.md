@@ -9,7 +9,8 @@ and this project follows semantic versioning for public package releases.
 
 ### Changed
 
-- Added resumable npm trusted-publishing automation and canonicalized the package repository URL for GitHub OIDC identity matching.
+- Excluded development-only tests and behavioral evals from published npm artifacts.
+- Publish verified GitHub releases to npm through resumable OIDC trusted-publishing automation, and canonicalized the package repository URL for GitHub identity matching.
 
 ## [0.4.0] - 2026-08-01
 
