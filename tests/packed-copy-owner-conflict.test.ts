@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
-import { createRepositoryPolicyRegistryV1, REPOSITORY_POLICY_REGISTRY_KEY_V1 } from "@aefree/pi-repo-search/contracts/v1";
 import { createPlasticRepositorySearchPolicyV1, loadPlasticOwnerV1 } from "../src/repository-search-provider.ts";
 
 const temp = await mkdtemp(path.join(tmpdir(), "pi-plastic-packed-copies-"));
@@ -24,11 +23,6 @@ try {
   const ownerTwo = await loadPlasticOwnerV1(entry(second));
   assert.notEqual(ownerOne.packageRoot, ownerTwo.packageRoot);
   assert.equal(ownerOne.packageVersion, ownerTwo.packageVersion);
-  const scope = {};
-  createRepositoryPolicyRegistryV1().register(scope, createPlasticRepositorySearchPolicyV1(ownerOne));
-  assert.throws(() => createRepositoryPolicyRegistryV1().register(scope, createPlasticRepositorySearchPolicyV1(ownerTwo)), (error) => (
-    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "PROVIDER_ID_CONFLICT"
-  ));
-  delete globalThis[Symbol.for(REPOSITORY_POLICY_REGISTRY_KEY_V1)];
+  assert.equal(createPlasticRepositorySearchPolicyV1(ownerOne).id, createPlasticRepositorySearchPolicyV1(ownerTwo).id);
 } finally { await rm(temp, { recursive: true, force: true }); }
-console.log("PASS: two packed physical pi-plastic copies retain distinct roots and conflict");
+console.log("PASS: two packed physical pi-plastic copies retain distinct owner roots");

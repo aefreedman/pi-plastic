@@ -2,13 +2,17 @@ import { access, readFile, realpath, stat } from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  type RepoSearchExecutionContextV1,
-  type RepoSearchOwnerV1,
-  type RepositoryPolicyRequestV1,
-  type RepositoryPolicyResultV1,
-  type RepositoryPolicyV1,
-} from "@aefree/pi-repo-search/contracts/v1";
+// Structural copies of the narrow public v1 contract keep the policy module loadable
+// when the optional registry package is absent. The installed registry validates the
+// record when registration is available.
+type RepoSearchOwnerV1 = Readonly<{ packageName: string; packageVersion: string; packageRoot: string; registeredBy: string }>;
+type RepoSearchExecutionContextV1 = Readonly<{ cwd: string; requestId?: string; signal: AbortSignal }>;
+type RepositoryPolicyRequestV1 = Readonly<{ workspaceRoot: string; roots: readonly string[]; includeHidden: boolean; options?: Readonly<Record<string, unknown>>; signal: AbortSignal }>;
+type RepositoryPolicyResultV1 =
+  | Readonly<{ outcome: "not_applicable" }>
+  | Readonly<{ outcome: "applied"; roots: readonly Readonly<{ root: string; policyOwnedRoot?: string; excludeGlobs?: readonly string[]; ignoreFiles?: readonly string[]; disclosures: readonly string[] }>[] }>
+  | Readonly<{ outcome: "unavailable" | "error"; code: string; retryable: boolean }>;
+type RepositoryPolicyV1 = Readonly<{ contractVersion: 1; id: string; kind: "repository-search-policy"; owner: RepoSearchOwnerV1; evaluate(context: RepoSearchExecutionContextV1, request: RepositoryPolicyRequestV1): Promise<RepositoryPolicyResultV1> }>;
 import { discoverPlasticWorkspace } from "./plastic-workspace.ts";
 
 export const PLASTIC_REPOSITORY_SEARCH_POLICY_ID = "plastic.ignore-files" as const;

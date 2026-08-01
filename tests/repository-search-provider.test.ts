@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { assertRepositoryPolicyConformanceV1 } from "@aefree/pi-repo-search/contracts/v1/conformance";
 import { createPlasticRepositorySearchPolicyV1, loadPlasticOwnerV1 } from "../src/repository-search-provider.ts";
 
 const root = await mkdtemp(join(tmpdir(), "pi-plastic-repo-policy-"));
@@ -22,7 +21,7 @@ try {
     assert.deepEqual(result.roots[0]?.ignoreFiles.map((file) => file.slice(plastic.length + 1).replaceAll("\\", "/")), ["ignore.conf", "Assets/cloaked.conf"]);
   }
 
-  // Frozen conformance helpers also prove cancellation/fresh context behavior with a marker fixture.
-  await assertRepositoryPolicyConformanceV1({ createPolicy: () => createPlasticRepositorySearchPolicyV1(owner), applicableRequest: { workspaceRoot: plastic, roots: [plastic] }, nonApplicableRequest: { workspaceRoot: gitOnly, roots: [gitOnly] } });
+  const nonApplicable = await policy.evaluate({ cwd: root, signal: new AbortController().signal }, { workspaceRoot: root, roots: [gitOnly], includeHidden: false, signal: new AbortController().signal });
+  assert.equal(nonApplicable.outcome, "not_applicable");
 } finally { await rm(root, { recursive: true, force: true }); }
 console.log("PASS: Plastic repository-search policy");

@@ -21,6 +21,8 @@ and this project follows semantic versioning for public package releases.
 
 ### Changed
 
+- Made `@aefree/pi-repo-search` an optional peer: Plastic ignore/cloak policy registration is enabled when the package is installed, while core Plastic tools and skills load normally without it.
+
 - Made `plastic_diffFile(path=...)` default to the workspace Plastic base, route changed-file questions to `plastic_status`, and document supported advanced revision forms without agent-authored `cm cat` temporary-file recipes.
 
 - Updated the Pi development baseline to 0.83.0.

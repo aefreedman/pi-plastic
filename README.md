@@ -10,7 +10,7 @@ The extension owns only the `plastic-branch` status key. It does not replace Pi'
 
 ## Repository-search policy
 
-Pi session startup registers the independent `plastic.ignore-files` repository-search policy. The marker-based policy discovers readable `ignore.conf` and `cloaked.conf` only from the nearest Plastic workspace to each requested root, then adds them as ripgrep ignore files without replacing native ripgrep/Git-ignore behavior. It does not register workflow guidance or perform Plastic CLI readiness checks; owning `plastic_*` tools validate their own workspace and CLI requirements.
+When `@aefree/pi-repo-search` is also installed, Pi session startup registers the independent `plastic.ignore-files` repository-search policy. The marker-based policy discovers readable `ignore.conf` and `cloaked.conf` only from the nearest Plastic workspace to each requested root, then adds them as ripgrep ignore files without replacing native ripgrep/Git-ignore behavior. The integration is optional: without `pi-repo-search`, all Plastic tools and skills still load and only this policy registration is omitted. It does not register workflow guidance or perform Plastic CLI readiness checks; owning `plastic_*` tools validate their own workspace and CLI requirements.
 
 
 ## Mutation execution
@@ -131,7 +131,7 @@ pi install -l <path-to-pi-plastic>
 - Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`, or `PI_PLASTIC_CM_EXECUTABLE` set to its full executable path
 - Git available on `PATH`, or `PI_PLASTIC_GIT_EXECUTABLE` set to its full executable path, for text-only diff tools
 - A configured Plastic workspace for workspace-scoped operations
-- `@aefree/pi-repo-search` is a normal semver runtime dependency. The pi-plastic tarball does not embed linked sibling workspaces or `node_modules` paths.
+- `@aefree/pi-repo-search` is an optional peer. When installed, it receives the Plastic ignore/cloak policy; when absent, `pi-plastic` loads without repository-search integration. The tarball does not embed linked sibling workspaces or `node_modules` paths.
 
 ## Testing
 
