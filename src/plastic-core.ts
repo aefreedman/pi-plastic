@@ -1,9 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { isUtf8 } from "node:buffer";
 import { spawn } from "node:child_process";
 import { tool } from "./pi-tool-compat";
 import { promises as fs, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "os";
-import { dirname, isAbsolute, join, relative, resolve, win32 } from "path";
+import { dirname, extname, isAbsolute, join, relative, resolve, win32 } from "path";
 import { parsePlasticStatusBranch } from "./plastic-workspace";
 
 type SpawnResult = {
@@ -11,6 +12,8 @@ type SpawnResult = {
     stderr: string;
     exitCode: number;
     aborted: boolean;
+    stdoutTruncated?: boolean;
+    stdoutTotalChars?: number;
 };
 
 const abortSignalStorage = new AsyncLocalStorage<AbortSignal | undefined>();
@@ -26,6 +29,9 @@ const resolveExecutable = (environment: ExecutableEnvironment, overrideVariable:
 
 const getCmExecutable = (): string => resolveExecutable(process.env, "PI_PLASTIC_CM_EXECUTABLE", "cm");
 const getGitExecutable = (): string => resolveExecutable(process.env, "PI_PLASTIC_GIT_EXECUTABLE", "git");
+// `diff -u` has compatible exit semantics on Windows GNU diff and macOS BSD diff.
+// Keep the executable name configurable rather than assuming a .exe suffix or package-manager path.
+const getDiffExecutable = (): string => resolveExecutable(process.env, "PI_PLASTIC_DIFF_EXECUTABLE", "diff");
 
 const executableNotFoundError = (command: string, error: Error): Error =>
 {
@@ -42,6 +48,11 @@ const executableNotFoundError = (command: string, error: Error): Error =>
     if (command === getGitExecutable())
     {
         return new Error(`Unable to launch Git executable '${command}' (ENOENT). Set PI_PLASTIC_GIT_EXECUTABLE to the full path to git, or add git to PATH.`);
+    }
+
+    if (command === getDiffExecutable())
+    {
+        return new Error(`Unable to launch text diff executable '${command}' (ENOENT). Set PI_PLASTIC_DIFF_EXECUTABLE to a safe diff executable, or add diff to PATH.`);
     }
 
     return new Error(`Unable to launch executable '${command}' (ENOENT). Verify that it is installed and available on PATH.`);
@@ -78,19 +89,25 @@ const writeInput = async (stdin: NodeJS.WritableStream | null | undefined, input
     });
 };
 
-const readStream = async (stream: NodeJS.ReadableStream | null | undefined): Promise<string> =>
+const readStream = async (stream: NodeJS.ReadableStream | null | undefined, maxChars?: number): Promise<{ output: string; truncated: boolean; totalChars: number }> =>
 {
     if (!stream)
     {
-        return "";
+        return { output: "", truncated: false, totalChars: 0 };
     }
 
     let output = "";
+    let totalChars = 0;
     for await (const chunk of stream)
     {
-        output += chunk.toString();
+        const text = chunk.toString();
+        totalChars += text.length;
+        if (maxChars === undefined || output.length < maxChars)
+        {
+            output += maxChars === undefined ? text : text.slice(0, Math.max(0, maxChars - output.length));
+        }
     }
-    return output;
+    return { output, truncated: maxChars !== undefined && totalChars > maxChars, totalChars };
 };
 
 type SpawnAndCollectDependencies = {
@@ -98,6 +115,7 @@ type SpawnAndCollectDependencies = {
     setTimeout?: (callback: () => void, delay: number) => NodeJS.Timeout;
     clearTimeout?: (timeout: NodeJS.Timeout) => void;
     abortKillDelayMs?: number;
+    outputLimitChars?: number;
 };
 
 const spawnAndCollect = async (
@@ -130,8 +148,8 @@ const spawnAndCollect = async (
 
     const scheduleTimeout = dependencies.setTimeout ?? setTimeout;
     const cancelTimeout = dependencies.clearTimeout ?? clearTimeout;
-    const stdoutPromise = readStream(proc.stdout);
-    const stderrPromise = readStream(proc.stderr);
+    const stdoutPromise = readStream(proc.stdout, dependencies.outputLimitChars);
+    const stderrPromise = readStream(proc.stderr, dependencies.outputLimitChars);
     let aborted = false;
     let terminalSettled = false;
     let killTimeout: NodeJS.Timeout | undefined;
@@ -211,12 +229,14 @@ const spawnAndCollect = async (
                 writeInput(proc.stdin, input).then(() => exitPromise),
             ])
             : await exitPromise;
-        const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise]);
+        const [stdoutResult, stderrResult] = await Promise.all([stdoutPromise, stderrPromise]);
         return {
-            stdout,
-            stderr,
+            stdout: stdoutResult.output,
+            stderr: stderrResult.output,
             exitCode,
             aborted,
+            stdoutTruncated: stdoutResult.truncated,
+            stdoutTotalChars: stdoutResult.totalChars,
         };
     }
     finally
@@ -231,7 +251,7 @@ const spawnAndCollect = async (
     }
 };
 
-const BLOCKED_CM_DIFF_MESSAGE = "`cm diff` is blocked in Pi because it may launch GUI windows and hang the CLI. Use `plastic_diffFile` (workspace vs revision) or `plastic_diffRevisions` (revision vs revision text diff).";
+const BLOCKED_CM_DIFF_MESSAGE = "`cm diff` is blocked in Pi because it may launch GUI windows and hang the CLI. Use `plastic_status` to list changed paths, `plastic_diffFile` for a file diff, or `plastic_diffRevisions` for two explicit revision specs.";
 
 const ensureCmCommandAllowed = (args: string[]): void =>
 {
@@ -292,6 +312,7 @@ type PendingItem = {
     comparisonKey: string;
     isDirectory: boolean;
     kind: PendingItemKind;
+    revisionId?: string;
 };
 
 type PendingItemSummary = {
@@ -573,7 +594,7 @@ const inferPendingItemKind = (statusCode: string): PendingItemKind =>
 const parseMachineReadablePendingItems = (output: string, cwd: string): PendingItem[] =>
 {
     const lines = normalizeFindOutputLines(output);
-    const statusLinePattern = /^([A-Z+]+)\s+(.+?)\s+(True|False)\s+.*$/;
+    const statusLinePattern = /^([A-Z+]+)\s+(.+?)\s+(True|False)\s+(.*)$/;
     const pendingItems: PendingItem[] = [];
 
     for (const line of lines)
@@ -592,6 +613,8 @@ const parseMachineReadablePendingItems = (output: string, cwd: string): PendingI
         const statusCode = match[1];
         const workspacePath = match[2];
         const isDirectory = match[3] === "True";
+        const remainder = match[4] ?? "";
+        const revisionId = remainder.match(/^\s*(\d+)\b/)?.[1];
         const normalizedPath = toNormalizedAbsolutePath(workspacePath, cwd);
         pendingItems.push({
             statusCode,
@@ -600,6 +623,7 @@ const parseMachineReadablePendingItems = (output: string, cwd: string): PendingI
             comparisonKey: toPathComparisonKeyFromAbsolutePath(normalizedPath),
             isDirectory,
             kind: inferPendingItemKind(statusCode),
+            ...(revisionId ? { revisionId } : {}),
         });
     }
 
@@ -609,7 +633,7 @@ const parseMachineReadablePendingItems = (output: string, cwd: string): PendingI
 const getMachineReadablePendingItems = async (workdir?: string): Promise<PendingItem[]> =>
 {
     const cwd = workdir ?? process.cwd();
-    const output = await runCmRaw(["status", "--machinereadable"], workdir);
+    const output = await runCmRaw(["status", "--machinereadable", "--includeRevId"], workdir);
     return parseMachineReadablePendingItems(output, cwd);
 };
 
@@ -864,35 +888,94 @@ const isItemSelectorRevisionSpec = (revision: string): boolean =>
         || normalized.startsWith("lb:");
 };
 
-const normalizeDiffFileRevisionSpec = (pathForRevision: string, revision: string): string =>
-{
-    const normalizedPath = pathForRevision.trim();
-    const normalizedRevision = revision.trim();
-
-    if (!normalizedRevision || normalizedRevision.includes("#") || isGlobalRevisionSpec(normalizedRevision))
-    {
-        return normalizedRevision;
-    }
-
-    if (isItemSelectorRevisionSpec(normalizedRevision) && normalizedPath.length > 0)
-    {
-        const selector = /^\d+$/.test(normalizedRevision) ? `cs:${normalizedRevision}` : normalizedRevision;
-        return `${normalizedPath}#${selector}`;
-    }
-
-    return normalizedRevision;
+type DiffFileRevisionResolution = {
+    supplied: string | null;
+    kind: "workspace-base" | "changeset" | "branch" | "label" | "global-revision" | "file-qualified";
+    resolved: string;
 };
 
-const isUnscopedDiffRevisionSpec = (revision: string): boolean =>
+const resolveDiffFileRevision = (pathForRevision: string, revision?: string): DiffFileRevisionResolution =>
 {
-    const normalizedRevision = revision.trim();
-    if (!normalizedRevision || normalizedRevision.includes("#") || isGlobalRevisionSpec(normalizedRevision))
+    const normalizedPath = pathForRevision.trim();
+    const normalizedRevision = revision?.trim() ?? "";
+    if (!normalizedPath)
+    {
+        throw new Error("path must identify a workspace file.");
+    }
+
+    // A bare item path is the unambiguous common case: cm cat resolves the
+    // workspace's loaded/base revision without asking agents to guess a revspec.
+    if (!normalizedRevision)
+    {
+        return { supplied: null, kind: "workspace-base", resolved: normalizedPath };
+    }
+
+    const lowerRevision = normalizedRevision.toLowerCase();
+    if (lowerRevision === "base" || lowerRevision === "head" || lowerRevision === "cs:head" || /^cs:br:/i.test(normalizedRevision))
+    {
+        throw new Error(
+            `Unsupported revision '${revision}'. Omit revision for the workspace base, or use a changeset number/cs:<number>, br:/<branch>, lb:<label>, a file-qualified '<path>#<selector>', or a global revid:/rev: spec.`,
+        );
+    }
+
+    if (normalizedRevision.includes("#"))
+    {
+        return { supplied: normalizedRevision, kind: "file-qualified", resolved: normalizedRevision };
+    }
+
+    if (isGlobalRevisionSpec(normalizedRevision))
+    {
+        return { supplied: normalizedRevision, kind: "global-revision", resolved: normalizedRevision };
+    }
+
+    if (/^\d+$/.test(normalizedRevision) || /^cs:\d+$/i.test(normalizedRevision))
+    {
+        const selector = /^\d+$/.test(normalizedRevision) ? `cs:${normalizedRevision}` : normalizedRevision;
+        return { supplied: normalizedRevision, kind: "changeset", resolved: `${normalizedPath}#${selector}` };
+    }
+
+    if (/^br:\/.+/i.test(normalizedRevision))
+    {
+        return { supplied: normalizedRevision, kind: "branch", resolved: `${normalizedPath}#${normalizedRevision}` };
+    }
+
+    if (/^lb:[^\s#]+/i.test(normalizedRevision))
+    {
+        return { supplied: normalizedRevision, kind: "label", resolved: `${normalizedPath}#${normalizedRevision}` };
+    }
+
+    throw new Error(
+        `Unsupported revision '${revision}'. Omit revision for the workspace base, or use a changeset number/cs:<number>, br:/<branch>, lb:<label>, a file-qualified '<path>#<selector>', or a global revid:/rev: spec.`,
+    );
+};
+
+// Kept as a small compatibility seam for older focused tests and consumers.
+const normalizeDiffFileRevisionSpec = (pathForRevision: string, revision: string): string =>
+    resolveDiffFileRevision(pathForRevision, revision).resolved;
+
+const isValidGlobalRevisionSpec = (revision: string): boolean =>
+    /^(?:rev|revid|itemid|serverpath):\S+$/i.test(revision.trim());
+
+const isValidFileQualifiedRevisionSpec = (revision: string): boolean =>
+{
+    const normalized = revision.trim();
+    const separator = normalized.lastIndexOf("#");
+    if (separator <= 0 || separator === normalized.length - 1)
     {
         return false;
     }
 
-    return isItemSelectorRevisionSpec(normalizedRevision);
+    const selector = normalized.slice(separator + 1);
+    return /^cs:\d+$/i.test(selector)
+        || /^br:\/.+/i.test(selector)
+        || /^lb:[^\s#]+$/i.test(selector)
+        || isValidGlobalRevisionSpec(selector);
 };
+
+const isValidDiffRevisionSpec = (revision: string): boolean =>
+    isValidGlobalRevisionSpec(revision) || isValidFileQualifiedRevisionSpec(revision);
+
+const isUnscopedDiffRevisionSpec = (revision: string): boolean => !isValidDiffRevisionSpec(revision);
 
 const extractBranchSelectorFromRevision = (revision: string): string | null =>
 {
@@ -1059,6 +1142,18 @@ const assertNonBlankPatchValue = (name: keyof PatchCommandArgs, value: string | 
     }
 };
 
+const resolvePatchToolPath = (toolPath?: string): string =>
+{
+    if (toolPath?.trim())
+    {
+        return toolPath.trim();
+    }
+
+    // Keep cm patch on the same configurable portable diff executable used by
+    // text-only file diffs. `diff` remains a PATH lookup on both platforms.
+    return getDiffExecutable();
+};
+
 const buildPatchCommandArgs = (args: PatchCommandArgs): string[] =>
 {
     assertRequiredPatchValue("source", args.source);
@@ -1099,6 +1194,7 @@ const buildPatchCommandArgs = (args: PatchCommandArgs): string[] =>
 export const __plasticProcessInternals = {
     resolveCmExecutable: (environment: ExecutableEnvironment = process.env): string => resolveExecutable(environment, "PI_PLASTIC_CM_EXECUTABLE", "cm"),
     resolveGitExecutable: (environment: ExecutableEnvironment = process.env): string => resolveExecutable(environment, "PI_PLASTIC_GIT_EXECUTABLE", "git"),
+    resolveDiffExecutable: (environment: ExecutableEnvironment = process.env): string => resolveExecutable(environment, "PI_PLASTIC_DIFF_EXECUTABLE", "diff"),
     spawnAndCollect,
     runCm,
     runCmRaw,
@@ -1106,6 +1202,7 @@ export const __plasticProcessInternals = {
 
 export const __plasticPatchInternals = {
     buildPatchCommandArgs,
+    resolvePatchToolPath,
 };
 
 export const __plasticCheckinInternals = {
@@ -1124,6 +1221,7 @@ export const __plasticCheckinInternals = {
     isGitUnknownOptionLabelError,
     isRevisionNotFoundError,
     normalizeDiffFileRevisionSpec,
+    resolveDiffFileRevision,
     isUnscopedDiffRevisionSpec,
     extractBranchSelectorFromRevision,
     extractBranchNameFromSelector,
@@ -1219,6 +1317,168 @@ const runGitDiffNoIndex = async (
     }
 
     return result.output;
+};
+
+const DIFF_OUTPUT_MAX_CHARS = 60_000;
+
+type TextDiffResult = {
+    backend: "diff";
+    changed: boolean;
+    binary: boolean;
+    output: string;
+    truncated: boolean;
+    totalChars: number;
+};
+
+// Do not classify serialized Unity YAML by its extension or importer metadata:
+// valid UTF-8 YAML is text, while NUL-containing or invalid UTF-8 bytes are binary.
+const isBinaryContent = (content: Buffer): boolean => content.includes(0) || !isUtf8(content);
+
+const stableDiffHeaders = (output: string, leftLabel: string, rightLabel: string): string =>
+{
+    const lines = output.split(/\r?\n/);
+    // Both GNU and BSD `diff -u` put the source paths in the first two header
+    // lines. Replacing only those lines keeps hunk content verbatim while never
+    // leaking package-owned temporary paths or host-specific timestamps.
+    if (lines[0]?.startsWith("--- "))
+    {
+        lines[0] = `--- ${leftLabel}`;
+    }
+    if (lines[1]?.startsWith("+++ "))
+    {
+        lines[1] = `+++ ${rightLabel}`;
+    }
+    return lines.join("\n").replace(/\n+$/, "");
+};
+
+const boundDiffOutput = (output: string): Pick<TextDiffResult, "output" | "truncated" | "totalChars"> =>
+{
+    const totalChars = output.length;
+    if (totalChars <= DIFF_OUTPUT_MAX_CHARS)
+    {
+        return { output, truncated: false, totalChars };
+    }
+
+    return {
+        output: `${output.slice(0, DIFF_OUTPUT_MAX_CHARS)}\n\n[Diff output truncated at ${DIFF_OUTPUT_MAX_CHARS} characters; inspect a narrower file or use a review patch for the complete change.]`,
+        truncated: true,
+        totalChars,
+    };
+};
+
+const runPortableTextDiff = async (
+    leftPath: string,
+    rightPath: string,
+    cwd: string,
+    leftLabel: string,
+    rightLabel: string,
+): Promise<TextDiffResult> =>
+{
+    const [leftContent, rightContent] = await Promise.all([fs.readFile(leftPath), fs.readFile(rightPath)]);
+    if (isBinaryContent(leftContent) || isBinaryContent(rightContent))
+    {
+        return { backend: "diff", changed: !leftContent.equals(rightContent), binary: true, output: "", truncated: false, totalChars: 0 };
+    }
+
+    const { stdout, stderr, exitCode, aborted, stdoutTruncated, stdoutTotalChars } = await spawnAndCollect(
+        getDiffExecutable(),
+        ["-u", leftPath, rightPath],
+        cwd,
+        undefined,
+        undefined,
+        { outputLimitChars: DIFF_OUTPUT_MAX_CHARS },
+    );
+    if (aborted)
+    {
+        throw new Error("Text diff was aborted.");
+    }
+    if (exitCode > 1)
+    {
+        const diagnostic = [stdout, stderr].filter(Boolean).join("\n").trim();
+        const sanitized = diagnostic
+            .split(leftPath).join(leftLabel)
+            .split(rightPath).join(rightLabel);
+        throw new Error(sanitized || `Text diff failed with exit code ${exitCode}.`);
+    }
+
+    const normalized = stableDiffHeaders(stdout, leftLabel, rightLabel);
+    const bounded = stdoutTruncated
+        ? {
+            output: `${normalized}\n\n[Diff output truncated at ${DIFF_OUTPUT_MAX_CHARS} characters; inspect a narrower file or generate a review patch for the complete change.]`,
+            truncated: true,
+            totalChars: stdoutTotalChars ?? normalized.length,
+        }
+        : boundDiffOutput(normalized);
+    return { backend: "diff", changed: exitCode === 1, binary: false, ...bounded };
+};
+
+const safeTempExtension = (pathValue: string): string =>
+{
+    const extension = extname(pathValue);
+    return /^\.[A-Za-z0-9]{1,12}$/.test(extension) ? extension : ".tmp";
+};
+
+const materializeRevision = async (revision: string, destination: string, workdir?: string): Promise<void> =>
+{
+    // --file keeps historical bytes out of the decoded stdout path. This is
+    // required for both reliable binary detection and Unity YAML text handling.
+    try
+    {
+        await runCm(["cat", revision, `--file=${destination}`], workdir);
+    }
+    catch (error)
+    {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(message.split(destination).join("<package-owned-temp-file>"));
+    }
+    const destinationStat = await fs.stat(destination).catch(() => null);
+    if (!destinationStat?.isFile())
+    {
+        throw new Error("Plastic did not materialize the requested historical file content.");
+    }
+};
+
+const formatTextDiff = async (
+    action: "diffFile" | "diffRevisions",
+    format: OutputFormat | undefined,
+    comparisonKind: string,
+    result: TextDiffResult,
+    workdir: string | undefined,
+): Promise<string> =>
+{
+    const status = result.binary ? (result.changed ? "binary-different" : "unchanged") : (result.changed ? "changed" : "unchanged");
+    const text = result.binary
+        ? (result.changed ? "Binary content differs; a text diff is unavailable." : "No differences.")
+        : (result.changed ? result.output : "No differences.");
+    return toStructuredResult(
+        action,
+        format ?? "text",
+        text,
+        {
+            comparisonKind,
+            backend: result.backend,
+            status,
+            changed: result.changed,
+            binary: result.binary,
+            truncated: result.truncated,
+            totalChars: result.totalChars,
+            diff: result.changed && !result.binary ? result.output : undefined,
+        },
+        workdir,
+        result.truncated ? ["Diff output was truncated; use a narrower file or generate a review patch for the complete result."] : undefined,
+    );
+};
+
+export const __plasticDiffInternals = {
+    DIFF_OUTPUT_MAX_CHARS,
+    isBinaryContent,
+    stableDiffHeaders,
+    boundDiffOutput,
+    runPortableTextDiff,
+    safeTempExtension,
+    materializeRevision,
+    resolveDiffFileRevision,
+    isUnscopedDiffRevisionSpec,
 };
 
 const workdirArg = tool.schema.string().optional().describe("Working directory for the workspace.");
@@ -2337,29 +2597,65 @@ export const diff = tool({
 });
 
 export const patch = tool({
-    description: "Generate a Plastic SCM patch with optional clean/integration filtering (cm patch).",
+    description: "Generate a Plastic SCM patch with the configured portable diff backend and optional clean/integration filtering (cm patch).",
     args: {
         source: tool.schema.string().min(1).describe("Source changeset or branch spec, for example a changeset spec or branch spec selected from the current workspace."),
         destination: tool.schema.string().optional().describe("Optional second changeset or branch spec for two-spec patch generation."),
         output: tool.schema.string().optional().describe("Optional output file path. If omitted, patch content is printed to stdout."),
-        toolPath: tool.schema.string().optional().describe("Optional path to the diff executable used by cm patch."),
+        toolPath: tool.schema.string().optional().describe("Optional path to the diff executable used by cm patch. Defaults to PI_PLASTIC_DIFF_EXECUTABLE or diff on PATH."),
         clean: tool.schema.boolean().optional().describe("Exclude content that arrived via merges and include only direct checkins."),
         integration: tool.schema.boolean().optional().describe("Show branch changes pending integration into the parent branch."),
         workdir: workdirArg,
     },
     async execute(args)
     {
-        const cmdArgs = buildPatchCommandArgs(args);
-        const output = await runCm(cmdArgs, args.workdir);
-        return args.output && output === "(no output)" ? `Patch generated at ${args.output}.` : output;
+        const cwd = args.workdir ?? process.cwd();
+        const tempDir = args.output ? null : await fs.mkdtemp(join(tmpdir(), "plastic-patch-"));
+        const requestedOutput = args.output ?? join(tempDir!, "review.patch");
+        const resolvedOutput = isAbsolute(requestedOutput) ? requestedOutput : resolve(cwd, requestedOutput);
+
+        try
+        {
+            const cmdArgs = buildPatchCommandArgs({ ...args, output: requestedOutput, toolPath: resolvePatchToolPath(args.toolPath) });
+            const commandOutput = await runCm(cmdArgs, args.workdir);
+            const patchStat = await fs.stat(resolvedOutput).catch(() => null);
+            if (!patchStat?.isFile())
+            {
+                throw new Error(`Plastic reported patch generation success but did not create '${requestedOutput}'.`);
+            }
+
+            const patchBytes = await fs.readFile(resolvedOutput);
+            const isText = isUtf8(patchBytes);
+            const patchText = isText ? patchBytes.toString("utf8") : "";
+            const bounded = boundDiffOutput(patchText);
+            const binaryLimited = /Binary files? .* differ|cannot diff|binary (?:content|file) (?:is )?not supported/i.test(`${patchText}\n${commandOutput}`);
+            const metadata = {
+                status: patchBytes.length === 0 ? "empty" : (binaryLimited ? "generated-with-binary-warning" : "generated"),
+                output: args.output ? requestedOutput : null,
+                bytes: patchBytes.length,
+                empty: patchBytes.length === 0,
+                binaryLimited: !isText || binaryLimited,
+                truncated: !args.output && bounded.truncated,
+                content: args.output ? null : bounded.output,
+            };
+            return JSON.stringify(metadata, null, 2);
+        }
+        finally
+        {
+            if (tempDir)
+            {
+                await fs.rm(tempDir, { recursive: true, force: true });
+            }
+        }
     },
 });
 
 export const diffRevisions = tool({
-    description: "Show a text-only diff between two Plastic revisions (cm cat + git diff --no-index).",
+    description: "Show a bounded text-only diff between two file-qualified Plastic revisions using portable diff -u; binary content is reported explicitly.",
     args: {
         leftRevision: tool.schema.string().min(1).describe("Left file-qualified Plastic revision spec for cm cat."),
         rightRevision: tool.schema.string().min(1).describe("Right file-qualified Plastic revision spec for cm cat."),
+        format: outputFormatArg,
         workdir: workdirArg,
     },
     async execute(args)
@@ -2372,18 +2668,16 @@ export const diffRevisions = tool({
         const cwd = args.workdir ?? process.cwd();
         const leftLabel = args.leftRevision.includes("#") ? args.leftRevision.replace("#", "@") : args.leftRevision;
         const rightLabel = args.rightRevision.includes("#") ? args.rightRevision.replace("#", "@") : args.rightRevision;
-        const leftContent = await runCmRaw(["cat", args.leftRevision], args.workdir);
-        const rightContent = await runCmRaw(["cat", args.rightRevision], args.workdir);
         const tempDir = await fs.mkdtemp(join(tmpdir(), "plastic-core-"));
-        const leftPath = join(tempDir, "left.txt");
-        const rightPath = join(tempDir, "right.txt");
+        const leftPath = join(tempDir, `left${safeTempExtension(args.leftRevision)}`);
+        const rightPath = join(tempDir, `right${safeTempExtension(args.rightRevision)}`);
 
         try
         {
-            await fs.writeFile(leftPath, leftContent, "utf8");
-            await fs.writeFile(rightPath, rightContent, "utf8");
-            const output = await runGitDiffNoIndex(leftPath, rightPath, cwd, leftLabel, rightLabel);
-            return output.length > 0 ? output : "No differences.";
+            await materializeRevision(args.leftRevision, leftPath, args.workdir);
+            await materializeRevision(args.rightRevision, rightPath, args.workdir);
+            const result = await runPortableTextDiff(leftPath, rightPath, cwd, leftLabel, rightLabel);
+            return formatTextDiff("diffRevisions", args.format, "revision-to-revision", result, args.workdir);
         }
         finally
         {
@@ -2393,50 +2687,76 @@ export const diffRevisions = tool({
 });
 
 export const diffFile = tool({
-    description: "Show a text-only diff between a workspace file and a Plastic revision (cm cat + git diff --no-index).",
+    description: "Show a bounded text-only diff between a workspace file and its Plastic base (or a supported revision). Omit revision for the common workspace-base comparison.",
     args: {
         path: tool.schema.string().min(1).describe("Workspace file path to diff."),
-        revision: tool.schema.string().min(1).describe("Plastic revision spec for cm cat."),
+        revision: tool.schema.string().optional().describe("Optional revision: changeset number/cs:<number>, br:/<branch>, lb:<label>, file-qualified '<path>#<selector>', or global revid:/rev:. Omit for the workspace base."),
+        format: outputFormatArg,
         workdir: workdirArg,
     },
     async execute(args)
     {
         const cwd = args.workdir ?? process.cwd();
         const workspacePath = isAbsolute(args.path) ? args.path : join(cwd, args.path);
+        const workspaceStat = await fs.stat(workspacePath).catch(() => null);
+        const pendingItems = args.revision ? [] : await getMachineReadablePendingItems(args.workdir);
+        const pendingItem = pendingItems.find((item) => item.comparisonKey === toPathComparisonKeyFromAbsolutePath(workspacePath));
+        const isAdded = !args.revision && pendingItem?.kind === "added";
+        const isDeleted = !args.revision && pendingItem?.kind === "deleted";
+        if (!workspaceStat?.isFile() && !isDeleted)
+        {
+            throw new Error(`Workspace file '${args.path}' does not exist or is not a regular file. Use plastic_status to confirm whether it is a pending deletion.`);
+        }
+
         const displayPath = isAbsolute(args.path) ? relative(cwd, args.path) : args.path;
         const revisionPath = displayPath.length > 0 ? displayPath : args.path;
-        const resolvedRevision = normalizeDiffFileRevisionSpec(revisionPath, args.revision);
-        const leftLabel = resolvedRevision.includes("#") ? resolvedRevision.replace("#", "@") : resolvedRevision;
-        const rightLabel = `${displayPath} (workspace)`;
-        let baseContent = "";
+        const revision = resolveDiffFileRevision(revisionPath, args.revision);
+        const leftLabel = isAdded ? `${revisionPath} (empty before add)` : (revision.resolved.includes("#") ? revision.resolved.replace("#", "@") : `${revisionPath} (Plastic base)`);
+        const rightLabel = isDeleted ? `${displayPath} (empty after delete)` : `${displayPath} (workspace)`;
+        const materializeSpec = isDeleted && pendingItem?.revisionId ? `revid:${pendingItem.revisionId}` : revision.resolved;
+        if (isDeleted && !pendingItem?.revisionId)
+        {
+            throw new Error(`Plastic status identified '${args.path}' as deleted but did not provide its base revision ID.`);
+        }
+        const tempDir = await fs.mkdtemp(join(tmpdir(), "plastic-core-"));
+        const basePath = join(tempDir, `base${safeTempExtension(workspacePath)}`);
+        const emptyWorkspacePath = join(tempDir, `workspace${safeTempExtension(workspacePath)}`);
 
         try
         {
-            baseContent = await runCmRaw(["cat", resolvedRevision], args.workdir);
-        }
-        catch (error)
-        {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            if (isRevisionNotFoundError(errorMessage))
+            if (isAdded)
             {
-                const guidance = await buildRevisionNotFoundGuidance(resolvedRevision, displayPath || args.path, args.workdir);
-                if (guidance)
+                await fs.writeFile(basePath, "");
+            }
+            else
+            {
+                try
                 {
-                    throw new Error(`${errorMessage}\n\n${guidance}`);
+                    await materializeRevision(materializeSpec, basePath, args.workdir);
+                }
+                catch (error)
+                {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    if (isRevisionNotFoundError(errorMessage))
+                    {
+                        const guidance = await buildRevisionNotFoundGuidance(revision.resolved, displayPath || args.path, args.workdir);
+                        if (guidance)
+                        {
+                            throw new Error(`${errorMessage}\n\n${guidance}`);
+                        }
+                    }
+                    throw error;
                 }
             }
 
-            throw error;
-        }
-
-        const tempDir = await fs.mkdtemp(join(tmpdir(), "plastic-core-"));
-        const basePath = join(tempDir, "base.txt");
-
-        try
-        {
-            await fs.writeFile(basePath, baseContent, "utf8");
-            const output = await runGitDiffNoIndex(basePath, workspacePath, cwd, leftLabel, rightLabel);
-            return output.length > 0 ? output : "No differences.";
+            if (isDeleted)
+            {
+                await fs.writeFile(emptyWorkspacePath, "");
+            }
+            const comparisonPath = isDeleted ? emptyWorkspacePath : workspacePath;
+            const comparisonKind = isAdded ? "workspace-added" : (isDeleted ? "workspace-deleted" : revision.kind);
+            const result = await runPortableTextDiff(basePath, comparisonPath, cwd, leftLabel, rightLabel);
+            return formatTextDiff("diffFile", args.format, comparisonKind, result, args.workdir);
         }
         finally
         {

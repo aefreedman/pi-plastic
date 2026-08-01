@@ -21,20 +21,16 @@ plastic_patch(source="<branch-spec>", toolPath="<path-to-diff-tool>")
 
 ## Text-Only Diff Options
 
-Prefer tool-first when available:
+Prefer tool-first:
 
 ```text
-plastic_diffFile(path="<workspace-path>", revision="<revision-spec>")
-plastic_diffRevisions(leftRevision="<left-revspec>", rightRevision="<right-revspec>")
+plastic_status(machineReadable=true) # “what changed?” / changed-path listing
+plastic_diffFile(path="<workspace-path>") # common workspace vs Plastic-base comparison
+plastic_diffFile(path="<workspace-path>", revision="cs:<number>") # explicit advanced comparison
+plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```
 
-Manual shell fallback for revision vs revision text diff:
-
-```bash
-cm cat "<left-revspec>" --file=left.tmp
-cm cat "<right-revspec>" --file=right.tmp
-git diff --no-index -- left.tmp right.tmp
-```
+The diff tools materialize historical bytes and remove their temporary files internally. They use a bounded portable text diff, treat valid Unity YAML as text, and report genuine binary content explicitly. Do not construct `cm cat` temporary-file recipes for ordinary review.
 
 ## Metadata Listing (No GUI Diff)
 
@@ -50,11 +46,12 @@ Use the Read tool for full context instead of GUI diffs.
 
 ## CLI-Safe File Diff
 
-Use Plastic tool:
+Use the common no-revision path first; `base`, `head`, and `cs:head` are rejected rather than guessed:
 
 ```text
-plastic_diffFile(path="<workspace-path>", revision="<revision-spec>")
-plastic_diffRevisions(leftRevision="<left-revspec>", rightRevision="<right-revspec>")
+plastic_diffFile(path="<workspace-path>")
+plastic_diffFile(path="<workspace-path>", revision="br:/<branch>")
+plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```
 
 ## Pending Changes

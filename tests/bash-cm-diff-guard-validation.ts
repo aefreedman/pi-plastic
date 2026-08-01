@@ -37,7 +37,12 @@ const main = (): void =>
     expectBlocked("zsh -lc \"command cm diff cs:123\"");
     expectBlocked("bash -lc \"env FOO=bar cm diff cs:123\"");
     expectBlocked("cmd /c \"cm diff cs:123\"");
+    expectBlocked("cmd /c cm diff cs:123");
     expectBlocked("pwsh -command \"cm diff cs:123\"");
+    expectBlocked("powershell -command cm diff cs:123");
+    expectBlocked("\"C:\\Program Files\\PlasticSCM5\\client\\cm.exe\" diff cs:123");
+    expectBlocked("cm status & cm diff cs:123");
+    expectBlocked("cm status\ncm diff cs:123");
 
     expectAllowed("cm status");
     expectAllowed("cm merge br:/main");

@@ -31,7 +31,10 @@ const assertThrows = (fn: () => void, expectedMessage: string, message: string):
 
 const main = (): void =>
 {
-    const { buildPatchCommandArgs } = __plasticPatchInternals;
+    const { buildPatchCommandArgs, resolvePatchToolPath } = __plasticPatchInternals;
+
+    assert(resolvePatchToolPath() === "diff", "Expected patch backend to share the portable diff PATH default.");
+    assert(resolvePatchToolPath(" C:\\gnu\\diff.exe ") === "C:\\gnu\\diff.exe", "Expected an explicit patch backend to override the default.");
 
     assertArgs(
         buildPatchCommandArgs({ source: "br:/main/task001" }),

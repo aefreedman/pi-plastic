@@ -73,9 +73,12 @@ async function main(): Promise<void> {
   assert.deepEqual(searchPlasticTools({ query: "list available branches" }).map((match) => match.name), ["plastic_branchList"], "multi-term branch discovery should not activate unrelated list tools");
   assert.deepEqual(searchPlasticTools({ query: "list branches in a specified workspace read-only", limit: 1 }).map((match) => match.name), ["plastic_branchList"], "the first capability domain should outrank incidental workspace context");
   assert.deepEqual(searchPlasticTools({ query: "find existing code reviews" }).map((match) => match.name), ["plastic_codeReviewFind"], "contextual review discovery should select the smallest sufficient query tool");
+  assert.deepEqual(searchPlasticTools({ query: "what changed" }).map((match) => match.name), ["plastic_status"], "changed-file questions should route to status rather than GUI-capable diff commands");
   const diffMatches = searchPlasticTools({ query: "diff" }).map((match) => match.name);
   assert(!diffMatches.includes("plastic_diff"), "the disabled compatibility diff alias must never be executable through search");
-  assert.deepEqual(diffMatches.slice(0, 2), ["plastic_diffRevisions", "plastic_diffFile"], "generic diff searches should prefer safe text-only alternatives");
+  assert.deepEqual(diffMatches.slice(0, 2), ["plastic_diffFile", "plastic_diffRevisions"], "generic diff searches should prefer the common workspace-file route before advanced revision comparison");
+  assert.deepEqual(searchPlasticTools({ query: "workspace diff" }).map((match) => match.name), ["plastic_diffFile"], "workspace diff intent should select the file diff tool");
+  assert.deepEqual(searchPlasticTools({ query: "compare revisions" }).map((match) => match.name), ["plastic_diffRevisions"], "explicit revision comparison should select the advanced tool");
   assert.deepEqual(searchPlasticTools({ toolNames: ["plastic_diff"] }).map((match) => match.name), [], "the disabled diff alias must not be exactly selectable");
   assert.deepEqual(searchPlasticTools({ toolNames: ["plastic_workspaceCreate"] }).map((match) => match.name), [], "workspace creation must not be discoverable until paired cleanup is available");
   assert.deepEqual(searchPlasticTools({ toolNames: ["foreign_tool"] }).map((match) => match.name), [], "unknown names must not be selectable");

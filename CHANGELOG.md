@@ -9,6 +9,8 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Added bounded portable `plastic_diffFile`/`plastic_diffRevisions` output metadata, explicit binary results, temporary historical-content cleanup, Unity-YAML-as-text coverage, revision validation, and Windows GNU `diff` regression coverage.
+
 - Added session-scoped generic repository-search policy. The policy safely discovers bounded `ignore.conf`/`cloaked.conf` chains.
 - Added actual package-root/version owner discovery at the extension boundary and packed-copy owner-conflict coverage.
 - Added direct mutation execution coverage proving one exact `cm` process attempt with no approval context and no implicit retry.
@@ -18,6 +20,8 @@ and this project follows semantic versioning for public package releases.
 - Added an opt-in, local-only branch-creation test for contributor-authenticated disposable Plastic repositories.
 
 ### Changed
+
+- Made `plastic_diffFile(path=...)` default to the workspace Plastic base, route changed-file questions to `plastic_status`, and document supported advanced revision forms without agent-authored `cm cat` temporary-file recipes.
 
 - Updated the Pi development baseline to 0.83.0.
 

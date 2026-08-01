@@ -6,9 +6,9 @@ import {
 } from "./shared/bash-command-guards";
 
 const BLOCK_MESSAGE =
-  "`cm diff` is blocked in Pi because it can launch a GUI window and hang CLI automation. Use `plastic_diffFile`, `plastic_diffRevisions`, or `cm cat` + `git diff --no-index`.";
+  "`cm diff` is blocked in Pi because it can launch a GUI window and hang CLI automation. Use `plastic_status` to list changed paths, `plastic_diffFile` for a file diff, or `plastic_diffRevisions` for two explicit revisions.";
 
-const DIRECT_CM_DIFF = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?cm(?:\.exe)?\s+diff(?:\s|$)/i;
+const DIRECT_CM_DIFF = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:(?:"[^"]*[\\/]cm(?:\.exe)?"|'[^']*[\\/]cm(?:\.exe)?')|(?:[^"'\s]*[\\/])?cm(?:\.exe)?)\s+diff(?:\s|$)/i;
 
 function isBashToolCall(event: { toolName?: string }): event is { toolName: "bash"; input: { command?: string } } {
   return event.toolName === "bash";

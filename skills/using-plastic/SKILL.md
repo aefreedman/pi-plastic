@@ -16,7 +16,9 @@ Treat `plastic_merge` success as provisional until `plastic_status` confirms the
 
 For the common closeout flow of merging a finished source branch into its parent branch, prefer `plastic_mergeToBranch` when available. When `target` is omitted, it resolves the source branch's Plastic parent branch instead of assuming `/dev`. It switches to the target, optionally updates, runs the safe merge, checks merge state, and checks in the merge result. Pass `target` only when the user explicitly wants a different integration branch.
 
-`plastic_diff` is intentionally disabled. Use `plastic_diffFile` or `plastic_diffRevisions` for text-only file diffs. Use `plastic_patch` for review patch generation with `clean` and `integration` filters; it is generation-only and does not apply patches.
+`plastic_diff` is intentionally disabled. For the common workspace change, use `plastic_diffFile(path="<workspace-path>")` with no revision; it materializes the Plastic base internally and returns a bounded portable text diff. Use a revision only when needed: a changeset number/`cs:<number>`, `br:/<branch>`, `lb:<label>`, file-qualified spec, or global `revid:`/`rev:` spec. `base`, `head`, and `cs:head` are intentionally rejected rather than guessed. Use `plastic_diffRevisions` only for two explicit file-qualified revisions. Binary content is reported rather than decoded as text.
+
+Use `plastic_status()` for “what changed?” and changed-path/status listing; do not use `cm diff` formatting for that purpose. Use `plastic_patch` for review patch generation with `clean` and `integration` filters; it is generation-only and does not apply patches. It uses `PI_PLASTIC_DIFF_EXECUTABLE` when set, otherwise portable `diff` on PATH; pass `toolPath` only for an intentional one-call override. For a large patch, pass an intentional new `output` path because Plastic will not overwrite it.
 
 Prefer runtime `plastic_*` tools first. Keep `cm` shell commands as manual fallback.
 

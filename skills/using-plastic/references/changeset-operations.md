@@ -76,15 +76,13 @@ Never run `cm diff` in Pi.
 Use one of these safe alternatives:
 
 ```text
-plastic_diffFile(path="<workspace-path>", revision="<revision-spec>")
-plastic_diffRevisions(leftRevision="<left-revspec>", rightRevision="<right-revspec>")
+plastic_status(machineReadable=true) # list pending paths/statuses
+plastic_diffFile(path="<workspace-path>") # common workspace-base diff
+plastic_diffFile(path="<workspace-path>", revision="cs:<number>")
+plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```
 
-```bash
-cm cat "<left-revspec>" --file=left.tmp
-cm cat "<right-revspec>" --file=right.tmp
-git diff --no-index -- left.tmp right.tmp
-```
+The typed diff tools own historical `cm cat --file` materialization and cleanup; do not create agent-authored temporary files for ordinary diffs.
 
 ## Commit Message Format
 

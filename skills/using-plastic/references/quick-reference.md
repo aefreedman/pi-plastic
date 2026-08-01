@@ -17,8 +17,10 @@ Note: command examples target current `cm` 11.x CLI syntax; legacy aliases may d
 | Finalize merge metadata | `plastic_finalizeMerge(source="<source-branch-spec>", strategy="destination")` | `cm merge <source-branch-spec> --merge --nointeractiveresolution --mergetype=forced --keepdestination` | Use after manual/reviewed resolution when checkin says merge is still in progress |
 | Shelve | `plastic_shelvesetCreate(comment="description")` | `cm shelveset create -c="description"` | Save work temporarily |
 | Patch for review | `plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<patch-file>")` | `cm patch <branch-spec> --clean --integration --output=<patch-file>` | Focused branch-review patch; inspect before sharing |
-| Diff (workspace vs revision) | `plastic_diffFile(path="<workspace-path>", revision="<revision-spec>")` | `cm cat <revspec> --file=base.tmp` + `git diff --no-index -- base.tmp <workspace-file>` | Text-only diff |
-| Diff (revision vs revision) | `plastic_diffRevisions(leftRevision="<left-revspec>", rightRevision="<right-revspec>")` | `cm cat <left> --file=left.tmp` + `cm cat <right> --file=right.tmp` + `git diff --no-index -- left.tmp right.tmp` | Avoids GUI diff |
+| Changed-file listing | `plastic_status(machineReadable=true)` | `cm status --all` | Lists changed, added, moved, deleted, and private items without GUI diff |
+| Diff (workspace vs Plastic base) | `plastic_diffFile(path="<workspace-path>")` | None recommended | Bounded portable text diff; no guessed revision needed |
+| Diff (workspace vs supported revision) | `plastic_diffFile(path="<workspace-path>", revision="cs:<number>")` | None recommended | Also accepts a branch, label, file-qualified, or global revision spec |
+| Diff (revision vs revision) | `plastic_diffRevisions(leftRevision="<left-revspec>", rightRevision="<right-revspec>")` | None recommended | Requires two file-qualified revisions; avoids GUI and package temp-file recipes |
 
 ## Merge verification checklist
 

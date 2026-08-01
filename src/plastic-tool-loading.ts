@@ -20,15 +20,15 @@ export type PlasticSearchCatalogEntry = {
  * disabled alias rather than a safe executable diff capability.
  */
 export const PLASTIC_SEARCH_CATALOG: readonly PlasticSearchCatalogEntry[] = [
-  { name: "plastic_status", aliases: ["status", "pending changes", "working changes"], tags: ["workspace", "inspect", "changes"], guidance: ["Inspect pending changes and merge state before workspace mutations."] },
+  { name: "plastic_status", aliases: ["status", "pending changes", "working changes", "what changed", "changed files", "list changes"], tags: ["workspace", "inspect", "changes"], guidance: ["Use machineReadable=true to list changed, added, moved, deleted, and private paths without invoking GUI-capable cm diff."] },
   { name: "plastic_update", aliases: ["update", "sync", "pull latest"], tags: ["workspace", "synchronize", "safe"], guidance: ["Review pending changes before updating a workspace."] },
   { name: "plastic_add", aliases: ["add files", "track files", "add item"], tags: ["workspace", "changes", "mutation"], guidance: ["Confirm the intended paths before adding them to source control."] },
   { name: "plastic_checkin", aliases: ["checkin", "check in", "commit changes"], tags: ["changes", "mutation", "changeset"], guidance: ["Inspect the selected paths and checkin message before creating a changeset."] },
   { name: "plastic_undo", aliases: ["undo changes", "revert changes", "discard changes"], tags: ["changes", "mutation", "destructive"], guidance: ["Confirm the exact paths before discarding pending changes."] },
   { name: "plastic_resolveDeleteChangeConflict", aliases: ["resolve delete conflict", "deleted conflict"], tags: ["merge", "conflict", "resolution"], guidance: ["Inspect the conflict and choose whether files should remain on disk before resolving it."] },
   { name: "plastic_patch", aliases: ["patch", "generate patch", "review patch"], tags: ["diff", "patch", "export"], guidance: ["Inspect generated patches before sharing because they can include source, paths, or secrets."] },
-  { name: "plastic_diffRevisions", aliases: ["diff", "diff revisions", "compare revisions", "revision diff"], tags: ["diff", "revision", "inspect"], guidance: ["Use this for text-only comparisons between two revision specifications."] },
-  { name: "plastic_diffFile", aliases: ["diff", "diff file", "file diff", "compare file"], tags: ["diff", "file", "inspect"], guidance: ["Use this for text-only file comparisons; inspect paths and revisions first."] },
+  { name: "plastic_diffFile", aliases: ["diff", "diff file", "file diff", "workspace diff", "compare file"], tags: ["diff", "file", "workspace", "inspect"], guidance: ["For the common workspace diff, pass path and omit revision; use a documented changeset, branch, label, file-qualified, or global revision only when needed."] },
+  { name: "plastic_diffRevisions", aliases: ["diff revisions", "compare revisions", "revision diff"], tags: ["diff", "revision", "inspect"], guidance: ["Use this only for two explicit file-qualified revision specifications."] },
   { name: "plastic_branchCreate", aliases: ["create branch", "new branch"], tags: ["branch", "mutation", "workflow"], guidance: ["Create normal work branches beneath an intended parent, which may differ from the loaded branch. Use allowRootBranch only for intentional top-level branches."] },
   { name: "plastic_switchBranch", aliases: ["switch branch", "checkout branch", "change branch"], tags: ["branch", "workspace", "mutation"], guidance: ["Check pending changes and choose how to handle them before switching branches."] },
   { name: "plastic_merge", aliases: ["merge branch", "merge changes"], tags: ["merge", "conflict", "workflow"], guidance: ["Inspect merge state and resolve conflicts before checkin."] },

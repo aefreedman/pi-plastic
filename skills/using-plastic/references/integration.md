@@ -34,11 +34,12 @@ plastic_patch(source="<branch-spec>", integration=true)
 plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<patch-file>")
 ```
 
-- Inspect specific file content changes with:
+- Inspect specific file content changes with the common workspace-base path first:
 
 ```text
-plastic_diffFile(path="<workspace-path>", revision="<revision-spec>")
-plastic_diffRevisions(leftRevision="<left-revspec>", rightRevision="<right-revspec>")
+plastic_diffFile(path="<workspace-path>")
+plastic_diffFile(path="<workspace-path>", revision="cs:<number>")
+plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```
 
 ## Plan Workflow

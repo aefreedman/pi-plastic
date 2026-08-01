@@ -2,12 +2,14 @@ export const WRAPPED_COMMAND_PATTERNS = [
   /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?(?:bash|sh|zsh)(?:\.exe)?\s+-lc\s+(["'])([\s\S]*)\1$/i,
   /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?(?:bash|sh|zsh)(?:\.exe)?\s+-c\s+(["'])([\s\S]*)\1$/i,
   /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?cmd(?:\.exe)?\s+\/[ck]\s+(["'])([\s\S]*)\1$/i,
+  /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?cmd(?:\.exe)?\s+\/[ck]\s+()([\s\S]+)$/i,
   /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?(?:pwsh|powershell)(?:\.exe)?\s+-command\s+(["'])([\s\S]*)\1$/i,
+  /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?(?:pwsh|powershell)(?:\.exe)?\s+-command\s+()([\s\S]+)$/i,
 ];
 
 export function splitSegments(command: string): string[] {
   return command
-    .split(/&&|\|\||;|\|/g)
+    .split(/&&|\|\||[;&|\r\n]/g)
     .map((part) => part.trim())
     .filter(Boolean);
 }
