@@ -9,6 +9,8 @@ and this project follows semantic versioning for public package releases.
 
 ### Changed
 
+- Replaced the optional `@aefree/pi-repo-search` integration with `@aefree/pi-file-discovery`. Plastic ignore/cloak data is now an advisory file-discovery filter: only roots with readable ignore/cloak files emit `filterDecision: "applied"` records with a nearest-workspace `filterBoundary`; no-op roots are omitted and unavailable or malformed filter data degrades to generic discovery as routine execution hygiene.
+- Register the optional Plastic filter through the package-qualified global capability-registry rendezvous instead of importing `pi-file-discovery` from Plastic's separate module root. Registration remains session-scoped, transactional, and safe against stale shutdown tokens.
 - Excluded development-only tests and behavioral evals from published npm artifacts.
 - Publish verified GitHub releases to npm through resumable OIDC trusted-publishing automation, and canonicalized the package repository URL for GitHub identity matching.
 

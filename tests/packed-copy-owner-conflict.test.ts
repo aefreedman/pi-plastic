@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
-import { createPlasticRepositorySearchPolicyV1, loadPlasticOwnerV1 } from "../src/repository-search-provider.ts";
+import { createPlasticFileDiscoveryFilterV1, loadPlasticOwnerV1 } from "../src/file-discovery-filter.ts";
 
 const temp = await mkdtemp(path.join(tmpdir(), "pi-plastic-packed-copies-"));
 try {
@@ -15,14 +15,14 @@ try {
   const first = path.join(temp, "first"); const second = path.join(temp, "second");
   await mkdir(first); await mkdir(second);
   for (const destination of [first, second]) {
-    const extracted = spawnSync("tar", ["-xf", filename, "-C", path.basename(destination), "package/package.json", "package/extensions/repository-search-provider.ts"], { cwd: temp, encoding: "utf8", shell: false });
+    const extracted = spawnSync("tar", ["-xf", filename, "-C", path.basename(destination), "package/package.json", "package/extensions/file-discovery-filter.ts"], { cwd: temp, encoding: "utf8", shell: false });
     assert.equal(extracted.status, 0, extracted.stderr);
   }
-  const entry = (root: string) => pathToFileURL(path.join(root, "package", "extensions", "repository-search-provider.ts")).href;
+  const entry = (root: string) => pathToFileURL(path.join(root, "package", "extensions", "file-discovery-filter.ts")).href;
   const ownerOne = await loadPlasticOwnerV1(entry(first));
   const ownerTwo = await loadPlasticOwnerV1(entry(second));
   assert.notEqual(ownerOne.packageRoot, ownerTwo.packageRoot);
   assert.equal(ownerOne.packageVersion, ownerTwo.packageVersion);
-  assert.equal(createPlasticRepositorySearchPolicyV1(ownerOne).id, createPlasticRepositorySearchPolicyV1(ownerTwo).id);
+  assert.equal(createPlasticFileDiscoveryFilterV1(ownerOne).id, createPlasticFileDiscoveryFilterV1(ownerTwo).id);
 } finally { await rm(temp, { recursive: true, force: true }); }
 console.log("PASS: two packed physical pi-plastic copies retain distinct owner roots");

@@ -8,9 +8,9 @@ When Pi starts inside a Plastic workspace, this package adds a themed `Plastic <
 
 The extension owns only the `plastic-branch` status key. It does not replace Pi's footer or suppress Pi's Git branch display, so Git and Plastic information can appear together in nested workspaces. If the Plastic marker exists but neither the selector nor `cm` yields a branch, the footer shows `Plastic branch unavailable`. Non-Plastic directories show no Plastic status.
 
-## Repository-search policy
+## File-discovery filter
 
-When `@aefree/pi-repo-search` is also installed, Pi session startup registers the independent `plastic.ignore-files` repository-search policy. The marker-based policy discovers readable `ignore.conf` and `cloaked.conf` only from the nearest Plastic workspace to each requested root, then adds them as ripgrep ignore files without replacing native ripgrep/Git-ignore behavior. The integration is optional: without `pi-repo-search`, all Plastic tools and skills still load and only this policy registration is omitted. It does not register workflow guidance or perform Plastic CLI readiness checks; owning `plastic_*` tools validate their own workspace and CLI requirements.
+When `@aefree/pi-file-discovery` is also loaded, Pi session startup registers the independent advisory `plastic.ignore-files` file-discovery filter through the package-qualified capability-registry rendezvous key. The packages may have separate module roots; Plastic does not import file-discovery from its own root. It discovers readable `ignore.conf` and `cloaked.conf` only from the nearest Plastic workspace to each requested root, then supplies them as ripgrep ignore files without replacing native ripgrep/Git-ignore behavior. A root is emitted only when it has at least one readable ignore/cloak file; each emitted root declares `filterDecision: "applied"`, decision code `plastic_ignore_files_applied`, and that workspace as its `filterBoundary`. No-op Plastic roots are omitted from mixed requests, and a request with no effective ignore/cloak records is `not_applicable`. The integration is optional: without `pi-file-discovery`, all Plastic tools and skills still load and no filter registry is created. Missing, malformed, or unavailable Plastic filter data degrades to generic discovery; `pi-file-discovery` owns that execution hygiene and disclosure behavior. It does not register workflow guidance or perform Plastic CLI readiness checks; owning `plastic_*` tools validate their own workspace and CLI requirements.
 
 
 ## Mutation execution
@@ -131,7 +131,7 @@ pi install -l <path-to-pi-plastic>
 - Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`, or `PI_PLASTIC_CM_EXECUTABLE` set to its full executable path
 - A compatible `diff` executable available on `PATH`, or `PI_PLASTIC_DIFF_EXECUTABLE` set to its full executable path, for text-only diff and patch tools
 - A configured Plastic workspace for workspace-scoped operations
-- `@aefree/pi-repo-search` is an optional peer. When installed, it receives the Plastic ignore/cloak policy; when absent, `pi-plastic` loads without repository-search integration. The tarball does not embed linked sibling workspaces or `node_modules` paths.
+- `pi-file-discovery` is an optional independently loaded integration. When its `discover_candidate_files` tool is active, it receives the advisory Plastic ignore/cloak filter through the shared global capability protocol; when absent, `pi-plastic` loads without file-discovery filtering. The tarball does not embed linked sibling workspaces or `node_modules` paths.
 
 ## Testing
 
