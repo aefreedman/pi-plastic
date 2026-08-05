@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows semantic versioning for public package releases.
 
+## [0.5.1] - 2026-08-05
+
+### Changed
+
+- Clarified that preflight is situational rather than routine and that status, focused tests, and direct reads should precede intentional diff output.
+- Reduced agent-facing diff defaults, added caller-controlled body bounds and complete JSON response bounds, required selected paths or explicit `allPending=true` for workspace diffs (including direct-call guards), and limited generic diff discovery to one focused tool.
+
 ## [0.5.0] - 2026-08-05
 
 ### Added

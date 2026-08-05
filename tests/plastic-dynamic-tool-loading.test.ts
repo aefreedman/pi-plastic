@@ -76,7 +76,7 @@ async function main(): Promise<void> {
   assert.deepEqual(searchPlasticTools({ query: "what changed" }).map((match) => match.name), ["plastic_status"], "changed-file questions should route to status rather than GUI-capable diff commands");
   const diffMatches = searchPlasticTools({ query: "diff" }).map((match) => match.name);
   assert(!diffMatches.includes("plastic_diff"), "the disabled compatibility diff alias must never be executable through search");
-  assert.deepEqual(diffMatches.slice(0, 2), ["plastic_diffFile", "plastic_workspaceDiff"], "generic diff searches should prefer safe workspace-file and pending-review routes before advanced revision comparison");
+  assert.deepEqual(diffMatches, ["plastic_diffFile"], "generic diff searches should activate only the smallest focused comparison capability");
   assert.deepEqual(searchPlasticTools({ query: "workspace diff" }).map((match) => match.name), ["plastic_workspaceDiff"], "workspace diff intent should select the bounded pending-review tool");
   assert.deepEqual(searchPlasticTools({ query: "pending review" }).map((match) => match.name), ["plastic_workspaceDiff"], "pending review should route to the batch workspace diff tool");
   assert.deepEqual(searchPlasticTools({ query: "compare revisions" }).map((match) => match.name), ["plastic_diffRevisions"], "explicit revision comparison should select the advanced tool");

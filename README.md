@@ -71,7 +71,8 @@ Pi 0.82 and newer use canonical `sourceInfo` provenance to identify this package
 ## Safety behavior
 
 - `plastic_branchCreate` supports an explicit parent branch independent of the loaded workspace branch, defaults relative names to the current branch when no parent is supplied, and rejects top-level paths unless `allowRootBranch=true` is explicit.
-- `plastic_diff` remains a disabled alias by design; use `plastic_status` for changed-path listing, `plastic_diffFile` for one file, `plastic_workspaceDiff` for pending review, or `plastic_diffRevisions` for an explicit historical pair.
+- `plastic_diff` remains a disabled alias by design. Use `plastic_status` for changed-path listing; do not diff as routine post-edit validation or checkin preflight. When change-boundary evidence is needed, use `plastic_diffFile` for one exact file, `plastic_workspaceDiff` with selected paths or explicit `allPending=true`, or `plastic_diffRevisions` for an explicit historical pair. Diff responses use small defaults and caller-controlled `maxChars` bounds.
+- Preflight is not routine confirmation. Use it for ambiguous or broad mutation scope, moved/deleted path rewriting, compound operations, or explicit preview requests; otherwise rely on exact targets and the tools' runtime guards.
 - `plastic_patch` generates review patches with `cm patch`, including `clean` and `integration` filters for branch review workflows. It does not expose patch apply.
 - Bash safety rails block `cm diff` and unsafe interactive `cm merge --merge` usage.
 - Merge tooling surfaces Plastic `FILE_CONFLICT` records and merge-state metadata from `cm status`.

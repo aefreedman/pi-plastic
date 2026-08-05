@@ -4,7 +4,7 @@
 
 - Create feature branch following detected conventions.
 - Use incremental checkins.
-- Never use `cm diff`; use text-only diff tools.
+- Never use `cm diff`. Do not diff routinely; use a text-only diff tool only when review needs change-boundary evidence.
 - Use `plastic_merge` (or `cm merge ... --nointeractiveresolution --mergetype=try`) for autonomous merges.
 
 ## Autonomous Merge Workflow
@@ -34,11 +34,12 @@ plastic_patch(source="<branch-spec>", integration=true)
 plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<patch-file>")
 ```
 
-- Inspect specific file content changes with the common workspace-base path first:
+- When change-boundary evidence is needed, inspect specific files first and opt into multi-file output explicitly:
 
 ```text
-plastic_diffFile(path="<workspace-path>") # one workspace file
-plastic_workspaceDiff() # bounded pending review
+plastic_diffFile(path="<workspace-path>", maxChars=4000) # one intentional file comparison
+plastic_workspaceDiff(paths=["<workspace-path>"], maxChars=3000) # explicitly scoped pending review
+plastic_workspaceDiff(allPending=true) # explicit small whole-workspace review
 plastic_diffFile(path="<workspace-path>", revision="cs:<number>")
 plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```

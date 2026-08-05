@@ -27,8 +27,8 @@ export const PLASTIC_SEARCH_CATALOG: readonly PlasticSearchCatalogEntry[] = [
   { name: "plastic_undo", aliases: ["undo changes", "revert changes", "discard changes"], tags: ["changes", "mutation", "destructive"], guidance: ["Confirm the exact paths before discarding pending changes."] },
   { name: "plastic_resolveDeleteChangeConflict", aliases: ["resolve delete conflict", "deleted conflict"], tags: ["merge", "conflict", "resolution"], guidance: ["Inspect the conflict and choose whether files should remain on disk before resolving it."] },
   { name: "plastic_patch", aliases: ["patch", "generate patch", "review patch"], tags: ["diff", "patch", "export"], guidance: ["Inspect generated patches before sharing because they can include source, paths, or secrets."] },
-  { name: "plastic_diffFile", aliases: ["diff", "diff file", "file diff", "compare one file", "compare file"], tags: ["diff", "file", "workspace", "inspect"], guidance: ["For one workspace file, pass path and omit revision; use a documented changeset, branch, label, file-qualified, or global revision only when needed."] },
-  { name: "plastic_workspaceDiff", aliases: ["workspace diff", "pending review", "review pending changes", "review workspace changes", "diff pending files"], tags: ["diff", "workspace", "review", "inspect"], guidance: ["For pending-change review, runs status once and returns bounded per-file outcomes. Private files are excluded unless explicitly selected or includePrivate=true."] },
+  { name: "plastic_diffFile", aliases: ["diff", "diff file", "file diff", "compare one file", "compare file"], tags: ["diff", "file", "workspace", "inspect"], guidance: ["Use only when change-boundary evidence is needed. Pass one exact workspace path, omit revision for its Plastic base, and keep maxChars small unless more output is intentional."] },
+  { name: "plastic_workspaceDiff", aliases: ["workspace diff", "pending review", "review pending changes", "review workspace changes", "diff pending files"], tags: ["diff", "workspace", "review", "inspect"], guidance: ["Use only for an intentional multi-file content review, not routine validation. Select exact paths or pass allPending=true explicitly; use plastic_status when only changed paths are needed."] },
   { name: "plastic_diffRevisions", aliases: ["diff revisions", "compare revisions", "revision diff"], tags: ["diff", "revision", "inspect"], guidance: ["Use this only for two explicit file-qualified revision specifications."] },
   { name: "plastic_branchCreate", aliases: ["create branch", "new branch"], tags: ["branch", "mutation", "workflow"], guidance: ["Create normal work branches beneath an intended parent, which may differ from the loaded branch. Use allowRootBranch only for intentional top-level branches."] },
   { name: "plastic_switchBranch", aliases: ["switch branch", "checkout branch", "change branch"], tags: ["branch", "workspace", "mutation"], guidance: ["Check pending changes and choose how to handle them before switching branches."] },
@@ -168,8 +168,7 @@ function safetyPriority(entry: PlasticSearchCatalogEntry): number {
 export function searchPlasticTools(input: PlasticToolSearchInput, descriptions: ReadonlyMap<string, string> = new Map()): PlasticToolSearchMatch[] {
   const requestedNames = exactRequestedNames(input.toolNames);
   const terms = typeof input.query === "string" ? tokenize(input.query) : [];
-  const normalizedLimit = normalizeLimit(input.limit, requestedNames);
-  const limit = input.limit === undefined && requestedNames.size === 0 && terms.length === 1 && terms[0] === "diff" ? 2 : normalizedLimit;
+  const limit = normalizeLimit(input.limit, requestedNames);
   const domainTerms = terms.filter((term) => SEARCH_DOMAIN_TERMS.has(term));
   const primaryDomainTerm = domainTerms[0];
   const mutationIntent = terms.some((term) => MUTATION_INTENT_TERMS.has(term));

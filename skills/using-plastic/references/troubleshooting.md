@@ -41,8 +41,9 @@ cm codereview -e <review-id> --reviewer="reviewer-name"
 - `cm diff` is blocked in Pi because it can launch GUI windows and hang the CLI.
 - Use text-only alternatives:
   - `plastic_status(machineReadable=true)` for changed paths/statuses.
-  - `plastic_diffFile(path="<workspace-path>")` for one workspace file.
-  - `plastic_workspaceDiff()` for bounded pending review (private files are excluded unless selected/opted in).
+  - `plastic_diffFile(path="<workspace-path>", maxChars=4000)` when one intentional file comparison is needed.
+  - `plastic_workspaceDiff(paths=["<workspace-path>"], maxChars=3000)` for an explicitly scoped pending review, or `allPending=true` for an intentional small whole-workspace review.
+  - Use `plastic_status` instead when only pending paths are needed; do not diff routinely.
   - `plastic_diffFile(path="<workspace-path>", revision="cs:<number>")` for an explicit supported revision.
   - `plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")` for two historical files.
 
@@ -96,12 +97,12 @@ plastic_resolveDeleteChangeConflict(paths=["<workspace-path>"], keepOnDisk=true)
 
 - Do not use `cm diff --summary`; this form is invalid.
 - Also avoid all other `cm diff` forms in Pi.
-- Use the same text-only alternatives listed above.
+- Use `plastic_status` unless change-boundary evidence is actually needed; then use the focused text-only alternatives above.
 
 ## Deleted Files Missing From Checkin
 
 - Run `cm status --all` and confirm deleted items are listed before checkin.
-- Use `plastic_checkin(preflight=true, paths=[...])` first; the tool can auto-rewrite moved/deleted file scopes to parent directories.
+- For a path-scoped checkin containing moved/deleted items, use `plastic_checkin(preflight=true, paths=[...])`; the tool can preview rewriting unstable file scopes to parent directories. Do not add preflight to unrelated routine checkins.
 - If a path-scoped checkin is rejected as "not changed", rerun with `applyChanged=true` and a parent-directory scope.
 - Re-run `cm status --all` just before checkin to validate scope.
 

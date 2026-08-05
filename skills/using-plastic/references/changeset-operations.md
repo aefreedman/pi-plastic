@@ -53,7 +53,7 @@ cm status --all
 
 Safe checklist:
 - Confirm deleted items appear in status output before checkin.
-- Prefer `plastic_checkin(preflight=true, paths=[...])` so the tool can rewrite unstable file scopes (moved/deleted) to stable parent scopes.
+- For path-scoped checkins containing moved/deleted items, use `plastic_checkin(preflight=true, paths=[...])` so the tool can preview rewriting unstable file scopes to stable parent scopes. Do not preflight ordinary exact-scope checkins routinely.
 - `plastic_checkin` now inspects `cm status --machinereadable` and auto-enables `--applychanged` when moved/deleted items are in scope.
 - Re-run `cm status --all` after add/scope changes, then checkin.
 
@@ -71,14 +71,13 @@ cm checkin -c="<commit-message>"
 
 ## Safe Diff Usage
 
-Never run `cm diff` in Pi.
-
-Use one of these safe alternatives:
+Never run `cm diff` in Pi. Do not replace it with a routine safe-diff call: use `plastic_status` for pending scope, focused tests for behavior, and direct reads for current content. Request diff output only when change-boundary evidence is needed.
 
 ```text
 plastic_status(machineReadable=true) # list pending paths/statuses
-plastic_diffFile(path="<workspace-path>") # one workspace file
-plastic_workspaceDiff() # bounded pending review; excludes private unless selected/opted in
+plastic_diffFile(path="<workspace-path>", maxChars=4000) # one intentional file comparison
+plastic_workspaceDiff(paths=["<workspace-path>"], maxChars=3000) # explicitly scoped review
+plastic_workspaceDiff(allPending=true) # explicit small whole-workspace review
 plastic_diffFile(path="<workspace-path>", revision="cs:<number>")
 plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```

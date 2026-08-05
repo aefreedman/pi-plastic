@@ -18,8 +18,8 @@ Note: command examples target current `cm` 11.x CLI syntax; legacy aliases may d
 | Shelve | `plastic_shelvesetCreate(comment="description")` | `cm shelveset create -c="description"` | Save work temporarily |
 | Patch for review | `plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<patch-file>")` | `cm patch <branch-spec> --clean --integration --output=<patch-file>` | Focused branch-review patch; inspect before sharing |
 | Changed-file listing | `plastic_status(machineReadable=true)` | `cm status --all` | Lists changed, added, moved, deleted, and private items without GUI diff |
-| Diff (one workspace file) | `plastic_diffFile(path="<workspace-path>")` | None recommended | Uses status base materialization; added/private files use an empty base |
-| Diff (pending review) | `plastic_workspaceDiff()` | None recommended | Runs status once; bounded per-file outcomes; private files excluded unless selected/opted in |
+| Diff (one workspace file) | `plastic_diffFile(path="<workspace-path>", maxChars=4000)` | None recommended | Intentional focused comparison only; not routine validation |
+| Diff (pending review) | `plastic_workspaceDiff(paths=["<workspace-path>"], maxChars=3000)` | None recommended | Requires selected paths or explicit `allPending=true`; use status for changed-path listing |
 | Diff (workspace vs supported revision) | `plastic_diffFile(path="<workspace-path>", revision="cs:<number>")` | None recommended | Also accepts a branch, label, file-qualified, or global revision spec |
 | Diff (revision vs revision) | `plastic_diffRevisions(leftRevision="<left-revspec>", rightRevision="<right-revspec>")` | None recommended | Requires two file-qualified revisions; avoids GUI and package temp-file recipes |
 

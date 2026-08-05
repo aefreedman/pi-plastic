@@ -6,7 +6,7 @@ import {
 } from "./shared/bash-command-guards";
 
 const BLOCK_MESSAGE =
-  "`cm diff` is blocked in Pi because it can launch a GUI window and hang CLI automation. Use `plastic_status` to list changed paths, `plastic_diffFile` for one file, `plastic_workspaceDiff` for pending review, or `plastic_diffRevisions` for two explicit revisions.";
+  "`cm diff` is blocked in Pi because it can launch a GUI window and hang CLI automation. Use `plastic_status` when only changed paths are needed. Do not diff routinely; when change-boundary evidence is necessary, use a focused `plastic_diffFile`, explicitly scoped `plastic_workspaceDiff`, or `plastic_diffRevisions`.";
 
 const DIRECT_CM_DIFF = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:(?:"[^"]*[\\/]cm(?:\.exe)?"|'[^']*[\\/]cm(?:\.exe)?')|(?:[^"'\s]*[\\/])?cm(?:\.exe)?)\s+diff(?:\s|$)/i;
 

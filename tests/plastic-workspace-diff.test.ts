@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
-import { diffFile, runWithAbortSignal, workspaceDiff } from "../src/plastic-core.ts";
+import { diffFile, diffRevisions, runWithAbortSignal, workspaceDiff } from "../src/plastic-core.ts";
 
 class FakeChildProcess extends EventEmitter {
   readonly stdout = new PassThrough();
@@ -121,8 +121,48 @@ try {
     "Focused --nodata diffs must explain why the base is unavailable and how to proceed.",
   );
 
+  await assert.rejects(
+    () => workspaceDiff.execute({ workdir: root, format: "text" }),
+    /requires explicit paths or allPending=true.*plastic_status/i,
+    "Unscoped workspace diff calls must require intentional whole-workspace review.",
+  );
+  await assert.rejects(
+    () => workspaceDiff.execute({ workdir: root, paths: [""], format: "text" }),
+    /non-blank workspace paths/i,
+    "Blank direct-call paths must not resolve to a broad workspace scope.",
+  );
+  await assert.rejects(
+    () => workspaceDiff.execute({ workdir: root, paths: ["."], format: "text" }),
+    /workspace-root path.*allPending=true/i,
+    "Workspace-root selection must require the explicit whole-workspace opt-in.",
+  );
+  await assert.rejects(
+    () => workspaceDiff.execute({ workdir: root, allPending: "false" as unknown as boolean, format: "text" }),
+    /allPending must be a boolean/i,
+    "Stringly typed direct-call opt-ins must not become truthy whole-workspace review.",
+  );
+  await assert.rejects(
+    () => workspaceDiff.execute({ workdir: root, allPending: true, includePrivate: "false" as unknown as boolean, format: "text" }),
+    /includePrivate must be a boolean/i,
+    "Stringly typed direct-call private flags must not include private files.",
+  );
+  await assert.rejects(
+    () => workspaceDiff.execute({ workdir: root, paths: ["changed.txt"], allPending: true, format: "text" }),
+    /either explicit paths or allPending=true/i,
+    "Selected and whole-workspace review scopes must not be combined.",
+  );
+  await assert.rejects(
+    () => workspaceDiff.execute({ workdir: root, paths: ["private.txt"], includePrivate: true, format: "text" }),
+    /includePrivate is only used with allPending=true/i,
+    "Explicit private paths must not need a redundant whole-workspace flag.",
+  );
+
+  const defaultBatch = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, allPending: true, format: "text" }), { spawn: fakeCommands([]) });
+  assert.match(String(defaultBatch), /Files considered: 3/, "Explicit whole-workspace review must keep a small default file count.");
+  assert.match(String(defaultBatch), /Skipped 2 pending item/, "The default whole-workspace bound must report omitted candidates.");
+
   const batchCalls: Call[] = [];
-  const batchResult = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, format: "text" }), { spawn: fakeCommands(batchCalls) });
+  const batchResult = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, allPending: true, maxFiles: 20, format: "text" }), { spawn: fakeCommands(batchCalls) });
   assert.match(String(batchResult), /changed\.txt \(changed\)/);
   assert.match(String(batchResult), /nodata\.txt \(changed\)\nUnavailable: Plastic cannot supply historical\/base bytes/);
   assert.match(String(batchResult), /moved destination\.txt \(moved\)/, "Workspace review must compare a moved destination path.");
@@ -141,27 +181,42 @@ try {
     await writeFile(join(root, name), "workspace\n");
   }
   const stressPaths = ["stress-1.txt", "stress-2.txt", "stress-3.txt", "stress-4.txt", "stress-5.txt", "unavailable.txt"];
-  const textStress = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: stressPaths, format: "text" }), { spawn: stressCommands([]) });
-  assert(String(textStress).length <= 60_000, "Text workspace diff must bound the complete response, not only individual diff bodies.");
+  const textStress = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: stressPaths, maxChars: 8_000, format: "text" }), { spawn: stressCommands([]) });
+  assert(String(textStress).length <= 20_000, "Text workspace diff must keep the complete response within the context-efficient bound.");
+  assert.match(String(textStress), /Per-file output bound: 8000 characters/, "Workspace diff must report an intentional raised per-file response bound.");
   assert.match(String(textStress), /outcome\(s\) omitted/, "An exhausted text budget must retain an omission summary.");
 
+  const focusedBound = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["stress-1.txt"], maxChars: 500, format: "text" }), { spawn: stressCommands([]) });
+  assert.match(String(focusedBound), /Per-file output bound: 500 characters/, "Callers must be able to request a smaller focused diff body.");
+  assert(String(focusedBound).length < 2_000, "A one-file focused review with a small bound must remain context efficient.");
+
+  const focusedJson = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "stress-1.txt", workdir: root, maxChars: 20_000, format: "json" }), { spawn: stressCommands([]) });
+  assert(String(focusedJson).length <= 24_000, "Focused file JSON must remain bounded after escape expansion.");
+  const focusedJsonPayload = jsonPayload(focusedJson);
+  assert.equal((focusedJsonPayload.data as Record<string, unknown>).truncated, true, "Post-serialization focused truncation must remain observable.");
+  assert(Array.isArray(focusedJsonPayload.warnings) && (focusedJsonPayload.warnings as string[]).some((warning) => warning.includes("JSON escaping")), "Focused JSON truncation must explain the complete-response bound.");
+
+  const revisionsJson = await runWithAbortSignal(undefined, () => diffRevisions.execute({ leftRevision: "stress-1.txt#cs:1", rightRevision: "stress-1.txt#cs:2", workdir: root, maxChars: 20_000, format: "json" }), { spawn: stressCommands([]) });
+  assert(String(revisionsJson).length <= 24_000, "Revision JSON must remain bounded after escape expansion.");
+  assert.equal((jsonPayload(revisionsJson).data as Record<string, unknown>).truncated, true, "Revision JSON must expose complete-response truncation.");
+
   const escapedUnmatchedPath = "missing \\\"quoted\\\" \\\\ path";
-  const jsonStress = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: [...stressPaths, escapedUnmatchedPath], format: "json" }), { spawn: stressCommands([]) });
-  assert(String(jsonStress).length <= 60_000, "JSON workspace diff must bound the complete framed response after JSON escaping.");
+  const jsonStress = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: [...stressPaths, escapedUnmatchedPath], maxChars: 8_000, format: "json" }), { spawn: stressCommands([]) });
+  assert(String(jsonStress).length <= 20_000, "JSON workspace diff must bound the complete framed response after JSON escaping.");
   const parsedStress = jsonPayload(jsonStress);
   const stressData = parsedStress.data as Record<string, unknown>;
   assert((stressData.omittedOutcomes as number) > 0, "An exhausted JSON budget must report omitted outcomes without breaking JSON framing.");
   assert(Array.isArray(parsedStress.warnings) && (parsedStress.warnings as string[]).some((warning) => warning.includes("no pending status record")), "Unmatched path inputs must remain summarized in bounded JSON warnings.");
 
   const unavailableJson = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["unavailable.txt", escapedUnmatchedPath], format: "json" }), { spawn: stressCommands([]) });
-  assert(String(unavailableJson).length <= 60_000, "Long per-file errors must not exceed the JSON response bound.");
+  assert(String(unavailableJson).length <= 20_000, "Long per-file errors must not exceed the JSON response bound.");
   const unavailableData = jsonPayload(unavailableJson).data as Record<string, unknown>;
   const unavailableOutcome = (unavailableData.outcomes as Array<Record<string, unknown>>)[0];
   assert(String(unavailableOutcome.error).length <= 1_024, "Long per-file errors must be bounded in metadata.");
 
   const zeroMaxFiles = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["stress-1.txt"], maxFiles: 0, format: "text" }), { spawn: stressCommands([]) });
   assert.match(String(zeroMaxFiles), /Files considered: 1/, "Runtime guards must clamp direct callers that bypass the schema with a zero file bound.");
-  assert(String(zeroMaxFiles).length <= 60_000, "A direct zero-bound caller must still receive a complete bounded response.");
+  assert(String(zeroMaxFiles).length <= 20_000, "A direct zero-bound caller must still receive a complete bounded response.");
 
   const oversizedPathInputs = ["x".repeat(5_000), ...Array.from({ length: 20 }, (_value, index) => `missing-${index}`)];
   const boundedInputs = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: oversizedPathInputs, format: "json" }), { spawn: stressCommands([]) });

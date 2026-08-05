@@ -245,7 +245,7 @@ const spawnAndCollect = async (
     }
 };
 
-const BLOCKED_CM_DIFF_MESSAGE = "`cm diff` is blocked in Pi because it may launch GUI windows and hang the CLI. Use `plastic_status` to list changed paths, `plastic_diffFile` for one file, `plastic_workspaceDiff` for pending review, or `plastic_diffRevisions` for two explicit revision specs.";
+const BLOCKED_CM_DIFF_MESSAGE = "`cm diff` is blocked in Pi because it may launch GUI windows and hang the CLI. Use `plastic_status` when only changed paths are needed. Do not diff routinely; when change-boundary evidence is necessary, use a focused `plastic_diffFile`, explicitly scoped `plastic_workspaceDiff`, or `plastic_diffRevisions`.";
 
 const ensureCmCommandAllowed = (args: string[]): void =>
 {
@@ -1276,7 +1276,14 @@ export const __plasticBranchInternals = {
     resolveBranchCreationTarget,
 };
 
+// Capture enough subprocess output for diagnostics while keeping the default
+// agent-facing response intentionally small. Callers may opt into a larger
+// focused response, but never the full capture bound.
 const DIFF_OUTPUT_MAX_CHARS = 60_000;
+const DIFF_RESPONSE_DEFAULT_MAX_CHARS = 8_000;
+const DIFF_RESPONSE_MAX_CHARS = 20_000;
+const DIFF_RESPONSE_MIN_CHARS = 500;
+const DIFF_RESPONSE_TOTAL_MAX_CHARS = 24_000;
 
 type TextDiffResult = {
     backend: "diff";
@@ -1395,37 +1402,47 @@ const materializeRevision = async (revision: string, destination: string, workdi
     }
 };
 
+const normalizeDiffResponseMaxChars = (value: unknown): number =>
+{
+    if (typeof value !== "number" || !Number.isFinite(value))
+    {
+        return DIFF_RESPONSE_DEFAULT_MAX_CHARS;
+    }
+    return Math.min(DIFF_RESPONSE_MAX_CHARS, Math.max(DIFF_RESPONSE_MIN_CHARS, Math.trunc(value)));
+};
+
 const formatTextDiff = async (
     action: "diffFile" | "diffRevisions",
     format: OutputFormat | undefined,
     comparisonKind: string,
-    result: TextDiffResult,
+    unboundedResult: TextDiffResult,
     workdir: string | undefined,
     comparisonMetadata: Record<string, unknown> = {},
+    maxChars?: number,
 ): Promise<string> =>
 {
+    const result = boundTextDiffResult(unboundedResult, normalizeDiffResponseMaxChars(maxChars));
     const status = result.binary ? (result.changed ? "binary-different" : "unchanged") : (result.changed ? "changed" : "unchanged");
     const text = result.binary
         ? (result.changed ? "Binary content differs; a text diff is unavailable." : "No differences.")
         : (result.changed ? result.output : "No differences.");
-    return toStructuredResult(
-        action,
-        format ?? "text",
-        text,
-        {
-            comparisonKind,
-            ...comparisonMetadata,
-            backend: result.backend,
-            status,
-            changed: result.changed,
-            binary: result.binary,
-            truncated: result.truncated,
-            totalChars: result.totalChars,
-            diff: result.changed && !result.binary ? result.output : undefined,
-        },
-        workdir,
-        result.truncated ? ["Diff output was truncated; use a narrower file or generate a review patch for the complete result."] : undefined,
-    );
+    const data = {
+        comparisonKind,
+        ...comparisonMetadata,
+        backend: result.backend,
+        status,
+        changed: result.changed,
+        binary: result.binary,
+        truncated: result.truncated,
+        totalChars: result.totalChars,
+        diff: result.changed && !result.binary ? result.output : undefined,
+    };
+    const warnings = result.truncated ? ["Diff output was truncated; use a narrower file or generate a review patch for the complete result."] : undefined;
+    if (format === "json")
+    {
+        return toBoundedDiffStructuredResult(action, data, workdir, warnings);
+    }
+    return text;
 };
 
 const isNoDataError = (message: string): boolean =>
@@ -1459,9 +1476,10 @@ const boundTextDiffResult = (result: TextDiffResult, maxChars: number): TextDiff
         return result;
     }
 
+    const suffix = `\n\n[Diff output truncated at the requested ${maxChars}-character response bound.]`;
     return {
         ...result,
-        output: `${result.output.slice(0, maxChars)}\n\n[Per-file diff output truncated at ${maxChars} characters.]`,
+        output: suffix.length >= maxChars ? suffix.slice(0, maxChars) : `${result.output.slice(0, maxChars - suffix.length)}${suffix}`,
         truncated: true,
         totalChars: result.totalChars,
     };
@@ -1469,6 +1487,11 @@ const boundTextDiffResult = (result: TextDiffResult, maxChars: number): TextDiff
 
 export const __plasticDiffInternals = {
     DIFF_OUTPUT_MAX_CHARS,
+    DIFF_RESPONSE_DEFAULT_MAX_CHARS,
+    DIFF_RESPONSE_MAX_CHARS,
+    DIFF_RESPONSE_MIN_CHARS,
+    DIFF_RESPONSE_TOTAL_MAX_CHARS,
+    normalizeDiffResponseMaxChars,
     isBinaryContent,
     stableDiffHeaders,
     boundDiffOutput,
@@ -1728,6 +1751,60 @@ const toStructuredResult = async (
     }
 
     return `## ${action}\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``;
+};
+
+const toBoundedDiffStructuredResult = async (
+    action: "diffFile" | "diffRevisions",
+    data: Record<string, unknown>,
+    workdir?: string,
+    warnings?: string[],
+): Promise<string> =>
+{
+    const wrap = (payload: Record<string, unknown>): string => `## ${action}\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``;
+    const basePayload = {
+        ok: true,
+        action,
+        toolVersion: TOOL_VERSION,
+        cliVersion: (await getCmVersion(workdir)).slice(0, 256),
+    };
+    const initial = wrap({ ...basePayload, data, ...(warnings?.length ? { warnings } : {}) });
+    if (initial.length <= DIFF_RESPONSE_TOTAL_MAX_CHARS)
+    {
+        return initial;
+    }
+
+    const originalDiff = typeof data.diff === "string" ? data.diff : "";
+    const responseWarning = `Diff content was further truncated after JSON escaping to keep the complete response within ${DIFF_RESPONSE_TOTAL_MAX_CHARS} characters.`;
+    const boundedWarnings = [...(warnings ?? []), responseWarning];
+    const suffix = `\n\n[Diff output truncated to keep the complete JSON response within ${DIFF_RESPONSE_TOTAL_MAX_CHARS} characters.]`;
+    const render = (prefixChars: number): string => wrap({
+        ...basePayload,
+        data: {
+            ...data,
+            truncated: true,
+            diff: `${originalDiff.slice(0, prefixChars)}${suffix}`,
+        },
+        warnings: boundedWarnings,
+    });
+
+    let low = 0;
+    let high = originalDiff.length;
+    let best = render(0);
+    while (low <= high)
+    {
+        const middle = Math.floor((low + high) / 2);
+        const candidate = render(middle);
+        if (candidate.length <= DIFF_RESPONSE_TOTAL_MAX_CHARS)
+        {
+            best = candidate;
+            low = middle + 1;
+        }
+        else
+        {
+            high = middle - 1;
+        }
+    }
+    return best;
 };
 
 type MergeConflictStrategy = "auto" | "source" | "destination";
@@ -2656,6 +2733,7 @@ export const diffRevisions = tool({
     args: {
         leftRevision: tool.schema.string().min(1).describe("Left file-qualified Plastic revision spec for cm cat."),
         rightRevision: tool.schema.string().min(1).describe("Right file-qualified Plastic revision spec for cm cat."),
+        maxChars: tool.schema.number().int().min(DIFF_RESPONSE_MIN_CHARS).max(DIFF_RESPONSE_MAX_CHARS).optional().describe(`Maximum diff-body characters returned (default ${DIFF_RESPONSE_DEFAULT_MAX_CHARS}, maximum ${DIFF_RESPONSE_MAX_CHARS}).`),
         format: outputFormatArg,
         workdir: workdirArg,
     },
@@ -2678,7 +2756,7 @@ export const diffRevisions = tool({
             await materializeRevision(args.leftRevision, leftPath, args.workdir);
             await materializeRevision(args.rightRevision, rightPath, args.workdir);
             const result = await runPortableTextDiff(leftPath, rightPath, cwd, leftLabel, rightLabel);
-            return formatTextDiff("diffRevisions", args.format, "revision-to-revision", result, args.workdir);
+            return formatTextDiff("diffRevisions", args.format, "revision-to-revision", result, args.workdir, {}, args.maxChars);
         }
         finally
         {
@@ -2779,6 +2857,7 @@ export const diffFile = tool({
     args: {
         path: tool.schema.string().min(1).describe("Workspace file path to diff."),
         revision: tool.schema.string().optional().describe("Optional revision: changeset number/cs:<number>, br:/<branch>, lb:<label>, file-qualified '<path>#<selector>', or global revid:/rev:. Omit for the workspace base."),
+        maxChars: tool.schema.number().int().min(DIFF_RESPONSE_MIN_CHARS).max(DIFF_RESPONSE_MAX_CHARS).optional().describe(`Maximum diff-body characters returned (default ${DIFF_RESPONSE_DEFAULT_MAX_CHARS}, maximum ${DIFF_RESPONSE_MAX_CHARS}).`),
         format: outputFormatArg,
         workdir: workdirArg,
     },
@@ -2819,7 +2898,7 @@ export const diffFile = tool({
                     throw error;
                 }
                 const result = await runPortableTextDiff(basePath, workspacePath, cwd, revision.resolved.replace("#", "@"), `${displayPath} (workspace)`);
-                return formatTextDiff("diffFile", args.format, revision.kind, result, args.workdir, { pendingKind: null, isNew: false });
+                return formatTextDiff("diffFile", args.format, revision.kind, result, args.workdir, { pendingKind: null, isNew: false }, args.maxChars);
             }
             finally
             {
@@ -2839,21 +2918,24 @@ export const diffFile = tool({
             compared.result,
             args.workdir,
             { pendingKind: compared.pendingKind, isNew: compared.pendingKind === "private" || compared.pendingKind === "added", statusRevisionId: pendingItem?.revisionId },
+            args.maxChars,
         );
     },
 });
 
-const WORKSPACE_DIFF_DEFAULT_MAX_FILES = 12;
+const WORKSPACE_DIFF_DEFAULT_MAX_FILES = 3;
 const WORKSPACE_DIFF_MAX_FILES = 20;
 const WORKSPACE_DIFF_MAX_PATHS = 20;
 const WORKSPACE_DIFF_PATH_MAX_CHARS = 1_024;
 const WORKSPACE_DIFF_DISPLAY_PATH_MAX_CHARS = 256;
 const WORKSPACE_DIFF_ERROR_MAX_CHARS = 1_024;
-const WORKSPACE_DIFF_PER_FILE_MAX_CHARS = 12_000;
+const WORKSPACE_DIFF_DEFAULT_MAX_CHARS = 3_000;
+const WORKSPACE_DIFF_PER_FILE_MAX_CHARS = 8_000;
+const WORKSPACE_DIFF_MIN_CHARS = 500;
 // This is a response bound, not just a diff-body bound. Reserve space for
 // framing and an omission summary so both text and JSON remain useful.
-const WORKSPACE_DIFF_TOTAL_MAX_CHARS = 60_000;
-const WORKSPACE_DIFF_CONTENT_MAX_CHARS = 48_000;
+const WORKSPACE_DIFF_TOTAL_MAX_CHARS = 20_000;
+const WORKSPACE_DIFF_CONTENT_MAX_CHARS = 16_000;
 
 const boundWorkspaceValue = (value: string, maxChars: number): string =>
 {
@@ -2945,11 +3027,13 @@ const formatWorkspaceDiffResult = async (
 };
 
 export const workspaceDiff = tool({
-    description: "Review bounded pending workspace file diffs in one status pass. Private files are excluded unless explicitly selected or includePrivate=true; unavailable files are reported without aborting the batch.",
+    description: "Review explicitly selected pending workspace file diffs, or opt into a small bounded whole-workspace review with allPending=true. Use plastic_status when only changed paths are needed.",
     args: {
-        paths: tool.schema.array(tool.schema.string().min(1).max(WORKSPACE_DIFF_PATH_MAX_CHARS)).max(WORKSPACE_DIFF_MAX_PATHS).optional().describe(`Optional pending workspace paths to review (maximum ${WORKSPACE_DIFF_MAX_PATHS}, ${WORKSPACE_DIFF_PATH_MAX_CHARS} characters each). Selecting paths includes matching private files.`),
-        includePrivate: tool.schema.boolean().optional().describe("Include private pending files when paths are omitted. Defaults to false."),
-        maxFiles: tool.schema.number().int().min(1).max(WORKSPACE_DIFF_MAX_FILES).optional().describe(`Maximum files to compare (default ${WORKSPACE_DIFF_DEFAULT_MAX_FILES}, maximum ${WORKSPACE_DIFF_MAX_FILES}).`),
+        paths: tool.schema.array(tool.schema.string().min(1).max(WORKSPACE_DIFF_PATH_MAX_CHARS)).max(WORKSPACE_DIFF_MAX_PATHS).optional().describe(`Pending workspace paths to review (maximum ${WORKSPACE_DIFF_MAX_PATHS}, ${WORKSPACE_DIFF_PATH_MAX_CHARS} characters each). Selecting paths includes matching private files.`),
+        allPending: tool.schema.boolean().optional().describe("Explicitly review pending non-private files when paths are omitted. Defaults to false; required for an unscoped workspace diff."),
+        includePrivate: tool.schema.boolean().optional().describe("Include private pending files with allPending=true. Selected private paths do not require this flag."),
+        maxFiles: tool.schema.number().int().min(1).max(WORKSPACE_DIFF_MAX_FILES).optional().describe(`Maximum files to compare for allPending review (default ${WORKSPACE_DIFF_DEFAULT_MAX_FILES}, maximum ${WORKSPACE_DIFF_MAX_FILES}); selected paths are all considered unless this is set.`),
+        maxChars: tool.schema.number().int().min(WORKSPACE_DIFF_MIN_CHARS).max(WORKSPACE_DIFF_PER_FILE_MAX_CHARS).optional().describe(`Maximum diff-body characters returned per file (default ${WORKSPACE_DIFF_DEFAULT_MAX_CHARS}, maximum ${WORKSPACE_DIFF_PER_FILE_MAX_CHARS}).`),
         format: outputFormatArg,
         workdir: workdirArg,
     },
@@ -2957,20 +3041,58 @@ export const workspaceDiff = tool({
     {
         const cwd = args.workdir ?? process.cwd();
         // Runtime guards also cover direct execute() callers that bypass schema validation.
-        const rawPaths = Array.isArray(args.paths) ? args.paths.filter((path): path is string => typeof path === "string") : [];
+        if (args.paths !== undefined && !Array.isArray(args.paths))
+        {
+            throw new Error("paths must be an array of non-blank workspace paths.");
+        }
+        if (args.allPending !== undefined && typeof args.allPending !== "boolean")
+        {
+            throw new Error("allPending must be a boolean; whole-workspace review requires allPending=true explicitly.");
+        }
+        if (args.includePrivate !== undefined && typeof args.includePrivate !== "boolean")
+        {
+            throw new Error("includePrivate must be a boolean and only applies with allPending=true.");
+        }
+        const rawPaths = Array.isArray(args.paths) ? args.paths : [];
+        if (rawPaths.some((path) => typeof path !== "string" || path.trim().length === 0))
+        {
+            throw new Error("paths must contain only non-blank workspace paths.");
+        }
         const selectedPaths = rawPaths.length > 0
             ? rawPaths.slice(0, WORKSPACE_DIFF_MAX_PATHS).map((path) => boundWorkspaceValue(path, WORKSPACE_DIFF_PATH_MAX_CHARS))
             : undefined;
+        const allPending = args.allPending === true;
+        const includePrivate = args.includePrivate === true;
+        const workspaceRoot = toNormalizedAbsolutePath(".", cwd);
+        if (selectedPaths?.some((path) => toPathComparisonKeyFromAbsolutePath(toNormalizedAbsolutePath(path, cwd)) === toPathComparisonKeyFromAbsolutePath(workspaceRoot)))
+        {
+            throw new Error("A workspace-root path is a whole-workspace review; use allPending=true instead of selecting the workspace root.");
+        }
+        if (selectedPaths && allPending)
+        {
+            throw new Error("Choose either explicit paths or allPending=true, not both.");
+        }
+        if (!selectedPaths && !allPending)
+        {
+            throw new Error("plastic_workspaceDiff requires explicit paths or allPending=true. Use plastic_status when only pending paths are needed.");
+        }
+        if (selectedPaths && includePrivate)
+        {
+            throw new Error("includePrivate is only used with allPending=true; explicitly selected private paths are already included.");
+        }
         const ignoredPathInputs = Math.max(0, rawPaths.length - (selectedPaths?.length ?? 0));
         const pendingItems = await getMachineReadablePendingItems(args.workdir); // exactly one status command per batch
         const selectedScopes = selectedPaths?.map((path) => toNormalizedAbsolutePath(path, cwd)) ?? [];
         let candidates = selectedPaths ? filterPendingItemsByScope(pendingItems, selectedScopes) : pendingItems.filter((item) => item.kind !== "private");
-        if (!selectedPaths && args.includePrivate)
+        if (!selectedPaths && includePrivate)
         {
             candidates = pendingItems;
         }
-        const requestedMaxFiles = typeof args.maxFiles === "number" && Number.isFinite(args.maxFiles) ? Math.trunc(args.maxFiles) : WORKSPACE_DIFF_DEFAULT_MAX_FILES;
+        const defaultMaxFiles = selectedPaths ? selectedPaths.length : WORKSPACE_DIFF_DEFAULT_MAX_FILES;
+        const requestedMaxFiles = typeof args.maxFiles === "number" && Number.isFinite(args.maxFiles) ? Math.trunc(args.maxFiles) : defaultMaxFiles;
         const maxFiles = Math.min(WORKSPACE_DIFF_MAX_FILES, Math.max(1, requestedMaxFiles));
+        const requestedMaxChars = typeof args.maxChars === "number" && Number.isFinite(args.maxChars) ? Math.trunc(args.maxChars) : WORKSPACE_DIFF_DEFAULT_MAX_CHARS;
+        const maxChars = Math.min(WORKSPACE_DIFF_PER_FILE_MAX_CHARS, Math.max(WORKSPACE_DIFF_MIN_CHARS, requestedMaxChars));
         const skippedByLimit = Math.max(0, candidates.length - maxFiles);
         candidates = candidates.slice(0, maxFiles);
 
@@ -2999,7 +3121,7 @@ export const workspaceDiff = tool({
             {
                 const compared = await diffPendingWorkspaceFile({ path, workdir: args.workdir }, item);
                 const remaining = Math.max(0, WORKSPACE_DIFF_CONTENT_MAX_CHARS - totalOutputChars);
-                const perFile = boundWorkspaceDiffResult(compared.result, WORKSPACE_DIFF_PER_FILE_MAX_CHARS);
+                const perFile = boundWorkspaceDiffResult(compared.result, maxChars);
                 const bounded = boundWorkspaceDiffResult(perFile, remaining);
                 const status = bounded.binary ? (bounded.changed ? "binary-different" : "unchanged") : (bounded.changed ? "changed" : "unchanged");
                 const diffOutput = bounded.changed && !bounded.binary ? bounded.output : undefined;
@@ -3025,14 +3147,14 @@ export const workspaceDiff = tool({
             ...(skippedByLimit > 0 ? [`Skipped ${skippedByLimit} pending item(s) after the maxFiles bound of ${maxFiles}.`] : []),
             ...(unmatchedPreviews.length > 0 ? [`${unmatchedPreviews.length} selected path(s) had no pending status record: ${unmatchedPreviews.slice(0, 5).join(", ")}${unmatchedPreviews.length > 5 ? `; ${unmatchedPreviews.length - 5} more omitted` : ""}.`] : []),
             ...(ignoredPathInputs > 0 ? [`Ignored ${ignoredPathInputs} path input(s) after the ${WORKSPACE_DIFF_MAX_PATHS}-path bound.`] : []),
-            ...(!selectedPaths && !args.includePrivate && pendingItems.some((item) => item.kind === "private") ? ["Private pending files were excluded; select their paths explicitly or pass includePrivate=true."] : []),
+            ...(!selectedPaths && !includePrivate && pendingItems.some((item) => item.kind === "private") ? ["Private pending files were excluded; select their paths explicitly or pass includePrivate=true."] : []),
         ].map((warning) => boundWorkspaceValue(warning, WORKSPACE_DIFF_ERROR_MAX_CHARS));
         const textPrefix = [
             "## Workspace Diff",
             "",
             `- Status records inspected once: ${pendingItems.length}`,
             `- Files considered: ${candidates.length}`,
-            `- Per-file output bound: ${WORKSPACE_DIFF_PER_FILE_MAX_CHARS} characters; complete response bound: ${WORKSPACE_DIFF_TOTAL_MAX_CHARS} characters.`,
+            `- Per-file output bound: ${maxChars} characters; complete response bound: ${WORKSPACE_DIFF_TOTAL_MAX_CHARS} characters.`,
             ...warnings.map((warning) => `- Warning: ${warning}`),
             ...(textSections.length > 0 ? [] : ["", "No eligible pending files."]),
         ].join("\n");
@@ -3040,9 +3162,10 @@ export const workspaceDiff = tool({
             statusRecords: pendingItems.length,
             selectedPaths: selectedPaths ? workspacePathPreview(selectedPaths) : null,
             selectedPathCount: selectedPaths?.length ?? 0,
-            includePrivate: args.includePrivate ?? false,
+            allPending,
+            includePrivate,
             maxFiles,
-            perFileMaxChars: WORKSPACE_DIFF_PER_FILE_MAX_CHARS,
+            perFileMaxChars: maxChars,
             totalMaxChars: WORKSPACE_DIFF_TOTAL_MAX_CHARS,
             skippedByLimit,
             unmatchedPaths: unmatchedPreviews,

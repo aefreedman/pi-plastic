@@ -21,17 +21,18 @@ plastic_patch(source="<branch-spec>", toolPath="<path-to-diff-tool>")
 
 ## Text-Only Diff Options
 
-Prefer tool-first:
+Do not use diffs as routine post-edit validation or checkin preflight. Prefer focused tests, `plastic_status` for pending scope, and direct reads for current content. Use a diff only when change-boundary evidence is needed, such as reviewing unfamiliar changes or confirming a specific risky hunk.
 
 ```text
 plastic_status(machineReadable=true) # “what changed?” / changed-path listing
-plastic_diffFile(path="<workspace-path>") # one workspace file
-plastic_workspaceDiff() # bounded pending review; private files excluded by default
+plastic_diffFile(path="<workspace-path>", maxChars=4000) # one intentional file comparison
+plastic_workspaceDiff(paths=["<workspace-path>"], maxChars=3000) # explicitly scoped pending review
+plastic_workspaceDiff(allPending=true) # explicit small whole-workspace review
 plastic_diffFile(path="<workspace-path>", revision="cs:<number>") # explicit historical comparison
 plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```
 
-The diff tools materialize historical bytes and remove their temporary files internally. Added and explicitly selected private/new files use an empty base; changed, moved, and deleted records use their status revision ID when available. A `--nodata` item cannot supply historical/base bytes: refresh the workspace or use two known file-qualified revisions. `plastic_workspaceDiff` returns per-file unavailable outcomes instead of aborting the batch. All tools use bounded GNU/POSIX text diff, treat valid Unity YAML as text, and report genuine binary content explicitly. Do not construct `cm cat` temporary-file recipes for ordinary review.
+The diff tools materialize historical bytes and remove their temporary files internally. Added and explicitly selected private/new files use an empty base; changed, moved, and deleted records use their status revision ID when available. A `--nodata` item cannot supply historical/base bytes: refresh the workspace or use two known file-qualified revisions. `plastic_workspaceDiff` requires selected paths or `allPending=true` and returns per-file unavailable outcomes instead of aborting the batch. All tools use bounded GNU/POSIX text diff, treat valid Unity YAML as text, and report genuine binary content explicitly. Do not construct `cm cat` temporary-file recipes for ordinary review.
 
 ## Metadata Listing (No GUI Diff)
 
@@ -50,9 +51,9 @@ Use the Read tool for full context instead of GUI diffs.
 Use the common no-revision path first; `base`, `head`, and `cs:head` are rejected rather than guessed:
 
 ```text
-plastic_diffFile(path="<workspace-path>")
-plastic_diffFile(path="<workspace-path>", revision="br:/<branch>")
-plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
+plastic_diffFile(path="<workspace-path>", maxChars=4000)
+plastic_diffFile(path="<workspace-path>", revision="br:/<branch>", maxChars=4000)
+plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>", maxChars=4000)
 ```
 
 ## Pending Changes

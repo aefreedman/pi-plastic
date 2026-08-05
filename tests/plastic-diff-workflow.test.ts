@@ -7,7 +7,13 @@ import { __plasticDiffInternals, __plasticProcessInternals } from "../src/plasti
 const root = await mkdtemp(join(tmpdir(), "pi-plastic-diff-"));
 
 try {
-    const { resolveDiffFileRevision, isUnscopedDiffRevisionSpec, runPortableTextDiff, DIFF_OUTPUT_MAX_CHARS, safeTempExtension } = __plasticDiffInternals;
+    const { resolveDiffFileRevision, isUnscopedDiffRevisionSpec, runPortableTextDiff, DIFF_OUTPUT_MAX_CHARS, DIFF_RESPONSE_DEFAULT_MAX_CHARS, DIFF_RESPONSE_MAX_CHARS, DIFF_RESPONSE_TOTAL_MAX_CHARS, normalizeDiffResponseMaxChars, boundTextDiffResult, safeTempExtension } = __plasticDiffInternals;
+
+    assert.equal(DIFF_RESPONSE_DEFAULT_MAX_CHARS, 8_000, "Focused diff responses must default well below the subprocess capture bound.");
+    assert.equal(DIFF_RESPONSE_TOTAL_MAX_CHARS, 24_000, "Focused JSON responses must have a complete serialized bound.");
+    assert.equal(normalizeDiffResponseMaxChars(undefined), 8_000);
+    assert.equal(normalizeDiffResponseMaxChars(100), 500, "Direct callers below the schema minimum must be clamped.");
+    assert.equal(normalizeDiffResponseMaxChars(99_000), DIFF_RESPONSE_MAX_CHARS, "Direct callers above the schema maximum must be clamped.");
 
     assert.deepEqual(
         resolveDiffFileRevision("Assets/Scene.unity"),
@@ -79,6 +85,9 @@ try {
     assert.equal(largeResult.truncated, true);
     assert.ok(largeResult.totalChars > DIFF_OUTPUT_MAX_CHARS);
     assert.match(largeResult.output, /Diff output truncated/);
+    const responseBound = boundTextDiffResult(largeResult, DIFF_RESPONSE_DEFAULT_MAX_CHARS);
+    assert(responseBound.output.length <= 8_000, "The default agent-facing diff body must stay within its 8,000-character bound, including truncation framing.");
+    assert.match(responseBound.output, /requested 8000-character response bound/);
 
     console.log("PASS: plastic diff workflow tests passed");
 } finally {

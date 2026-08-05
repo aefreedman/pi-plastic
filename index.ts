@@ -172,6 +172,7 @@ const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       normalizeWorkdirAliases(input);
       assignAlias(input, "leftRevision", ["left_revision"]);
       assignAlias(input, "rightRevision", ["right_revision"]);
+      assignAlias(input, "maxChars", ["max_chars"]);
       return input;
     },
   },
@@ -179,6 +180,7 @@ const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
     prepareArguments(args) {
       const input = normalizeArgs(args);
       normalizeWorkdirAliases(input);
+      assignAlias(input, "maxChars", ["max_chars"]);
       return input;
     },
   },
@@ -188,8 +190,10 @@ const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       normalizeWorkdirAliases(input);
       promoteSinglePath(input);
       assignAlias(input, "paths", ["items", "files"]);
+      assignAlias(input, "allPending", ["all_pending"]);
       assignAlias(input, "includePrivate", ["include_private"]);
       assignAlias(input, "maxFiles", ["max_files"]);
+      assignAlias(input, "maxChars", ["max_chars"]);
       return input;
     },
   },
@@ -708,12 +712,12 @@ export default function plasticTools(pi: ExtensionAPI) {
     description: "Search and enable Plastic SCM / Unity Version Control tools for workspace status and sync, changes and checkins, text-only diffs and patches, branches and merges, shelvesets, code reviews, and workspaces.",
     promptSnippet: "Use plastic_tool_search to find and enable Plastic SCM capabilities that are not active.",
     promptGuidelines: [
-      "Use plastic_tool_search before a Plastic SCM action when an appropriate plastic_* tool is not active. Inspect exact targets and use each tool's preflight and safety options before mutations.",
+      "Use plastic_tool_search before a Plastic SCM action when an appropriate plastic_* tool is not active. Inspect exact mutation targets. Do not preflight routinely: use preflight for ambiguous or broad scope, moved/deleted path rewriting, compound operations, or an explicit preview request.",
     ],
     parameters: Type.Object({
       query: Type.Optional(Type.String({ description: "Capability or workflow to search for." })),
       toolNames: Type.Optional(Type.Array(Type.String({ description: "Exact public Plastic tool name." }), { maxItems: 4, description: "Optional exact tool names to enable." })),
-      limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 4, description: "Maximum matching tools to enable. Defaults to the single best keyword match, except generic diff loads both safe text-only alternatives; exact toolNames requests may enable up to four." })),
+      limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 4, description: "Maximum matching tools to enable. Defaults to the single best keyword match; exact toolNames requests may enable up to four." })),
     }),
     async execute(_toolCallId, params) {
       if (isPlasticToolBrowseRequest(params)) {
