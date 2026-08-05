@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cp, mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -86,7 +86,7 @@ for (const order of ["plastic-first", "file-discovery-first"] as const) {
 
     const active = await resolveFilters(fileDiscoveryRoot, scope);
     assert.equal(active.outcome, "available", `${order} must compose separate local package roots.`);
-    assert.equal(active.records?.[0]?.owner.packageRoot, plasticRoot, "Plastic must retain the isolated physical owner root.");
+    assert.equal(active.records?.[0]?.owner.packageRoot, await realpath(plasticRoot), "Plastic must retain the isolated physical owner root.");
 
     // A second extension instance replaces the same owner record. Its predecessor's
     // delayed shutdown holds a stale token and must not unregister the replacement.
