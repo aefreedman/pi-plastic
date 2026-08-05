@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { createPlasticFileDiscoveryFilterV1, loadPlasticOwnerV1, PLASTIC_IGNORE_FILES_APPLIED_CODE } from "../src/file-discovery-filter.ts";
 
@@ -15,13 +15,14 @@ try {
   assert.equal(owner.packageVersion, packageManifest.version);
   assert.equal(owner.packageRoot, await realpath(join(import.meta.dirname, "..")));
   const filter = createPlasticFileDiscoveryFilterV1(owner);
+  const canonicalPlastic = await realpath(plastic);
   const result = await filter.evaluate({ cwd: root, signal: new AbortController().signal }, { workspaceRoot: root, roots: [source], includeHidden: false, signal: new AbortController().signal });
   assert.equal(result.outcome, "applied");
   if (result.outcome === "applied") {
     assert.equal(result.roots[0]?.filterDecision, "applied");
     assert.equal(result.roots[0]?.decisionCode, PLASTIC_IGNORE_FILES_APPLIED_CODE);
-    assert.equal(result.roots[0]?.filterBoundary, plastic);
-    assert.deepEqual(result.roots[0]?.ignoreFiles.map((file) => file.slice(plastic.length + 1).replaceAll("\\", "/")), ["ignore.conf", "Assets/cloaked.conf"]);
+    assert.equal(result.roots[0]?.filterBoundary, canonicalPlastic);
+    assert.deepEqual(result.roots[0]?.ignoreFiles.map((file) => relative(canonicalPlastic, file).replaceAll("\\", "/")), ["ignore.conf", "Assets/cloaked.conf"]);
     assert.match(result.roots[0]?.disclosures[0] ?? "", /filter applied.*readable files/i);
   }
 
