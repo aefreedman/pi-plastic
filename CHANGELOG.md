@@ -5,9 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows semantic versioning for public package releases.
 
-## Unreleased
+## [0.5.0] - 2026-08-05
+
+### Added
+
+- Added dynamically loadable `plastic_workspaceDiff` for bounded pending review: one machine-readable status pass, per-file text/binary/unavailable outcomes, selected-path and private-file policy, and intentional file/output limits.
 
 ### Changed
+
+- Kept GNU/POSIX `diff` as the only text-diff backend, improved `PI_PLASTIC_DIFF_EXECUTABLE`/bare-PATH diagnostics (including Windows-like missing-diff guidance), and removed unused Git diff fallback code.
+- Made workspace `plastic_diffFile` use machine-readable pending status for private/new, added, changed, moved, and deleted comparisons; status revision IDs materialize safe bases and `--nodata` base failures now explain recovery.
+- Updated diff routing guidance: changed listing uses `plastic_status`, one file uses `plastic_diffFile`, pending review uses `plastic_workspaceDiff`, and explicit historical pairs use `plastic_diffRevisions`.
 
 - Replaced the optional `@aefree/pi-repo-search` integration with `@aefree/pi-file-discovery`. Plastic ignore/cloak data is now an advisory file-discovery filter: only roots with readable ignore/cloak files emit `filterDecision: "applied"` records with a nearest-workspace `filterBoundary`; no-op roots are omitted and unavailable or malformed filter data degrades to generic discovery as routine execution hygiene.
 - Register the optional Plastic filter through the package-qualified global capability-registry rendezvous instead of importing `pi-file-discovery` from Plastic's separate module root. Registration remains session-scoped, transactional, and safe against stale shutdown tokens.

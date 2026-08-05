@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createPlasticFileDiscoveryFilterV1, loadPlasticOwnerV1, PLASTIC_IGNORE_FILES_APPLIED_CODE } from "../src/file-discovery-filter.ts";
@@ -11,7 +11,8 @@ try {
   await mkdir(source, { recursive: true }); await writeFile(join(plastic, "ignore.conf"), "ignored.txt\n"); await writeFile(join(plastic, "Assets", "cloaked.conf"), "cache/**\n");
   await mkdir(join(gitOnly, ".git"), { recursive: true });
   const owner = await loadPlasticOwnerV1(new URL("../extensions/file-discovery-filter.ts", import.meta.url).href);
-  assert.equal(owner.packageVersion, "0.4.0");
+  const packageManifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+  assert.equal(owner.packageVersion, packageManifest.version);
   assert.equal(owner.packageRoot, await realpath(join(import.meta.dirname, "..")));
   const filter = createPlasticFileDiscoveryFilterV1(owner);
   const result = await filter.evaluate({ cwd: root, signal: new AbortController().signal }, { workspaceRoot: root, roots: [source], includeHidden: false, signal: new AbortController().signal });

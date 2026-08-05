@@ -28,14 +28,57 @@ const main = (): void =>
     ].join("\n");
 
     const pendingItems = __plasticCheckinInternals.parseMachineReadablePendingItems(machineOutput, cwd);
-    assert(pendingItems.length === 4, "Expected parser to return four pending items.");
+    assert(pendingItems.length === 3, "Expected ambiguous legacy moved records to be skipped.");
     assert(pendingItems.some((item) => item.kind === "deleted"), "Expected at least one deleted pending item.");
-    assert(pendingItems.some((item) => item.kind === "moved"), "Expected at least one moved pending item.");
+    assert(!pendingItems.some((item) => item.kind === "moved"), "Expected ambiguous legacy moved records not to select a potentially wrong path.");
     assert(__plasticCheckinInternals.inferPendingItemKind("CO+RP") === "changed", "Expected CO+RP to classify as changed.");
 
+    const separator = "\x1f";
+    const separatedOutput = [
+        `PR${separator}/repo/ws/Assets/True False private.txt${separator}False${separator}201${separator}NO_MERGES`,
+        `AD${separator}/repo/ws/Assets/True False added.txt${separator}False${separator}202${separator}NO_MERGES`,
+        `CH${separator}/repo/ws/Assets/True False changed.txt${separator}False${separator}203${separator}NO_MERGES`,
+        `DE${separator}/repo/ws/Assets/True False deleted.txt${separator}False${separator}204${separator}NO_MERGES`,
+        `MV${separator}100%${separator}/repo/ws/Assets/old True False moved.txt${separator}/repo/ws/Assets/moved destination True False.txt${separator}False${separator}205${separator}NO_MERGES`,
+    ].join("\n");
+    const separatedItems = __plasticCheckinInternals.parseMachineReadablePendingItems(separatedOutput, cwd);
+    assert(separatedItems.length === 5, "Expected all separated PR/AD/CH/DE/MV records to parse.");
+    assert(separatedItems.map((item) => item.kind).join(",") === "private,added,changed,deleted,moved", "Expected separated status records to retain their kinds.");
+    assert(separatedItems.map((item) => item.revisionId).join(",") === "201,202,203,204,205", "Expected separated records to retain revision IDs.");
+    const movedItem = separatedItems[4];
+    assert(movedItem.workspacePath === "/repo/ws/Assets/moved destination True False.txt", "Expected moved records to use their destination as the current workspace path.");
+    assert(movedItem.sourceWorkspacePath === "/repo/ws/Assets/old True False moved.txt", "Expected moved records to retain source metadata.");
+    const separatedSummary = __plasticCheckinInternals.summarizePendingItems(separatedItems, cwd);
+    assert(separatedSummary.moved === 1 && separatedSummary.tracked === 4, "Expected summary accounting to retain the separated moved destination record.");
+    const movedDestinationScope = __plasticCheckinInternals.resolveCheckinPaths(["Assets/moved destination True False.txt"], separatedItems, cwd);
+    assert(movedDestinationScope.includedPaths.length === 1 && pathMatches(movedDestinationScope.includedPaths[0], "Assets/moved destination True False.txt"), "Expected checkin scope to match a moved destination path.");
+    assert(movedDestinationScope.shouldApplyChanged, "Expected moved destination scope to retain checkin --applychanged handling.");
+
+    const pathTokenOutput = [
+        "CH /repo/ws/Assets/True False changed.txt False 101 NO_MERGES",
+        "AD /repo/ws/Assets/True False added.txt False 102 NO_MERGES",
+        "MV /repo/ws/Assets/True False moved.txt False 103 NO_MERGES",
+        "LD /repo/ws/Assets/True False deleted.txt False 104 NO_MERGES",
+        "PR /repo/ws/Assets/True False private.txt False 105 NO_MERGES",
+        "CH /repo/ws/Assets/True False directory True 106 NO_MERGES",
+        "CH /repo/ws/missing-directory-flag 107",
+        "ch /repo/ws/lowercase-status False 108",
+        "CH  False 109",
+    ].join("\n");
+    const pathTokenItems = __plasticCheckinInternals.parseMachineReadablePendingItems(pathTokenOutput, cwd);
+    assert(pathTokenItems.length === 5, "Expected malformed and ambiguous legacy moved records to be ignored.");
+    for (const [index, [kind, revisionId]] of [["changed", "101"], ["added", "102"], ["deleted", "104"], ["private", "105"], ["changed", "106"]].entries())
+    {
+        const item = pathTokenItems[index];
+        assert(item.workspacePath.includes("True False"), `Expected ${kind} path to preserve whitespace-delimited True/False filename tokens.`);
+        assert(item.revisionId === revisionId, `Expected ${kind} status revision ID to be preserved.`);
+        assert(item.kind === kind, `Expected ${kind} status to remain classified correctly.`);
+    }
+    assert(pathTokenItems[4].isDirectory, "Expected the rightmost True/False token to be parsed as the directory flag.");
+
     const pendingSummary = __plasticCheckinInternals.summarizePendingItems(pendingItems, cwd);
-    assert(pendingSummary.totalPending === 4, "Expected pending summary total count to match parsed items.");
-    assert(pendingSummary.tracked === 4, "Expected tracked count to equal total when no private items exist.");
+    assert(pendingSummary.totalPending === 3, "Expected pending summary total count to match parsed items.");
+    assert(pendingSummary.tracked === 3, "Expected tracked count to equal total when no private items exist.");
     assert(pendingSummary.private === 0, "Expected no private items in initial sample summary.");
 
     const changedOnly = __plasticCheckinInternals.resolveCheckinPaths([
@@ -125,7 +168,7 @@ const main = (): void =>
         pendingItems,
         gameplayScope.length > 0 ? [gameplayScope] : [],
     );
-    assert(scopedPendingItems.length === 3, "Expected scope-filter helper to return only pending items under the requested path.");
+    assert(scopedPendingItems.length === 2, "Expected scope-filter helper to return only pending items under the requested path.");
 
     const fallbackPaths = __plasticCheckinInternals.buildFallbackScopePaths([
         "/repo/ws/Assets/Gameplay/Movement.cs",
@@ -155,9 +198,6 @@ const main = (): void =>
     assert(__plasticCheckinInternals.isUnscopedDiffRevisionSpec("947"), "Expected numeric selector without file scope to be detected as unscoped.");
     assert(!__plasticCheckinInternals.isUnscopedDiffRevisionSpec("Assets/Gameplay/Movement.cs#cs:947"), "Expected file-qualified selector not to be treated as unscoped.");
 
-    assert(__plasticCheckinInternals.isGitUnknownOptionLabelError("error: unknown option `label'"), "Expected backtick-style git unknown-option error to be detected.");
-    assert(__plasticCheckinInternals.isGitUnknownOptionLabelError("error: unknown option 'label'"), "Expected single-quote-style git unknown-option error to be detected.");
-    assert(!__plasticCheckinInternals.isGitUnknownOptionLabelError("fatal: unrelated error"), "Expected unrelated git errors not to match label-option detector.");
 
     assert(__plasticCheckinInternals.isRevisionNotFoundError("The specified revision was not found foo#cs:1"), "Expected revision-not-found detector to match Plastic cat errors.");
     assert(!__plasticCheckinInternals.isRevisionNotFoundError("fatal: unrelated error"), "Expected unrelated errors not to match revision-not-found detector.");

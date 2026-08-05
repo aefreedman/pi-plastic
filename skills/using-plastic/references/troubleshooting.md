@@ -41,7 +41,8 @@ cm codereview -e <review-id> --reviewer="reviewer-name"
 - `cm diff` is blocked in Pi because it can launch GUI windows and hang the CLI.
 - Use text-only alternatives:
   - `plastic_status(machineReadable=true)` for changed paths/statuses.
-  - `plastic_diffFile(path="<workspace-path>")` for the common workspace-base comparison.
+  - `plastic_diffFile(path="<workspace-path>")` for one workspace file.
+  - `plastic_workspaceDiff()` for bounded pending review (private files are excluded unless selected/opted in).
   - `plastic_diffFile(path="<workspace-path>", revision="cs:<number>")` for an explicit supported revision.
   - `plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")` for two historical files.
 

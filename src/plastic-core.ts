@@ -28,7 +28,6 @@ const resolveExecutable = (environment: ExecutableEnvironment, overrideVariable:
 };
 
 const getCmExecutable = (): string => resolveExecutable(process.env, "PI_PLASTIC_CM_EXECUTABLE", "cm");
-const getGitExecutable = (): string => resolveExecutable(process.env, "PI_PLASTIC_GIT_EXECUTABLE", "git");
 // `diff -u` has compatible exit semantics on Windows GNU diff and macOS BSD diff.
 // Keep the executable name configurable rather than assuming a .exe suffix or package-manager path.
 const getDiffExecutable = (): string => resolveExecutable(process.env, "PI_PLASTIC_DIFF_EXECUTABLE", "diff");
@@ -45,14 +44,9 @@ const executableNotFoundError = (command: string, error: Error): Error =>
         return new Error(`Unable to launch Plastic SCM executable '${command}' (ENOENT). Set PI_PLASTIC_CM_EXECUTABLE to the full path to cm, or add cm to PATH.`);
     }
 
-    if (command === getGitExecutable())
-    {
-        return new Error(`Unable to launch Git executable '${command}' (ENOENT). Set PI_PLASTIC_GIT_EXECUTABLE to the full path to git, or add git to PATH.`);
-    }
-
     if (command === getDiffExecutable())
     {
-        return new Error(`Unable to launch text diff executable '${command}' (ENOENT). Set PI_PLASTIC_DIFF_EXECUTABLE to a safe diff executable, or add diff to PATH.`);
+        return new Error(`Unable to launch GNU/POSIX text diff executable '${command}' (ENOENT). Set PI_PLASTIC_DIFF_EXECUTABLE to the full path of GNU/POSIX diff (paths containing spaces are supported), or install bare diff on PATH. Pi does not discover Git Bash paths automatically.`);
     }
 
     return new Error(`Unable to launch executable '${command}' (ENOENT). Verify that it is installed and available on PATH.`);
@@ -251,7 +245,7 @@ const spawnAndCollect = async (
     }
 };
 
-const BLOCKED_CM_DIFF_MESSAGE = "`cm diff` is blocked in Pi because it may launch GUI windows and hang the CLI. Use `plastic_status` to list changed paths, `plastic_diffFile` for a file diff, or `plastic_diffRevisions` for two explicit revision specs.";
+const BLOCKED_CM_DIFF_MESSAGE = "`cm diff` is blocked in Pi because it may launch GUI windows and hang the CLI. Use `plastic_status` to list changed paths, `plastic_diffFile` for one file, `plastic_workspaceDiff` for pending review, or `plastic_diffRevisions` for two explicit revision specs.";
 
 const ensureCmCommandAllowed = (args: string[]): void =>
 {
@@ -313,6 +307,7 @@ type PendingItem = {
     isDirectory: boolean;
     kind: PendingItemKind;
     revisionId?: string;
+    sourceWorkspacePath?: string;
 };
 
 type PendingItemSummary = {
@@ -591,30 +586,18 @@ const inferPendingItemKind = (statusCode: string): PendingItemKind =>
     return "other";
 };
 
+// Unit separator is accepted by Plastic and cannot occur in supported workspace paths.
+const STATUS_FIELD_SEPARATOR = "\x1f";
+
 const parseMachineReadablePendingItems = (output: string, cwd: string): PendingItem[] =>
 {
     const lines = normalizeFindOutputLines(output);
-    const statusLinePattern = /^([A-Z+]+)\s+(.+?)\s+(True|False)\s+(.*)$/;
+    // Legacy records have no reliable way to distinguish the source and destination
+    // fields of a move, so they remain supported for normal records only.
+    const legacyStatusLinePattern = /^([A-Z+]+)\s+(.+)\s+(True|False)(?:\s+(.*))?$/;
     const pendingItems: PendingItem[] = [];
-
-    for (const line of lines)
+    const addItem = (statusCode: string, workspacePath: string, isDirectory: boolean, revisionId?: string, sourceWorkspacePath?: string): void =>
     {
-        if (line.startsWith("STATUS "))
-        {
-            continue;
-        }
-
-        const match = line.match(statusLinePattern);
-        if (!match)
-        {
-            continue;
-        }
-
-        const statusCode = match[1];
-        const workspacePath = match[2];
-        const isDirectory = match[3] === "True";
-        const remainder = match[4] ?? "";
-        const revisionId = remainder.match(/^\s*(\d+)\b/)?.[1];
         const normalizedPath = toNormalizedAbsolutePath(workspacePath, cwd);
         pendingItems.push({
             statusCode,
@@ -624,7 +607,68 @@ const parseMachineReadablePendingItems = (output: string, cwd: string): PendingI
             isDirectory,
             kind: inferPendingItemKind(statusCode),
             ...(revisionId ? { revisionId } : {}),
+            ...(sourceWorkspacePath ? { sourceWorkspacePath } : {}),
         });
+    };
+
+    for (const line of lines)
+    {
+        if (line.startsWith("STATUS "))
+        {
+            continue;
+        }
+
+        if (line.includes(STATUS_FIELD_SEPARATOR))
+        {
+            const fields = line.split(STATUS_FIELD_SEPARATOR);
+            const statusCode = fields[0];
+            if (!/^[A-Z+]+$/.test(statusCode))
+            {
+                continue;
+            }
+
+            const kind = inferPendingItemKind(statusCode);
+            if (kind === "moved")
+            {
+                // MV: status, percent, source, destination, directory, revision, metadata.
+                const [,, sourceWorkspacePath, workspacePath, directoryField, revisionField] = fields;
+                if (!sourceWorkspacePath || !workspacePath || (directoryField !== "True" && directoryField !== "False"))
+                {
+                    continue;
+                }
+                addItem(statusCode, workspacePath, directoryField === "True", /^\d+$/.test(revisionField ?? "") ? revisionField : undefined, sourceWorkspacePath);
+                continue;
+            }
+
+            // Ordinary records: status, path, directory, revision, metadata.
+            // Only moved records include a similarity-percent field.
+            const [, workspacePath, directoryField, revisionField] = fields;
+            if (!workspacePath || (directoryField !== "True" && directoryField !== "False"))
+            {
+                continue;
+            }
+            addItem(statusCode, workspacePath, directoryField === "True", /^\d+$/.test(revisionField ?? "") ? revisionField : undefined);
+            continue;
+        }
+
+        const match = line.match(legacyStatusLinePattern);
+        if (!match)
+        {
+            continue;
+        }
+
+        const statusCode = match[1];
+        // A whitespace-delimited MV record cannot safely reveal which portion is
+        // its destination. Skipping it prevents checkin/diff from targeting a
+        // wrong workspace path; package-owned calls always request a separator.
+        if (inferPendingItemKind(statusCode) === "moved")
+        {
+            continue;
+        }
+        const workspacePath = match[2];
+        const isDirectory = match[3] === "True";
+        const revisionId = (match[4] ?? "").match(/^\s*(\d+)\b/)?.[1];
+        addItem(statusCode, workspacePath, isDirectory, revisionId);
     }
 
     return pendingItems;
@@ -633,7 +677,7 @@ const parseMachineReadablePendingItems = (output: string, cwd: string): PendingI
 const getMachineReadablePendingItems = async (workdir?: string): Promise<PendingItem[]> =>
 {
     const cwd = workdir ?? process.cwd();
-    const output = await runCmRaw(["status", "--machinereadable", "--includeRevId"], workdir);
+    const output = await runCmRaw(["status", "--machinereadable", "--includeRevId", `--fieldseparator=${STATUS_FIELD_SEPARATOR}`], workdir);
     return parseMachineReadablePendingItems(output, cwd);
 };
 
@@ -854,14 +898,6 @@ const buildFallbackScopePaths = (absolutePaths: string[], cwd: string): string[]
 {
     const fallbackAbsolutePaths = absolutePaths.map((path) => toNormalizedAbsolutePath(dirname(path), cwd));
     return dedupeAndMinimizeAbsolutePaths(fallbackAbsolutePaths).map((path) => toCommandPath(path, cwd));
-};
-
-const isGitUnknownOptionLabelError = (message: string): boolean =>
-{
-    const normalized = message.toLowerCase();
-    return normalized.includes("unknown option `label'")
-        || normalized.includes("unknown option 'label'")
-        || normalized.includes("unknown option \"label\"");
 };
 
 const isRevisionNotFoundError = (message: string): boolean =>
@@ -1193,7 +1229,6 @@ const buildPatchCommandArgs = (args: PatchCommandArgs): string[] =>
 
 export const __plasticProcessInternals = {
     resolveCmExecutable: (environment: ExecutableEnvironment = process.env): string => resolveExecutable(environment, "PI_PLASTIC_CM_EXECUTABLE", "cm"),
-    resolveGitExecutable: (environment: ExecutableEnvironment = process.env): string => resolveExecutable(environment, "PI_PLASTIC_GIT_EXECUTABLE", "git"),
     resolveDiffExecutable: (environment: ExecutableEnvironment = process.env): string => resolveExecutable(environment, "PI_PLASTIC_DIFF_EXECUTABLE", "diff"),
     spawnAndCollect,
     runCm,
@@ -1218,7 +1253,6 @@ export const __plasticCheckinInternals = {
     resolveCheckinPaths,
     buildFallbackScopePaths,
     isNoChangesWorkspaceCheckinError,
-    isGitUnknownOptionLabelError,
     isRevisionNotFoundError,
     normalizeDiffFileRevisionSpec,
     resolveDiffFileRevision,
@@ -1240,83 +1274,6 @@ export const __plasticBranchInternals = {
     getBranchLeafName,
     parsePlasticStatusBranch,
     resolveBranchCreationTarget,
-};
-
-let gitNoIndexSupportsLabel: boolean | null = null;
-
-type GitDiffResult = {
-    exitCode: number;
-    output: string;
-};
-
-const runGitDiffNoIndexOnce = async (args: string[], cwd: string): Promise<GitDiffResult> =>
-{
-    const { stdout, stderr, exitCode } = await spawnAndCollect(getGitExecutable(), args, cwd);
-    const output = [stdout, stderr].filter(Boolean).join("\n").trim();
-
-    return {
-        exitCode,
-        output,
-    };
-};
-
-const buildGitDiffNoIndexArgs = (
-    left: string,
-    right: string,
-    labelLeft?: string,
-    labelRight?: string,
-    includeLabels = true,
-): string[] =>
-{
-    const cmdArgs = ["diff", "--no-index"];
-
-    if (includeLabels && labelLeft)
-    {
-        cmdArgs.push("--label", labelLeft);
-    }
-
-    if (includeLabels && labelRight)
-    {
-        cmdArgs.push("--label", labelRight);
-    }
-
-    cmdArgs.push("--", left, right);
-    return cmdArgs;
-};
-
-const runGitDiffNoIndex = async (
-    left: string,
-    right: string,
-    workdir?: string,
-    labelLeft?: string,
-    labelRight?: string,
-): Promise<string> =>
-{
-    const cwd = workdir ?? process.cwd();
-    const hasLabels = Boolean(labelLeft || labelRight);
-    const includeLabels = hasLabels && gitNoIndexSupportsLabel !== false;
-    let result = await runGitDiffNoIndexOnce(
-        buildGitDiffNoIndexArgs(left, right, labelLeft, labelRight, includeLabels),
-        cwd,
-    );
-
-    if (includeLabels && result.exitCode > 1 && isGitUnknownOptionLabelError(result.output))
-    {
-        gitNoIndexSupportsLabel = false;
-        result = await runGitDiffNoIndexOnce(buildGitDiffNoIndexArgs(left, right), cwd);
-    }
-
-    if (includeLabels && result.exitCode <= 1 && gitNoIndexSupportsLabel === null)
-    {
-        gitNoIndexSupportsLabel = true;
-    }
-
-    if (result.exitCode > 1)
-    {
-        throw new Error(result.output.length > 0 ? result.output : `git diff failed with exit code ${result.exitCode}`);
-    }
-
-    return result.output;
 };
 
 const DIFF_OUTPUT_MAX_CHARS = 60_000;
@@ -1385,8 +1342,8 @@ const runPortableTextDiff = async (
         ["-u", leftPath, rightPath],
         cwd,
         undefined,
-        undefined,
-        { outputLimitChars: DIFF_OUTPUT_MAX_CHARS },
+        getActiveAbortSignal(),
+        { ...commandExecutionStorage.getStore(), outputLimitChars: DIFF_OUTPUT_MAX_CHARS },
     );
     if (aborted)
     {
@@ -1444,6 +1401,7 @@ const formatTextDiff = async (
     comparisonKind: string,
     result: TextDiffResult,
     workdir: string | undefined,
+    comparisonMetadata: Record<string, unknown> = {},
 ): Promise<string> =>
 {
     const status = result.binary ? (result.changed ? "binary-different" : "unchanged") : (result.changed ? "changed" : "unchanged");
@@ -1456,6 +1414,7 @@ const formatTextDiff = async (
         text,
         {
             comparisonKind,
+            ...comparisonMetadata,
             backend: result.backend,
             status,
             changed: result.changed,
@@ -1469,6 +1428,45 @@ const formatTextDiff = async (
     );
 };
 
+const isNoDataError = (message: string): boolean =>
+{
+    const normalized = message.toLowerCase();
+    return normalized.includes("--nodata")
+        || normalized.includes("no data available")
+        || normalized.includes("data is not available")
+        || normalized.includes("cannot retrieve data")
+        || normalized.includes("could not retrieve data");
+};
+
+const withWorkspaceBaseUnavailableDiagnostic = (path: string, error: unknown): Error =>
+{
+    const message = error instanceof Error ? error.message : String(error);
+    if (!isNoDataError(message))
+    {
+        return error instanceof Error ? error : new Error(message);
+    }
+
+    return new Error(
+        `Plastic cannot supply historical/base bytes for '${path}' because this workspace/status record is --nodata. `
+        + "A workspace diff cannot be calculated without those bytes. Run plastic_status(machineReadable=true, includeRevId=true) to verify the item, then update/refresh the workspace or use plastic_diffRevisions with two known file-qualified revisions when historical content is available.",
+    );
+};
+
+const boundTextDiffResult = (result: TextDiffResult, maxChars: number): TextDiffResult =>
+{
+    if (!result.output || result.output.length <= maxChars)
+    {
+        return result;
+    }
+
+    return {
+        ...result,
+        output: `${result.output.slice(0, maxChars)}\n\n[Per-file diff output truncated at ${maxChars} characters.]`,
+        truncated: true,
+        totalChars: result.totalChars,
+    };
+};
+
 export const __plasticDiffInternals = {
     DIFF_OUTPUT_MAX_CHARS,
     isBinaryContent,
@@ -1477,6 +1475,9 @@ export const __plasticDiffInternals = {
     runPortableTextDiff,
     safeTempExtension,
     materializeRevision,
+    isNoDataError,
+    withWorkspaceBaseUnavailableDiagnostic,
+    boundTextDiffResult,
     resolveDiffFileRevision,
     isUnscopedDiffRevisionSpec,
 };
@@ -2686,6 +2687,93 @@ export const diffRevisions = tool({
     },
 });
 
+type WorkspacePendingDiff = {
+    item?: PendingItem;
+    workspacePath: string;
+    displayPath: string;
+    revisionPath: string;
+    pendingKind: "added" | "changed" | "moved" | "deleted" | "private" | "other";
+    result: TextDiffResult;
+    comparisonKind: string;
+};
+
+const diffPendingWorkspaceFile = async (
+    args: { path: string; workdir?: string },
+    pendingItem?: PendingItem,
+): Promise<WorkspacePendingDiff> =>
+{
+    const cwd = args.workdir ?? process.cwd();
+    const workspacePath = toNormalizedAbsolutePath(args.path, cwd);
+    const pendingKind = pendingItem?.kind ?? "changed";
+    const isAdded = pendingKind === "added";
+    const isPrivate = pendingKind === "private";
+    const isDeleted = pendingKind === "deleted";
+    const workspaceStat = await fs.stat(workspacePath).catch(() => null);
+    if (!workspaceStat?.isFile() && !isDeleted)
+    {
+        throw new Error(`Workspace file '${args.path}' does not exist or is not a regular file. Use plastic_status to confirm its pending status.`);
+    }
+
+    const displayPath = isAbsolute(args.path) ? toCommandPath(workspacePath, cwd) : args.path;
+    const revisionPath = displayPath.length > 0 ? displayPath : args.path;
+    const workspaceBase = resolveDiffFileRevision(revisionPath);
+    const leftLabel = isAdded
+        ? `${revisionPath} (empty before add)`
+        : isPrivate
+            ? `${revisionPath} (empty before private/new file)`
+            : workspaceBase.resolved.includes("#") ? workspaceBase.resolved.replace("#", "@") : `${revisionPath} (Plastic base)`;
+    const rightLabel = isDeleted ? `${displayPath} (empty after delete)` : `${displayPath} (workspace)`;
+    const materializeSpec = pendingItem?.revisionId ? `revid:${pendingItem.revisionId}` : workspaceBase.resolved;
+    if (isDeleted && !pendingItem?.revisionId)
+    {
+        throw new Error(`Plastic status identified '${args.path}' as deleted but did not provide its base revision ID.`);
+    }
+
+    const tempDir = await fs.mkdtemp(join(tmpdir(), "plastic-core-"));
+    const basePath = join(tempDir, `base${safeTempExtension(workspacePath)}`);
+    const emptyWorkspacePath = join(tempDir, `workspace${safeTempExtension(workspacePath)}`);
+    try
+    {
+        if (isAdded || isPrivate)
+        {
+            await fs.writeFile(basePath, "");
+        }
+        else
+        {
+            try
+            {
+                // Status revision IDs preserve the exact pre-change materialization for
+                // changed, moved, and deleted records. Explicit revision requests use a
+                // separate path below and never consult workspace status.
+                await materializeRevision(materializeSpec, basePath, args.workdir);
+            }
+            catch (error)
+            {
+                throw withWorkspaceBaseUnavailableDiagnostic(args.path, error);
+            }
+        }
+
+        if (isDeleted)
+        {
+            await fs.writeFile(emptyWorkspacePath, "");
+        }
+        const result = await runPortableTextDiff(basePath, isDeleted ? emptyWorkspacePath : workspacePath, cwd, leftLabel, rightLabel);
+        return {
+            item: pendingItem,
+            workspacePath,
+            displayPath,
+            revisionPath,
+            pendingKind,
+            result,
+            comparisonKind: isPrivate ? "workspace-private-new" : (isAdded ? "workspace-added" : (isDeleted ? "workspace-deleted" : `workspace-${pendingKind}`)),
+        };
+    }
+    finally
+    {
+        await fs.rm(tempDir, { recursive: true, force: true });
+    }
+};
+
 export const diffFile = tool({
     description: "Show a bounded text-only diff between a workspace file and its Plastic base (or a supported revision). Omit revision for the common workspace-base comparison.",
     args: {
@@ -2696,43 +2784,26 @@ export const diffFile = tool({
     },
     async execute(args)
     {
-        const cwd = args.workdir ?? process.cwd();
-        const workspacePath = isAbsolute(args.path) ? args.path : join(cwd, args.path);
-        const workspaceStat = await fs.stat(workspacePath).catch(() => null);
-        const pendingItems = args.revision ? [] : await getMachineReadablePendingItems(args.workdir);
-        const pendingItem = pendingItems.find((item) => item.comparisonKey === toPathComparisonKeyFromAbsolutePath(workspacePath));
-        const isAdded = !args.revision && pendingItem?.kind === "added";
-        const isDeleted = !args.revision && pendingItem?.kind === "deleted";
-        if (!workspaceStat?.isFile() && !isDeleted)
+        // Explicit revision behavior intentionally bypasses workspace status. It is
+        // a request for the supplied historical selector, not a pending-item diff.
+        if (args.revision)
         {
-            throw new Error(`Workspace file '${args.path}' does not exist or is not a regular file. Use plastic_status to confirm whether it is a pending deletion.`);
-        }
-
-        const displayPath = isAbsolute(args.path) ? relative(cwd, args.path) : args.path;
-        const revisionPath = displayPath.length > 0 ? displayPath : args.path;
-        const revision = resolveDiffFileRevision(revisionPath, args.revision);
-        const leftLabel = isAdded ? `${revisionPath} (empty before add)` : (revision.resolved.includes("#") ? revision.resolved.replace("#", "@") : `${revisionPath} (Plastic base)`);
-        const rightLabel = isDeleted ? `${displayPath} (empty after delete)` : `${displayPath} (workspace)`;
-        const materializeSpec = isDeleted && pendingItem?.revisionId ? `revid:${pendingItem.revisionId}` : revision.resolved;
-        if (isDeleted && !pendingItem?.revisionId)
-        {
-            throw new Error(`Plastic status identified '${args.path}' as deleted but did not provide its base revision ID.`);
-        }
-        const tempDir = await fs.mkdtemp(join(tmpdir(), "plastic-core-"));
-        const basePath = join(tempDir, `base${safeTempExtension(workspacePath)}`);
-        const emptyWorkspacePath = join(tempDir, `workspace${safeTempExtension(workspacePath)}`);
-
-        try
-        {
-            if (isAdded)
+            const cwd = args.workdir ?? process.cwd();
+            const workspacePath = toNormalizedAbsolutePath(args.path, cwd);
+            const workspaceStat = await fs.stat(workspacePath).catch(() => null);
+            if (!workspaceStat?.isFile())
             {
-                await fs.writeFile(basePath, "");
+                throw new Error(`Workspace file '${args.path}' does not exist or is not a regular file.`);
             }
-            else
+            const displayPath = isAbsolute(args.path) ? toCommandPath(workspacePath, cwd) : args.path;
+            const revision = resolveDiffFileRevision(displayPath || args.path, args.revision);
+            const tempDir = await fs.mkdtemp(join(tmpdir(), "plastic-core-"));
+            const basePath = join(tempDir, `base${safeTempExtension(workspacePath)}`);
+            try
             {
                 try
                 {
-                    await materializeRevision(materializeSpec, basePath, args.workdir);
+                    await materializeRevision(revision.resolved, basePath, args.workdir);
                 }
                 catch (error)
                 {
@@ -2747,21 +2818,236 @@ export const diffFile = tool({
                     }
                     throw error;
                 }
+                const result = await runPortableTextDiff(basePath, workspacePath, cwd, revision.resolved.replace("#", "@"), `${displayPath} (workspace)`);
+                return formatTextDiff("diffFile", args.format, revision.kind, result, args.workdir, { pendingKind: null, isNew: false });
             }
-
-            if (isDeleted)
+            finally
             {
-                await fs.writeFile(emptyWorkspacePath, "");
+                await fs.rm(tempDir, { recursive: true, force: true });
             }
-            const comparisonPath = isDeleted ? emptyWorkspacePath : workspacePath;
-            const comparisonKind = isAdded ? "workspace-added" : (isDeleted ? "workspace-deleted" : revision.kind);
-            const result = await runPortableTextDiff(basePath, comparisonPath, cwd, leftLabel, rightLabel);
-            return formatTextDiff("diffFile", args.format, comparisonKind, result, args.workdir);
         }
-        finally
+
+        const cwd = args.workdir ?? process.cwd();
+        const workspacePath = toNormalizedAbsolutePath(args.path, cwd);
+        const pendingItems = await getMachineReadablePendingItems(args.workdir);
+        const pendingItem = pendingItems.find((item) => item.comparisonKey === toPathComparisonKeyFromAbsolutePath(workspacePath));
+        const compared = await diffPendingWorkspaceFile(args, pendingItem);
+        return formatTextDiff(
+            "diffFile",
+            args.format,
+            compared.comparisonKind,
+            compared.result,
+            args.workdir,
+            { pendingKind: compared.pendingKind, isNew: compared.pendingKind === "private" || compared.pendingKind === "added", statusRevisionId: pendingItem?.revisionId },
+        );
+    },
+});
+
+const WORKSPACE_DIFF_DEFAULT_MAX_FILES = 12;
+const WORKSPACE_DIFF_MAX_FILES = 20;
+const WORKSPACE_DIFF_MAX_PATHS = 20;
+const WORKSPACE_DIFF_PATH_MAX_CHARS = 1_024;
+const WORKSPACE_DIFF_DISPLAY_PATH_MAX_CHARS = 256;
+const WORKSPACE_DIFF_ERROR_MAX_CHARS = 1_024;
+const WORKSPACE_DIFF_PER_FILE_MAX_CHARS = 12_000;
+// This is a response bound, not just a diff-body bound. Reserve space for
+// framing and an omission summary so both text and JSON remain useful.
+const WORKSPACE_DIFF_TOTAL_MAX_CHARS = 60_000;
+const WORKSPACE_DIFF_CONTENT_MAX_CHARS = 48_000;
+
+const boundWorkspaceValue = (value: string, maxChars: number): string =>
+{
+    if (maxChars <= 0)
+    {
+        return "";
+    }
+    if (value.length <= maxChars)
+    {
+        return value;
+    }
+    const suffix = `… [truncated; original ${value.length} characters]`;
+    return suffix.length >= maxChars ? value.slice(0, maxChars) : `${value.slice(0, maxChars - suffix.length)}${suffix}`;
+};
+
+const boundWorkspaceDiffResult = (result: TextDiffResult, maxChars: number): TextDiffResult =>
+{
+    if (result.output.length <= maxChars)
+    {
+        return result;
+    }
+    return { ...result, output: boundWorkspaceValue(result.output, maxChars), truncated: true };
+};
+
+const workspacePathPreview = (paths: string[]): string[] => paths.map((path) => boundWorkspaceValue(path, WORKSPACE_DIFF_DISPLAY_PATH_MAX_CHARS));
+
+const appendBoundedWorkspaceText = (prefix: string, sections: string[], omitted: number): string =>
+{
+    const omission = (count: number): string => `\n\n[${count} file outcome(s) omitted to keep this response within ${WORKSPACE_DIFF_TOTAL_MAX_CHARS} characters.]`;
+    let text = prefix;
+    let omittedCount = omitted;
+    for (let index = 0; index < sections.length; index += 1)
+    {
+        const candidate = `${text}\n\n${sections[index]}`;
+        if (candidate.length + omission(omittedCount + sections.length - index - 1).length > WORKSPACE_DIFF_TOTAL_MAX_CHARS)
         {
-            await fs.rm(tempDir, { recursive: true, force: true });
+            omittedCount += sections.length - index;
+            break;
         }
+        text = candidate;
+    }
+    return omittedCount > 0 ? `${text}${omission(omittedCount)}` : text;
+};
+
+const formatWorkspaceDiffResult = async (
+    format: OutputFormat,
+    textPrefix: string,
+    textSections: string[],
+    data: Record<string, unknown>,
+    warnings: string[],
+    outcomes: Array<Record<string, unknown>>,
+    preOmittedOutcomes: number,
+    workdir?: string,
+): Promise<string> =>
+{
+    if (format !== "json")
+    {
+        return appendBoundedWorkspaceText(textPrefix, textSections, preOmittedOutcomes);
+    }
+
+    const cliVersion = boundWorkspaceValue(await getCmVersion(workdir), WORKSPACE_DIFF_DISPLAY_PATH_MAX_CHARS);
+    const wrap = (payload: Record<string, unknown>): string => `## workspaceDiff\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``;
+    const retained: Array<Record<string, unknown>> = [];
+    let omittedOutcomes = preOmittedOutcomes;
+    const payloadFor = (): Record<string, unknown> => ({
+        ok: true,
+        action: "workspaceDiff",
+        toolVersion: TOOL_VERSION,
+        cliVersion,
+        data: { ...data, outcomes: retained, omittedOutcomes },
+        ...(warnings.length > 0 ? { warnings } : {}),
+    });
+
+    for (let index = 0; index < outcomes.length; index += 1)
+    {
+        retained.push(outcomes[index]);
+        const remainingCount = outcomes.length - index - 1;
+        // Keep an omission field in the serialized payload before deciding to
+        // retain another result; JSON escaping can otherwise exceed the bound.
+        omittedOutcomes = preOmittedOutcomes + remainingCount;
+        if (wrap(payloadFor()).length > WORKSPACE_DIFF_TOTAL_MAX_CHARS)
+        {
+            retained.pop();
+            omittedOutcomes = preOmittedOutcomes + outcomes.length - index;
+            break;
+        }
+    }
+    return wrap(payloadFor());
+};
+
+export const workspaceDiff = tool({
+    description: "Review bounded pending workspace file diffs in one status pass. Private files are excluded unless explicitly selected or includePrivate=true; unavailable files are reported without aborting the batch.",
+    args: {
+        paths: tool.schema.array(tool.schema.string().min(1).max(WORKSPACE_DIFF_PATH_MAX_CHARS)).max(WORKSPACE_DIFF_MAX_PATHS).optional().describe(`Optional pending workspace paths to review (maximum ${WORKSPACE_DIFF_MAX_PATHS}, ${WORKSPACE_DIFF_PATH_MAX_CHARS} characters each). Selecting paths includes matching private files.`),
+        includePrivate: tool.schema.boolean().optional().describe("Include private pending files when paths are omitted. Defaults to false."),
+        maxFiles: tool.schema.number().int().min(1).max(WORKSPACE_DIFF_MAX_FILES).optional().describe(`Maximum files to compare (default ${WORKSPACE_DIFF_DEFAULT_MAX_FILES}, maximum ${WORKSPACE_DIFF_MAX_FILES}).`),
+        format: outputFormatArg,
+        workdir: workdirArg,
+    },
+    async execute(args)
+    {
+        const cwd = args.workdir ?? process.cwd();
+        // Runtime guards also cover direct execute() callers that bypass schema validation.
+        const rawPaths = Array.isArray(args.paths) ? args.paths.filter((path): path is string => typeof path === "string") : [];
+        const selectedPaths = rawPaths.length > 0
+            ? rawPaths.slice(0, WORKSPACE_DIFF_MAX_PATHS).map((path) => boundWorkspaceValue(path, WORKSPACE_DIFF_PATH_MAX_CHARS))
+            : undefined;
+        const ignoredPathInputs = Math.max(0, rawPaths.length - (selectedPaths?.length ?? 0));
+        const pendingItems = await getMachineReadablePendingItems(args.workdir); // exactly one status command per batch
+        const selectedScopes = selectedPaths?.map((path) => toNormalizedAbsolutePath(path, cwd)) ?? [];
+        let candidates = selectedPaths ? filterPendingItemsByScope(pendingItems, selectedScopes) : pendingItems.filter((item) => item.kind !== "private");
+        if (!selectedPaths && args.includePrivate)
+        {
+            candidates = pendingItems;
+        }
+        const requestedMaxFiles = typeof args.maxFiles === "number" && Number.isFinite(args.maxFiles) ? Math.trunc(args.maxFiles) : WORKSPACE_DIFF_DEFAULT_MAX_FILES;
+        const maxFiles = Math.min(WORKSPACE_DIFF_MAX_FILES, Math.max(1, requestedMaxFiles));
+        const skippedByLimit = Math.max(0, candidates.length - maxFiles);
+        candidates = candidates.slice(0, maxFiles);
+
+        const outcomes: Array<Record<string, unknown>> = [];
+        const textSections: string[] = [];
+        let totalOutputChars = 0;
+        let unprocessedCandidates = 0;
+        for (let index = 0; index < candidates.length; index += 1)
+        {
+            if (totalOutputChars >= WORKSPACE_DIFF_CONTENT_MAX_CHARS)
+            {
+                unprocessedCandidates = candidates.length - index;
+                break;
+            }
+            const item = candidates[index];
+            const path = toCommandPath(item.normalizedPath, cwd);
+            const displayPath = boundWorkspaceValue(path, WORKSPACE_DIFF_DISPLAY_PATH_MAX_CHARS);
+            if (item.isDirectory)
+            {
+                outcomes.push({ path: displayPath, kind: item.kind, status: "skipped-directory" });
+                textSections.push(`### ${displayPath} (${item.kind})\nDirectory entries are not diffed.`);
+                totalOutputChars += textSections[textSections.length - 1].length;
+                continue;
+            }
+            try
+            {
+                const compared = await diffPendingWorkspaceFile({ path, workdir: args.workdir }, item);
+                const remaining = Math.max(0, WORKSPACE_DIFF_CONTENT_MAX_CHARS - totalOutputChars);
+                const perFile = boundWorkspaceDiffResult(compared.result, WORKSPACE_DIFF_PER_FILE_MAX_CHARS);
+                const bounded = boundWorkspaceDiffResult(perFile, remaining);
+                const status = bounded.binary ? (bounded.changed ? "binary-different" : "unchanged") : (bounded.changed ? "changed" : "unchanged");
+                const diffOutput = bounded.changed && !bounded.binary ? bounded.output : undefined;
+                outcomes.push({ path: displayPath, kind: item.kind, status, changed: bounded.changed, binary: bounded.binary, truncated: bounded.truncated, totalChars: bounded.totalChars, ...(diffOutput ? { diff: diffOutput } : {}) });
+                const body = bounded.binary ? (bounded.changed ? "Binary content differs; a text diff is unavailable." : "No differences.") : (bounded.changed ? bounded.output : "No differences.");
+                const section = `### ${displayPath} (${item.kind})\n${body}`;
+                textSections.push(section);
+                totalOutputChars += section.length;
+            }
+            catch (error)
+            {
+                const message = boundWorkspaceValue(error instanceof Error ? error.message : String(error), WORKSPACE_DIFF_ERROR_MAX_CHARS);
+                outcomes.push({ path: displayPath, kind: item.kind, status: "unavailable", error: message });
+                const section = `### ${displayPath} (${item.kind})\nUnavailable: ${message}`;
+                textSections.push(section);
+                totalOutputChars += section.length;
+            }
+        }
+
+        const unmatchedPaths = selectedPaths?.filter((path) => !filterPendingItemsByScope(pendingItems, [toNormalizedAbsolutePath(path, cwd)]).length) ?? [];
+        const unmatchedPreviews = workspacePathPreview(unmatchedPaths);
+        const warnings = [
+            ...(skippedByLimit > 0 ? [`Skipped ${skippedByLimit} pending item(s) after the maxFiles bound of ${maxFiles}.`] : []),
+            ...(unmatchedPreviews.length > 0 ? [`${unmatchedPreviews.length} selected path(s) had no pending status record: ${unmatchedPreviews.slice(0, 5).join(", ")}${unmatchedPreviews.length > 5 ? `; ${unmatchedPreviews.length - 5} more omitted` : ""}.`] : []),
+            ...(ignoredPathInputs > 0 ? [`Ignored ${ignoredPathInputs} path input(s) after the ${WORKSPACE_DIFF_MAX_PATHS}-path bound.`] : []),
+            ...(!selectedPaths && !args.includePrivate && pendingItems.some((item) => item.kind === "private") ? ["Private pending files were excluded; select their paths explicitly or pass includePrivate=true."] : []),
+        ].map((warning) => boundWorkspaceValue(warning, WORKSPACE_DIFF_ERROR_MAX_CHARS));
+        const textPrefix = [
+            "## Workspace Diff",
+            "",
+            `- Status records inspected once: ${pendingItems.length}`,
+            `- Files considered: ${candidates.length}`,
+            `- Per-file output bound: ${WORKSPACE_DIFF_PER_FILE_MAX_CHARS} characters; complete response bound: ${WORKSPACE_DIFF_TOTAL_MAX_CHARS} characters.`,
+            ...warnings.map((warning) => `- Warning: ${warning}`),
+            ...(textSections.length > 0 ? [] : ["", "No eligible pending files."]),
+        ].join("\n");
+        return formatWorkspaceDiffResult(args.format ?? "text", textPrefix, textSections, {
+            statusRecords: pendingItems.length,
+            selectedPaths: selectedPaths ? workspacePathPreview(selectedPaths) : null,
+            selectedPathCount: selectedPaths?.length ?? 0,
+            includePrivate: args.includePrivate ?? false,
+            maxFiles,
+            perFileMaxChars: WORKSPACE_DIFF_PER_FILE_MAX_CHARS,
+            totalMaxChars: WORKSPACE_DIFF_TOTAL_MAX_CHARS,
+            skippedByLimit,
+            unmatchedPaths: unmatchedPreviews,
+            unprocessedCandidates,
+        }, warnings, outcomes, unprocessedCandidates, args.workdir);
     },
 });
 

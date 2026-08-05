@@ -64,6 +64,7 @@ const PLASTIC_EXPORTS = [
   "patch",
   "diffRevisions",
   "diffFile",
+  "workspaceDiff",
   "branchCreate",
   "switchBranch",
   "merge",
@@ -178,6 +179,17 @@ const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
     prepareArguments(args) {
       const input = normalizeArgs(args);
       normalizeWorkdirAliases(input);
+      return input;
+    },
+  },
+  workspaceDiff: {
+    prepareArguments(args) {
+      const input = normalizeOutputFormatAlias(normalizeArgs(args));
+      normalizeWorkdirAliases(input);
+      promoteSinglePath(input);
+      assignAlias(input, "paths", ["items", "files"]);
+      assignAlias(input, "includePrivate", ["include_private"]);
+      assignAlias(input, "maxFiles", ["max_files"]);
       return input;
     },
   },

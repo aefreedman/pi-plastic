@@ -1,0 +1,177 @@
+import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { PassThrough } from "node:stream";
+import { diffFile, runWithAbortSignal, workspaceDiff } from "../src/plastic-core.ts";
+
+class FakeChildProcess extends EventEmitter {
+  readonly stdout = new PassThrough();
+  readonly stderr = new PassThrough();
+  readonly stdin = new PassThrough();
+  kill(): boolean { return true; }
+  close(code: number): void { this.stdout.end(); this.stderr.end(); this.emit("close", code, null); }
+}
+
+type Call = { command: string; args: string[] };
+const statusSeparator = "\x1f";
+
+function fakeCommands(calls: Call[]) {
+  return ((command: string, args: string[]) => {
+    const proc = new FakeChildProcess();
+    calls.push({ command, args });
+    queueMicrotask(async () => {
+      if (command === "cm" && args[0] === "status") {
+        proc.stdout.write([
+          `CH${statusSeparator}changed.txt${statusSeparator}False${statusSeparator}41${statusSeparator}NO_MERGES`,
+          `PR${statusSeparator}private.txt${statusSeparator}False${statusSeparator}0${statusSeparator}NO_MERGES`,
+          `AD${statusSeparator}added.txt${statusSeparator}False${statusSeparator}0${statusSeparator}NO_MERGES`,
+          `DE${statusSeparator}deleted.txt${statusSeparator}False${statusSeparator}42${statusSeparator}NO_MERGES`,
+          `CH${statusSeparator}nodata.txt${statusSeparator}False${statusSeparator}43${statusSeparator}NO_MERGES`,
+          `MV${statusSeparator}100%${statusSeparator}source moved.txt${statusSeparator}moved destination.txt${statusSeparator}False${statusSeparator}44${statusSeparator}NO_MERGES`,
+        ].join("\n"));
+        proc.close(0);
+        return;
+      }
+      if (command === "cm" && args[0] === "cat") {
+        if (args[1] === "revid:43") {
+          proc.stderr.write("Historical data is unavailable because the item was loaded with --nodata.");
+          proc.close(1);
+          return;
+        }
+        const destination = args.find((arg) => arg.startsWith("--file="))!.slice("--file=".length);
+        await writeFile(destination, `base for ${args[1]}\n`);
+        proc.close(0);
+        return;
+      }
+      if (args[0] === "-u") {
+        proc.stdout.write("--- temporary-left\n+++ temporary-right\n@@ -1 +1 @@\n-base\n+workspace\n");
+        proc.close(1);
+        return;
+      }
+      proc.close(0);
+    });
+    return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
+  }) as typeof import("node:child_process").spawn;
+}
+
+function stressCommands(calls: Call[]) {
+  return ((command: string, args: string[]) => {
+    const proc = new FakeChildProcess();
+    calls.push({ command, args });
+    queueMicrotask(async () => {
+      if (command === "cm" && args[0] === "status") {
+        proc.stdout.write(["stress-1.txt", "stress-2.txt", "stress-3.txt", "stress-4.txt", "stress-5.txt"]
+          .map((name, index) => `CH ${name} False ${index + 1}`)
+          .concat("CH unavailable.txt False 99").join("\n"));
+        proc.close(0);
+        return;
+      }
+      if (command === "cm" && args[0] === "cat") {
+        if (args[1] === "revid:99") {
+          proc.stderr.write(`Failure with JSON-sensitive text \\\" \\\\ ${"x".repeat(5_000)}`);
+          proc.close(1);
+          return;
+        }
+        const destination = args.find((arg) => arg.startsWith("--file="))!.slice("--file=".length);
+        await writeFile(destination, "base\n");
+        proc.close(0);
+        return;
+      }
+      if (args[0] === "-u") {
+        proc.stdout.write(`--- left\n+++ right\n${"+\\\"\\\\\n".repeat(30_000)}`);
+        proc.close(1);
+        return;
+      }
+      proc.close(0);
+    });
+    return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
+  }) as typeof import("node:child_process").spawn;
+}
+
+const jsonPayload = (result: unknown): Record<string, unknown> => {
+  const match = String(result).match(/```json\n([\s\S]*)\n```$/);
+  assert(match, "Expected a fenced JSON result.");
+  return JSON.parse(match[1]) as Record<string, unknown>;
+};
+
+const root = await mkdtemp(join(tmpdir(), "pi-plastic-workspace-diff-"));
+try {
+  for (const name of ["changed.txt", "private.txt", "added.txt", "nodata.txt", "moved destination.txt"]) {
+    await writeFile(join(root, name), `workspace ${name}\n`);
+  }
+
+  const privateCalls: Call[] = [];
+  const privateResult = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "private.txt", workdir: root, format: "text" }), { spawn: fakeCommands(privateCalls) });
+  assert.match(String(privateResult), /empty before private\/new file/, "Explicitly selected private files must compare against an empty base with a private/new label.");
+  assert.equal(privateCalls.filter((call) => call.command === "cm" && call.args[0] === "cat").length, 0, "Private/new files must not materialize a historical base.");
+
+  const changedCalls: Call[] = [];
+  await runWithAbortSignal(undefined, () => diffFile.execute({ path: "changed.txt", workdir: root, format: "text" }), { spawn: fakeCommands(changedCalls) });
+  assert(changedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:41"), "Changed files must use the status revision ID for safe base materialization.");
+
+  const deletedCalls: Call[] = [];
+  await runWithAbortSignal(undefined, () => diffFile.execute({ path: "deleted.txt", workdir: root, format: "text" }), { spawn: fakeCommands(deletedCalls) });
+  assert(deletedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:42"), "Deleted files must materialize their status base before comparing it to empty content.");
+
+  await assert.rejects(
+    () => runWithAbortSignal(undefined, () => diffFile.execute({ path: "nodata.txt", workdir: root, format: "text" }), { spawn: fakeCommands([]) }),
+    /Plastic cannot supply historical\/base bytes.*update\/refresh the workspace or use plastic_diffRevisions/i,
+    "Focused --nodata diffs must explain why the base is unavailable and how to proceed.",
+  );
+
+  const batchCalls: Call[] = [];
+  const batchResult = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, format: "text" }), { spawn: fakeCommands(batchCalls) });
+  assert.match(String(batchResult), /changed\.txt \(changed\)/);
+  assert.match(String(batchResult), /nodata\.txt \(changed\)\nUnavailable: Plastic cannot supply historical\/base bytes/);
+  assert.match(String(batchResult), /moved destination\.txt \(moved\)/, "Workspace review must compare a moved destination path.");
+  assert(batchCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:44"), "Moved files must materialize their status revision before destination comparison.");
+  assert.doesNotMatch(String(batchResult), /private\.txt \(private\)/, "Batch review must exclude private files by default.");
+  const batchStatusCalls = batchCalls.filter((call) => call.command === "cm" && call.args[0] === "status");
+  assert.equal(batchStatusCalls.length, 1, "Workspace review must run status exactly once.");
+  assert.deepEqual(batchStatusCalls[0].args, ["status", "--machinereadable", "--includeRevId", `--fieldseparator=${statusSeparator}`], "Pending-item status must request the explicit separator exactly once.");
+
+  const selectedPrivateCalls: Call[] = [];
+  const selectedPrivate = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["private.txt"], format: "text" }), { spawn: fakeCommands(selectedPrivateCalls) });
+  assert.match(String(selectedPrivate), /private\.txt \(private\)/, "Explicit selection must include a private file in workspace review.");
+  assert.equal(selectedPrivateCalls.filter((call) => call.command === "cm" && call.args[0] === "cat").length, 0, "Selected private files still use an empty base.");
+
+  for (const name of ["stress-1.txt", "stress-2.txt", "stress-3.txt", "stress-4.txt", "stress-5.txt"]) {
+    await writeFile(join(root, name), "workspace\n");
+  }
+  const stressPaths = ["stress-1.txt", "stress-2.txt", "stress-3.txt", "stress-4.txt", "stress-5.txt", "unavailable.txt"];
+  const textStress = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: stressPaths, format: "text" }), { spawn: stressCommands([]) });
+  assert(String(textStress).length <= 60_000, "Text workspace diff must bound the complete response, not only individual diff bodies.");
+  assert.match(String(textStress), /outcome\(s\) omitted/, "An exhausted text budget must retain an omission summary.");
+
+  const escapedUnmatchedPath = "missing \\\"quoted\\\" \\\\ path";
+  const jsonStress = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: [...stressPaths, escapedUnmatchedPath], format: "json" }), { spawn: stressCommands([]) });
+  assert(String(jsonStress).length <= 60_000, "JSON workspace diff must bound the complete framed response after JSON escaping.");
+  const parsedStress = jsonPayload(jsonStress);
+  const stressData = parsedStress.data as Record<string, unknown>;
+  assert((stressData.omittedOutcomes as number) > 0, "An exhausted JSON budget must report omitted outcomes without breaking JSON framing.");
+  assert(Array.isArray(parsedStress.warnings) && (parsedStress.warnings as string[]).some((warning) => warning.includes("no pending status record")), "Unmatched path inputs must remain summarized in bounded JSON warnings.");
+
+  const unavailableJson = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["unavailable.txt", escapedUnmatchedPath], format: "json" }), { spawn: stressCommands([]) });
+  assert(String(unavailableJson).length <= 60_000, "Long per-file errors must not exceed the JSON response bound.");
+  const unavailableData = jsonPayload(unavailableJson).data as Record<string, unknown>;
+  const unavailableOutcome = (unavailableData.outcomes as Array<Record<string, unknown>>)[0];
+  assert(String(unavailableOutcome.error).length <= 1_024, "Long per-file errors must be bounded in metadata.");
+
+  const zeroMaxFiles = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["stress-1.txt"], maxFiles: 0, format: "text" }), { spawn: stressCommands([]) });
+  assert.match(String(zeroMaxFiles), /Files considered: 1/, "Runtime guards must clamp direct callers that bypass the schema with a zero file bound.");
+  assert(String(zeroMaxFiles).length <= 60_000, "A direct zero-bound caller must still receive a complete bounded response.");
+
+  const oversizedPathInputs = ["x".repeat(5_000), ...Array.from({ length: 20 }, (_value, index) => `missing-${index}`)];
+  const boundedInputs = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: oversizedPathInputs, format: "json" }), { spawn: stressCommands([]) });
+  const boundedInputPayload = jsonPayload(boundedInputs);
+  const boundedInputData = boundedInputPayload.data as Record<string, unknown>;
+  assert(boundedInputData.selectedPathCount === 20, "Runtime path guards must retain no more than the configured path count.");
+  assert(Array.isArray(boundedInputPayload.warnings) && (boundedInputPayload.warnings as string[]).some((warning) => warning.includes("Ignored 1 path input")), "Runtime path guards must summarize excess path inputs.");
+  assert((boundedInputData.unmatchedPaths as string[]).every((path) => path.length <= 256), "Runtime path guards must bound long path metadata.");
+
+  console.log("PASS: plastic workspace diff tests passed");
+} finally {
+  await rm(root, { recursive: true, force: true });
+}

@@ -1,6 +1,9 @@
 import { EventEmitter } from "node:events";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PassThrough } from "node:stream";
-import { __plasticProcessInternals } from "../src/plastic-core.ts";
+import { __plasticDiffInternals, __plasticProcessInternals, runWithAbortSignal } from "../src/plastic-core.ts";
 
 const assert = (condition: boolean, message: string): void =>
 {
@@ -40,7 +43,21 @@ const testExecutableResolutionAndDiagnostics = async (): Promise<void> =>
 {
     assert(__plasticProcessInternals.resolveCmExecutable({}) === "cm", "Expected cm to be the default Plastic executable.");
     assert(__plasticProcessInternals.resolveCmExecutable({ PI_PLASTIC_CM_EXECUTABLE: " /tools/cm " }) === "/tools/cm", "Expected PI_PLASTIC_CM_EXECUTABLE to override cm.");
-    assert(__plasticProcessInternals.resolveGitExecutable({ PI_PLASTIC_GIT_EXECUTABLE: "C:/Tools/git.exe" }) === "C:/Tools/git.exe", "Expected PI_PLASTIC_GIT_EXECUTABLE to override git.");
+    assert(__plasticProcessInternals.resolveDiffExecutable({}) === "diff", "Expected bare diff on PATH to be the only default text-diff backend.");
+    assert(__plasticProcessInternals.resolveDiffExecutable({ PATH: "C:\\Program Files\\Git\\usr\\bin" }) === "diff", "A Pi/Windows-like PATH must not turn Git Bash into an implicit diff executable path.");
+    const spacedDiffPath = __plasticProcessInternals.resolveDiffExecutable({ PI_PLASTIC_DIFF_EXECUTABLE: " C:/Program Files/GNU Diff/diff.exe " });
+    assert(spacedDiffPath === "C:/Program Files/GNU Diff/diff.exe", "Expected a space-containing PI_PLASTIC_DIFF_EXECUTABLE path to be preserved as one executable.");
+    const spacedProc = new FakeChildProcess();
+    let spawnedCommand = "";
+    const spacedRun = __plasticProcessInternals.spawnAndCollect(spacedDiffPath, ["-u", "left file", "right file"], process.cwd(), undefined, undefined, {
+        spawn: ((command) => {
+            spawnedCommand = command;
+            queueMicrotask(() => spacedProc.close(0));
+            return spacedProc as unknown as ReturnType<typeof import("node:child_process").spawn>;
+        }) as typeof import("node:child_process").spawn,
+    });
+    await spacedRun;
+    assert(spawnedCommand === spacedDiffPath, "Expected the space-containing diff path to be passed directly to spawn rather than shell-split.");
 
     const proc = new FakeChildProcess();
     const missingCm = __plasticProcessInternals.spawnAndCollect("cm", ["status"], process.cwd(), undefined, undefined, {
@@ -57,16 +74,18 @@ const testExecutableResolutionAndDiagnostics = async (): Promise<void> =>
         },
     );
 
-    const gitProc = new FakeChildProcess();
-    const missingGit = __plasticProcessInternals.spawnAndCollect("git", ["--version"], process.cwd(), undefined, undefined, {
-        spawn: fakeSpawn(gitProc),
+    // Model a Pi/Windows environment with no Git Bash directory on PATH. The
+    // package must report the portable diff setup, never suggest/use Git.
+    const diffProc = new FakeChildProcess();
+    const missingDiff = __plasticProcessInternals.spawnAndCollect(__plasticProcessInternals.resolveDiffExecutable(), ["-u", "left", "right"], process.cwd(), undefined, undefined, {
+        spawn: fakeSpawn(diffProc),
     });
-    gitProc.emit("error", Object.assign(new Error("spawn git ENOENT"), { code: "ENOENT" }));
-    await missingGit.then(
-        () => { throw new Error("Expected a missing Git executable to reject."); },
+    diffProc.emit("error", Object.assign(new Error("spawn diff ENOENT"), { code: "ENOENT" }));
+    await missingDiff.then(
+        () => { throw new Error("Expected a missing diff executable to reject."); },
         (reason: unknown) =>
         {
-            assert(reason instanceof Error && reason.message.includes("PI_PLASTIC_GIT_EXECUTABLE"), "Expected missing git guidance to name PI_PLASTIC_GIT_EXECUTABLE.");
+            assert(reason instanceof Error && reason.message.includes("PI_PLASTIC_DIFF_EXECUTABLE") && reason.message.includes("Git Bash paths automatically"), "Expected Windows-like missing-diff guidance to name PI_PLASTIC_DIFF_EXECUTABLE and explain that Git Bash is not discovered.");
         },
     );
 };
@@ -109,6 +128,38 @@ const testAbortEscalatesUntilTerminalSettlement = async (): Promise<void> =>
     assert(proc.signals.join(",") === "SIGTERM,SIGKILL", "Expected abort listener cleanup after terminal settlement.");
 };
 
+const testPortableDiffReceivesActiveAbortSignal = async (): Promise<void> =>
+{
+    const root = await mkdtemp(join(tmpdir(), "pi-plastic-diff-abort-"));
+    try
+    {
+        const left = join(root, "left.txt");
+        const right = join(root, "right.txt");
+        await Promise.all([writeFile(left, "left\n"), writeFile(right, "right\n")]);
+        const proc = new FakeChildProcess();
+        const controller = new AbortController();
+        let spawnedResolve: (() => void) | undefined;
+        const spawned = new Promise<void>((resolvePromise) => { spawnedResolve = resolvePromise; });
+        const result = runWithAbortSignal(
+            controller.signal,
+            () => __plasticDiffInternals.runPortableTextDiff(left, right, root, "left", "right"),
+            { spawn: (() => { spawnedResolve?.(); return proc as unknown as ReturnType<typeof import("node:child_process").spawn>; }) as typeof import("node:child_process").spawn },
+        );
+        await spawned;
+        controller.abort();
+        assert(proc.signals.join(",") === "SIGTERM", "Expected the active abort signal to terminate the GNU/POSIX diff subprocess.");
+        proc.close(1);
+        await result.then(
+            () => { throw new Error("Expected an aborted text diff to reject."); },
+            (error: unknown) => { assert(error instanceof Error && error.message === "Text diff was aborted.", "Expected portable diff cancellation to retain its focused diagnostic."); },
+        );
+    }
+    finally
+    {
+        await rm(root, { recursive: true, force: true });
+    }
+};
+
 const testTerminalListenersExistBeforeStdinWrite = async (): Promise<void> =>
 {
     const proc = new FakeChildProcess();
@@ -141,6 +192,7 @@ const main = async (): Promise<void> =>
 {
     await testExecutableResolutionAndDiagnostics();
     await testAbortEscalatesUntilTerminalSettlement();
+    await testPortableDiffReceivesActiveAbortSignal();
     await testTerminalListenersExistBeforeStdinWrite();
     console.log("PASS: plastic process lifecycle tests passed");
 };

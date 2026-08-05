@@ -5,7 +5,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const packagePath = fileURLToPath(new URL("../", import.meta.url));
-const workspacePath = dirname(packagePath);
+const packageRootFor = (specifier: string): string => dirname(dirname(fileURLToPath(import.meta.resolve(specifier))));
+const fileDiscoveryPackagePath = packageRootFor("@aefree/pi-file-discovery");
+const capabilityRegistryPackagePath = packageRootFor("@aefree/pi-capability-registry");
 const registryKey = "@aefree/pi-file-discovery/filters/v1";
 
 type Handler = (_event: unknown, context: any) => Promise<void> | void;
@@ -32,20 +34,19 @@ async function isolatedPlasticCopy(name: string): Promise<string> {
   for (const entry of ["extensions", "src", "package.json"]) await cp(join(packagePath, entry), join(root, entry), { recursive: true });
   return root;
 }
-/** A neutral local file-discovery copy owns the real contract and registry dependency. */
+/** A neutral installed file-discovery copy owns the real contract and registry dependency. */
 async function isolatedFileDiscoveryCopy(name: string): Promise<string> {
-  const source = join(workspacePath, "pi-file-discovery");
   const root = await mkdtemp(join(tmpdir(), `pi-file-discovery-${name}-`));
-  for (const entry of ["src", "package.json"]) await cp(join(source, entry), join(root, entry), { recursive: true });
+  for (const entry of ["dist", "package.json"]) await cp(join(fileDiscoveryPackagePath, entry), join(root, entry), { recursive: true });
   await mkdir(join(root, "node_modules", "@aefree"), { recursive: true });
-  await symlink(join(source, "node_modules", "@aefree", "pi-capability-registry"), join(root, "node_modules", "@aefree", "pi-capability-registry"), linkType());
+  await symlink(capabilityRegistryPackagePath, join(root, "node_modules", "@aefree", "pi-capability-registry"), linkType());
   return root;
 }
 async function loadPlastic(root: string): Promise<(pi: any) => void> {
   return (await import(`${pathToFileURL(join(root, "extensions/file-discovery-filter.ts")).href}?${encodeURIComponent(root)}`)).default;
 }
 async function resolveFilters(root: string, scope: object): Promise<{ outcome: string; records?: readonly any[] }> {
-  const contract = await import(`${pathToFileURL(join(root, "src/contracts/v1/index.ts")).href}?${encodeURIComponent(root)}`);
+  const contract = await import(`${pathToFileURL(join(root, "dist/contracts/v1/index.js")).href}?${encodeURIComponent(root)}`);
   return contract.resolveFileDiscoveryFiltersV1(scope);
 }
 

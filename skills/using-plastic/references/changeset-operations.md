@@ -77,7 +77,8 @@ Use one of these safe alternatives:
 
 ```text
 plastic_status(machineReadable=true) # list pending paths/statuses
-plastic_diffFile(path="<workspace-path>") # common workspace-base diff
+plastic_diffFile(path="<workspace-path>") # one workspace file
+plastic_workspaceDiff() # bounded pending review; excludes private unless selected/opted in
 plastic_diffFile(path="<workspace-path>", revision="cs:<number>")
 plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```

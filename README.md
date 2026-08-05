@@ -32,6 +32,7 @@ Removing the approval layer does not relax Plastic safety guards. Command allowl
 - `plastic_patch`
 - `plastic_diffRevisions`
 - `plastic_diffFile`
+- `plastic_workspaceDiff`
 - `plastic_branchCreate`
 - `plastic_switchBranch`
 - `plastic_merge`
@@ -53,7 +54,7 @@ Removing the approval layer does not relax Plastic safety guards. Command allowl
 
 ## Dynamic tool loading
 
-The package exposes 28 public `plastic_*` tools. `plastic_workspaceCreate` is intentionally not registered or discoverable until the package provides a paired, safe workspace-cleanup capability. `plastic_tool_search` is a package-owned loader that searches the explicit Plastic capability catalog, reports bounded matches and safety guidance, and additively enables selected tools for the next model request.
+The package exposes 29 public `plastic_*` tools. `plastic_workspaceCreate` is intentionally not registered or discoverable until the package provides a paired, safe workspace-cleanup capability. `plastic_tool_search` is a package-owned loader that searches the explicit Plastic capability catalog, reports bounded matches and safety guidance, and additively enables selected tools for the next model request.
 
 The default **balanced** session set keeps `plastic_tool_search`, `plastic_status`, and `plastic_currentBranch` active. The other Plastic tools remain registered but inactive until selected; built-in and other-extension tools are not removed. Previous loader additions on the active session branch are restored on startup, resume, fork, and reload.
 
@@ -62,7 +63,7 @@ For controlled comparisons, set `PI_PLASTIC_TOOL_LOADING_MODE` before starting P
 ```bash
 PI_PLASTIC_TOOL_LOADING_MODE=balanced    # default production candidate
 PI_PLASTIC_TOOL_LOADING_MODE=loader-only # maximum initial schema reduction
-PI_PLASTIC_TOOL_LOADING_MODE=all-active  # all 28 currently exposed tools; loader omitted
+PI_PLASTIC_TOOL_LOADING_MODE=all-active  # all 29 currently exposed tools; loader omitted
 ```
 
 Pi 0.82 and newer use canonical `sourceInfo` provenance to identify this package's effective tools before deferring, restoring, or activating them. If canonical provenance or ownership of the effective loader cannot be proven, `pi-plastic` fails safe: it preserves the complete current active set exactly, does not defer, remove, or activate any `plastic_*` name, and an effective package loader can only report known tools that are already active rather than activating inactive names. On sourceInfo-capable Pi instances, providers without native deferred definitions still receive the complete current active set after a loader call. Reload or restart Pi after source edits; source files are not watched automatically.
@@ -70,7 +71,7 @@ Pi 0.82 and newer use canonical `sourceInfo` provenance to identify this package
 ## Safety behavior
 
 - `plastic_branchCreate` supports an explicit parent branch independent of the loaded workspace branch, defaults relative names to the current branch when no parent is supplied, and rejects top-level paths unless `allowRootBranch=true` is explicit.
-- `plastic_diff` remains a disabled alias by design; use `plastic_diffFile` or `plastic_diffRevisions` for text-only file diffs.
+- `plastic_diff` remains a disabled alias by design; use `plastic_status` for changed-path listing, `plastic_diffFile` for one file, `plastic_workspaceDiff` for pending review, or `plastic_diffRevisions` for an explicit historical pair.
 - `plastic_patch` generates review patches with `cm patch`, including `clean` and `integration` filters for branch review workflows. It does not expose patch apply.
 - Bash safety rails block `cm diff` and unsafe interactive `cm merge --merge` usage.
 - Merge tooling surfaces Plastic `FILE_CONFLICT` records and merge-state metadata from `cm status`.
@@ -129,7 +130,7 @@ pi install -l <path-to-pi-plastic>
 - Node.js 22.19.0 or newer
 - Pi 0.82.0 or newer; the current development and eval baseline is Pi 0.83
 - Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`, or `PI_PLASTIC_CM_EXECUTABLE` set to its full executable path
-- A compatible `diff` executable available on `PATH`, or `PI_PLASTIC_DIFF_EXECUTABLE` set to its full executable path, for text-only diff and patch tools
+- GNU/POSIX-compatible `diff` available on `PATH`, or `PI_PLASTIC_DIFF_EXECUTABLE` set to its full executable path (including paths containing spaces), for text-only diff and patch tools. Pi does not discover Git Bash paths automatically.
 - A configured Plastic workspace for workspace-scoped operations
 - `pi-file-discovery` is an optional independently loaded integration. When its `discover_candidate_files` tool is active, it receives the advisory Plastic ignore/cloak filter through the shared global capability protocol; when absent, `pi-plastic` loads without file-discovery filtering. The tarball does not embed linked sibling workspaces or `node_modules` paths.
 

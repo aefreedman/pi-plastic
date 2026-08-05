@@ -1,6 +1,6 @@
 {
   "name": "@aefree/pi-plastic",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
@@ -36,12 +36,13 @@
     ]
   },
   "scripts": {
-    "test": "npx --yes tsx tests/plastic-tool-validation.ts && npx --yes tsx tests/plastic-checkin-path-resolution.ts && npx --yes tsx tests/plastic-diff-workflow.test.ts && npx --yes tsx tests/plastic-process-lifecycle.test.ts && npx --yes tsx tests/plastic-patch-command.test.ts && npx --yes tsx tests/plastic-extension-registration.test.ts && npx --yes tsx tests/plastic-dynamic-tool-loading.test.ts && npx --yes tsx tests/plastic-tool-rendering.test.ts && npx --yes tsx tests/plastic-branch-query.test.ts && npx --yes tsx tests/plastic-workspace.test.ts && npx --yes tsx tests/plastic-mutation-execution.test.ts && npx --yes tsx tests/file-discovery-filter.test.ts && npx --yes tsx tests/file-discovery-filter-registration.test.ts && npx --yes tsx tests/packed-copy-owner-conflict.test.ts && npx --yes tsx tests/plastic-branch-status.test.ts && npx --yes tsx tests/plastic-constrained-sampling.test.ts && npx --yes tsx tests/bash-cm-diff-guard-validation.ts",
+    "test": "npx --yes tsx tests/plastic-tool-validation.ts && npx --yes tsx tests/plastic-checkin-path-resolution.ts && npx --yes tsx tests/plastic-diff-workflow.test.ts && npx --yes tsx tests/plastic-workspace-diff.test.ts && npx --yes tsx tests/plastic-process-lifecycle.test.ts && npx --yes tsx tests/plastic-patch-command.test.ts && npx --yes tsx tests/plastic-extension-registration.test.ts && npx --yes tsx tests/plastic-dynamic-tool-loading.test.ts && npx --yes tsx tests/plastic-tool-rendering.test.ts && npx --yes tsx tests/plastic-branch-query.test.ts && npx --yes tsx tests/plastic-workspace.test.ts && npx --yes tsx tests/plastic-mutation-execution.test.ts && npx --yes tsx tests/file-discovery-filter.test.ts && npx --yes tsx tests/file-discovery-filter-registration.test.ts && npx --yes tsx tests/packed-copy-owner-conflict.test.ts && npx --yes tsx tests/plastic-branch-status.test.ts && npx --yes tsx tests/plastic-constrained-sampling.test.ts && npx --yes tsx tests/bash-cm-diff-guard-validation.ts",
     "test:live": "npx --yes tsx tests/plastic-live-smoke.test.ts",
     "test:live:branch-create": "npx --yes tsx tests/plastic-branch-create-live.test.ts",
     "eval:tool-loading": "npx --yes tsx evals/tool-loading/run-eval.ts"
   },
   "devDependencies": {
+    "@aefree/pi-file-discovery": "^0.1.1",
     "@earendil-works/pi-coding-agent": "0.83.0",
     "typebox": "^1.3.8"
   },

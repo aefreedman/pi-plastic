@@ -36,7 +36,7 @@ async function loadHarness(activeTools: string[], branchEntries: unknown[] = [],
 async function main(): Promise<void> {
   await withMode(undefined, async () => {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
-    assert.equal(harness.registry.size, 29, "all 28 public Plastic tools plus the loader should be registered");
+    assert.equal(harness.registry.size, 30, "all 29 public Plastic tools plus the loader should be registered");
     assert(harness.registry.has(PLASTIC_TOOL_SEARCH_NAME));
     assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", PLASTIC_TOOL_SEARCH_NAME, ...BALANCED_ACTIVE_PLASTIC_TOOL_NAMES]));
   });
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
 
   await withMode("all-active", async () => {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
-    assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", ...publicToolNames]), "all-active should expose all 28 current Plastic tools without the new loader");
+    assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", ...publicToolNames]), "all-active should expose all 29 current Plastic tools without the new loader");
   });
 
   await withMode("balanced", async () => {
@@ -76,8 +76,9 @@ async function main(): Promise<void> {
   assert.deepEqual(searchPlasticTools({ query: "what changed" }).map((match) => match.name), ["plastic_status"], "changed-file questions should route to status rather than GUI-capable diff commands");
   const diffMatches = searchPlasticTools({ query: "diff" }).map((match) => match.name);
   assert(!diffMatches.includes("plastic_diff"), "the disabled compatibility diff alias must never be executable through search");
-  assert.deepEqual(diffMatches.slice(0, 2), ["plastic_diffFile", "plastic_diffRevisions"], "generic diff searches should prefer the common workspace-file route before advanced revision comparison");
-  assert.deepEqual(searchPlasticTools({ query: "workspace diff" }).map((match) => match.name), ["plastic_diffFile"], "workspace diff intent should select the file diff tool");
+  assert.deepEqual(diffMatches.slice(0, 2), ["plastic_diffFile", "plastic_workspaceDiff"], "generic diff searches should prefer safe workspace-file and pending-review routes before advanced revision comparison");
+  assert.deepEqual(searchPlasticTools({ query: "workspace diff" }).map((match) => match.name), ["plastic_workspaceDiff"], "workspace diff intent should select the bounded pending-review tool");
+  assert.deepEqual(searchPlasticTools({ query: "pending review" }).map((match) => match.name), ["plastic_workspaceDiff"], "pending review should route to the batch workspace diff tool");
   assert.deepEqual(searchPlasticTools({ query: "compare revisions" }).map((match) => match.name), ["plastic_diffRevisions"], "explicit revision comparison should select the advanced tool");
   assert.deepEqual(searchPlasticTools({ toolNames: ["plastic_diff"] }).map((match) => match.name), [], "the disabled diff alias must not be exactly selectable");
   assert.deepEqual(searchPlasticTools({ toolNames: ["plastic_workspaceCreate"] }).map((match) => match.name), [], "workspace creation must not be discoverable until paired cleanup is available");

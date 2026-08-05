@@ -1,4 +1,4 @@
-import { __plasticPatchInternals } from "../src/plastic-core.ts";
+import { __plasticPatchInternals, __plasticProcessInternals } from "../src/plastic-core.ts";
 
 const assert = (condition: boolean, message: string): void =>
 {
@@ -33,7 +33,7 @@ const main = (): void =>
 {
     const { buildPatchCommandArgs, resolvePatchToolPath } = __plasticPatchInternals;
 
-    assert(resolvePatchToolPath() === "diff", "Expected patch backend to share the portable diff PATH default.");
+    assert(resolvePatchToolPath() === __plasticProcessInternals.resolveDiffExecutable(), "Expected patch backend to share the configured GNU/POSIX diff executable.");
     assert(resolvePatchToolPath(" C:\\gnu\\diff.exe ") === "C:\\gnu\\diff.exe", "Expected an explicit patch backend to override the default.");
 
     assertArgs(

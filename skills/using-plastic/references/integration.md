@@ -37,7 +37,8 @@ plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<pat
 - Inspect specific file content changes with the common workspace-base path first:
 
 ```text
-plastic_diffFile(path="<workspace-path>")
+plastic_diffFile(path="<workspace-path>") # one workspace file
+plastic_workspaceDiff() # bounded pending review
 plastic_diffFile(path="<workspace-path>", revision="cs:<number>")
 plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```

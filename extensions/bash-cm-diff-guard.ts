@@ -6,7 +6,7 @@ import {
 } from "./shared/bash-command-guards";
 
 const BLOCK_MESSAGE =
-  "`cm diff` is blocked in Pi because it can launch a GUI window and hang CLI automation. Use `plastic_status` to list changed paths, `plastic_diffFile` for a file diff, or `plastic_diffRevisions` for two explicit revisions.";
+  "`cm diff` is blocked in Pi because it can launch a GUI window and hang CLI automation. Use `plastic_status` to list changed paths, `plastic_diffFile` for one file, `plastic_workspaceDiff` for pending review, or `plastic_diffRevisions` for two explicit revisions.";
 
 const DIRECT_CM_DIFF = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:(?:"[^"]*[\\/]cm(?:\.exe)?"|'[^']*[\\/]cm(?:\.exe)?')|(?:[^"'\s]*[\\/])?cm(?:\.exe)?)\s+diff(?:\s|$)/i;
 
@@ -24,6 +24,7 @@ function commandRunsCmDiff(command: string): boolean {
 }
 
 export const __bashCmDiffGuardInternals = {
+  blockMessage: BLOCK_MESSAGE,
   segmentRunsCmDiff,
   commandRunsCmDiff,
   stripAssignments,
