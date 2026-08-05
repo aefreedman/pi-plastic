@@ -1,6 +1,6 @@
 {
   "name": "@aefree/pi-plastic",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"

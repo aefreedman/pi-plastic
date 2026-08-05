@@ -42,6 +42,8 @@ try {
     assert.equal(safeTempExtension("Assets/My Scene.unity"), ".unity");
     assert.equal(safeTempExtension("revid:99"), ".tmp");
     assert.equal(__plasticProcessInternals.resolveDiffExecutable({ PI_PLASTIC_DIFF_EXECUTABLE: "D:/tools/diff.exe" }), "D:/tools/diff.exe");
+    await assert.rejects(() => __plasticProcessInternals.runCm(["diff", "cs:1"], root), /`cm diff` is blocked/);
+    await assert.rejects(() => __plasticProcessInternals.runCm(["differences", "cs:1"], root), /`cm diff` is blocked/);
 
     const left = join(root, "Unity Scene ünicode.unity");
     const right = join(root, "Unity Scene ünicode copy.unity");

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows semantic versioning for public package releases.
 
+## [0.5.2] - 2026-08-05
+
+### Fixed
+
+- Hardened the Bash GUI-diff guard for Plastic's `differences` alias, quoted subcommands, common CMD and PowerShell wrappers, `call`/`start`, `Start-Process`, CMD caret escaping, and direct `!`/`!!` shell commands; the internal process guard now rejects the alias too.
+- Added runtime-handler coverage and documented that user-scope installation is required to protect delegated Pi processes whose working directory does not load the originating project's package settings.
+
 ## [0.5.1] - 2026-08-05
 
 ### Changed

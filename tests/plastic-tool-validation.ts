@@ -122,6 +122,7 @@ const main = (): void => {
   const bashGuardText = readText(bashGuardPath);
   failures += checkRequired(bashGuardText, "pi-plastic/extensions/bash-cm-diff-guard.ts", [
     'pi.on("tool_call"',
+    'pi.on("user_bash"',
     "isBashToolCall",
     "commandRunsCmDiff",
     "__bashCmDiffGuardInternals",

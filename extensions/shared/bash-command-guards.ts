@@ -1,10 +1,10 @@
 export const WRAPPED_COMMAND_PATTERNS = [
   /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?(?:bash|sh|zsh)(?:\.exe)?\s+-lc\s+(["'])([\s\S]*)\1$/i,
   /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?(?:bash|sh|zsh)(?:\.exe)?\s+-c\s+(["'])([\s\S]*)\1$/i,
-  /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?cmd(?:\.exe)?\s+\/[ck]\s+(["'])([\s\S]*)\1$/i,
-  /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?cmd(?:\.exe)?\s+\/[ck]\s+()([\s\S]+)$/i,
-  /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?(?:pwsh|powershell)(?:\.exe)?\s+-command\s+(["'])([\s\S]*)\1$/i,
-  /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?(?:pwsh|powershell)(?:\.exe)?\s+-command\s+()([\s\S]+)$/i,
+  /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?cmd(?:\.exe)?(?:\s+\/[dqsvu](?::\S+)*)*\s+\/[ck]\s+(["'])([\s\S]*)\1$/i,
+  /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?cmd(?:\.exe)?(?:\s+\/[dqsvu](?::\S+)*)*\s+\/[ck]\s+()([\s\S]+)$/i,
+  /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?(?:pwsh|powershell)(?:\.exe)?(?:(?:\s+-(?:noprofile|noninteractive|nologo|sta|mta))|(?:\s+-executionpolicy\s+\S+))*\s+-(?:command|c)\s+(["'])([\s\S]*)\1$/i,
+  /^(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:["']?[^"'\s]*[\\/])?(?:pwsh|powershell)(?:\.exe)?(?:(?:\s+-(?:noprofile|noninteractive|nologo|sta|mta))|(?:\s+-executionpolicy\s+\S+))*\s+-(?:command|c)\s+()([\s\S]+)$/i,
 ];
 
 export function splitSegments(command: string): string[] {
@@ -25,6 +25,8 @@ export function stripLeadingWrappers(segment: string): string {
     const next = value
       .replace(/^sudo\s+/i, "")
       .replace(/^command\s+/i, "")
+      .replace(/^call\s+/i, "")
+      .replace(/^start\s+(?:["'][^"']*["']\s+)?(?:(?:\/wait|\/b|\/min|\/max|\/i|\/low|\/normal|\/high|\/realtime|\/abovenormal|\/belownormal)\s+)*/i, "")
       .replace(/^time\s+/i, "")
       .replace(/^nice(?:\s+(?:-n\s+)?-?\d+)?\s+/i, "");
 

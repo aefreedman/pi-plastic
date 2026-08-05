@@ -250,7 +250,7 @@ const BLOCKED_CM_DIFF_MESSAGE = "`cm diff` is blocked in Pi because it may launc
 const ensureCmCommandAllowed = (args: string[]): void =>
 {
     const command = (args[0] ?? "").trim().toLowerCase();
-    if (command === "diff")
+    if (command === "diff" || command === "differences")
     {
         throw new Error(BLOCKED_CM_DIFF_MESSAGE);
     }

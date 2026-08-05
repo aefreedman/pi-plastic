@@ -70,6 +70,8 @@ Pi 0.82 and newer use canonical `sourceInfo` provenance to identify this package
 
 ## Safety behavior
 
+The Bash guards run only in Pi processes that actually load this package. A project-local install does not protect a delegated child process whose working directory resolves different project settings. Install `pi-plastic` at user scope (the default `pi install`, without `-l`) when subagents and sessions in arbitrary workspaces must inherit the guards. Restart existing Pi processes after installation or source changes.
+
 - `plastic_branchCreate` supports an explicit parent branch independent of the loaded workspace branch, defaults relative names to the current branch when no parent is supplied, and rejects top-level paths unless `allowRootBranch=true` is explicit.
 - `plastic_diff` remains a disabled alias by design. Use `plastic_status` for changed-path listing; do not diff as routine post-edit validation or checkin preflight. When change-boundary evidence is needed, use `plastic_diffFile` for one exact file, `plastic_workspaceDiff` with selected paths or explicit `allPending=true`, or `plastic_diffRevisions` for an explicit historical pair. Diff responses use small defaults and caller-controlled `maxChars` bounds.
 - Preflight is not routine confirmation. Use it for ambiguous or broad mutation scope, moved/deleted path rewriting, compound operations, or explicit preview requests; otherwise rely on exact targets and the tools' runtime guards.
@@ -96,16 +98,22 @@ If `output` is omitted, Plastic prints patch content to stdout. If `output` is p
 
 ## Install
 
-Install the stable GitHub release over HTTPS:
+Install the latest stable npm release at user scope so the safety guards also load for delegated child processes in other workspaces:
 
 ```bash
-pi install git:github.com/aefreedman/pi-plastic@v0.4.0
+pi install npm:@aefree/pi-plastic
+```
+
+Install a pinned GitHub release over HTTPS:
+
+```bash
+pi install git:github.com/aefreedman/pi-plastic@v0.5.1
 ```
 
 Equivalent SSH install:
 
 ```bash
-pi install git:git@github.com:aefreedman/pi-plastic@v0.4.0
+pi install git:git@github.com:aefreedman/pi-plastic@v0.5.1
 ```
 
 To intentionally track the moving default branch instead of a release tag:
@@ -125,6 +133,8 @@ Project-local install:
 ```bash
 pi install -l <path-to-pi-plastic>
 ```
+
+Project-local installation protects only Pi processes that load those project settings. It is insufficient as a global Bash safety rail when a subagent launches with another working directory.
 
 ## Requirements
 
