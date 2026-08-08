@@ -25,9 +25,12 @@ Note: command examples target current `cm` 11.x CLI syntax; legacy aliases may d
 
 ## Merge verification checklist
 
+Plastic merges into the branch currently loaded in the workspace; switching afterward does not move a source-branch changeset to the target.
+
 - Run `plastic_merge(...)`.
 - If `plastic_merge(...)` reports `FILE_CONFLICT`, inspect/resolve the listed paths and validate before finalizing.
 - Immediately run `plastic_status()`.
 - Pending merge links are expected until the merge result is checked in; merge-in-progress hints are blockers.
 - If validation/tests were run after the merge, run `plastic_status()` again before checkin so generated private artifacts do not muddy the result.
 - If `plastic_checkin(...)` says a merge is still in progress after files are resolved and validated, run `plastic_finalizeMerge(source=..., strategy="destination")`, then retry checkin.
+- Confirm the merge changeset and final workspace branch are the intended target. A source/target mismatch is failure, even when the command returned success or the workspace is clean.

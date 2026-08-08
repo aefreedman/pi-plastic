@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows semantic versioning for public package releases.
 
+## Unreleased
+
+### Fixed
+
+- Reject branch-switch and merge-closeout success when the workspace is not actually on the requested target branch, including checks after target update, before merge checkin, and after checkin.
+- Clarify that Plastic merge checkins belong to the branch loaded in the workspace and cannot be integrated by switching branches afterward like a Git fast-forward.
+
 ## [0.5.2] - 2026-08-05
 
 ### Fixed

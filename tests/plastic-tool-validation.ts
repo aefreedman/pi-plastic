@@ -67,6 +67,8 @@ const main = (): void => {
     "auto-add-private-retry-success",
     "__plasticSwitchInternals",
     "normalizeBranchSpecForComparison",
+    "assertWorkspaceOnBranch",
+    "Plastic changesets remain on the branch where they were created",
     "isSwitchBringBlockedForUnattended",
     "canSwitchDirectWithPrivateOnlyPending",
     "direct-switch-private-only",
@@ -95,6 +97,8 @@ const main = (): void => {
     "plastic_merge",
     "plastic_mergeToBranch",
   "source branch's Plastic parent branch",
+    "not Git fast-forwards",
+    "Switching to the target after a checkin on the source branch does not move or integrate that changeset",
   ]);
   failures += checkForbidden(skillText, "pi-plastic/skills/using-plastic/SKILL.md", [
     /^\s*-\s+plastic_diff\s*$/m,

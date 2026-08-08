@@ -1070,6 +1070,22 @@ const isSameBranchSpec = (left: string, right: string): boolean =>
     return normalizeBranchSpecForComparison(left) === normalizeBranchSpecForComparison(right);
 };
 
+const assertWorkspaceOnBranch = (actualBranch: string, expectedBranch: string, phase: string): void =>
+{
+    if (isSameBranchSpec(actualBranch, expectedBranch))
+    {
+        return;
+    }
+
+    throw new Error([
+        `Plastic workspace branch mismatch after ${phase}.`,
+        `Expected target: ${expectedBranch}`,
+        `Actual branch: ${actualBranch}`,
+        "The requested merge/checkin was not completed on the target branch.",
+        "Do not switch branches and assume the changeset moved; Plastic changesets remain on the branch where they were created. Inspect branch history and retry the merge from the actual target branch.",
+    ].join("\n"));
+};
+
 const getBranchLeafName = (branch: string): string =>
 {
     const normalized = normalizeBranchSpecForComparison(branch);
@@ -1265,6 +1281,7 @@ export const __plasticSwitchInternals = {
     toLegacyPendingSummary,
     normalizeBranchSpecForComparison,
     isSameBranchSpec,
+    assertWorkspaceOnBranch,
     buildSwitchPendingProfile,
     isSwitchBringBlockedForUnattended,
     canSwitchDirectWithPrivateOnlyPending,
@@ -3338,6 +3355,7 @@ export const switchBranch = tool({
 
             const output = await runCm(switchCmd, args.workdir);
             const branchAfter = await resolveCurrentBranchName(args.workdir);
+            assertWorkspaceOnBranch(branchAfter, args.branch, "cm switch");
             return toStructuredResult(
                 "switch-branch",
                 format,
@@ -3398,6 +3416,7 @@ export const switchBranch = tool({
 
             const output = await runCm(switchCmd, args.workdir);
             const branchAfter = await resolveCurrentBranchName(args.workdir);
+            assertWorkspaceOnBranch(branchAfter, args.branch, "cm switch with private-only pending items");
             return toStructuredResult(
                 "switch-branch",
                 format,
@@ -3569,6 +3588,7 @@ export const switchBranch = tool({
 
         const switchOutput = await runCm(switchCmd, args.workdir);
         const branchAfter = await resolveCurrentBranchName(args.workdir).catch(() => branchBefore);
+        assertWorkspaceOnBranch(branchAfter, args.branch, "cm switch after shelving");
 
         return toStructuredResult(
             "switch-branch",
@@ -3860,6 +3880,8 @@ export const mergeToBranch = tool({
             workdir: args.workdir,
         });
         const updateResult = updateTarget ? await update.execute({ workdir: args.workdir }) : "(skipped)";
+        const branchBeforeMerge = await resolveCurrentBranchName(args.workdir);
+        assertWorkspaceOnBranch(branchBeforeMerge, targetBranch, "target update and before merge");
         const mergeResult = await merge.execute({
             source: sourceBranch,
             strategy,
@@ -3898,6 +3920,9 @@ export const mergeToBranch = tool({
             );
         }
 
+        const branchBeforeCheckin = await resolveCurrentBranchName(args.workdir);
+        assertWorkspaceOnBranch(branchBeforeCheckin, targetBranch, "merge and before checkin");
+
         const preflightResult = await checkin.execute({
             message: checkinMessage,
             includeAll: true,
@@ -3914,6 +3939,7 @@ export const mergeToBranch = tool({
             workdir: args.workdir,
         });
         const finalBranch = await resolveCurrentBranchName(args.workdir);
+        assertWorkspaceOnBranch(finalBranch, targetBranch, "merge checkin");
         const finalShortStatus = await runCmRaw(["status", "--short"], args.workdir).catch(() => "");
         const finalPendingSummary = summarizeShortStatus(finalShortStatus);
 

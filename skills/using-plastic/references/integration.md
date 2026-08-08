@@ -9,6 +9,8 @@
 
 ## Autonomous Merge Workflow
 
+Plastic does not perform a Git-style fast-forward. It applies the merge into the branch currently loaded in the workspace, and the resulting merge changeset belongs to the branch where checkin runs. Switching branches afterward does not move an incorrectly placed changeset.
+
 - Switch to the target branch/workspace and ensure you understand the current pending state.
 - Run `plastic_merge(...)`.
 - If Plastic stops on a delete/change directory conflict and source deletion is the intended resolution, run `plastic_resolveDeleteChangeConflict(...)`, then rerun `plastic_merge(...)`.
@@ -17,6 +19,7 @@
 - If `plastic_status()` still shows `Pending merge links`, merge-in-progress state, or conflict-like pending items, stop and follow troubleshooting before any checkin.
 - After compile/tests, run `plastic_status()` again so Unity-generated private artifacts are not mistaken for merge fallout.
 - Only then create the merge checkin.
+- Verify the merge checkin was created on the target branch. If the workspace or changeset is on the source branch, stop: do not switch to the target and claim completion. Inspect target history and rerun the merge while the target is actually loaded.
 
 ## Review Workflow
 

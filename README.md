@@ -78,7 +78,7 @@ The Bash guards run only in Pi processes that actually load this package. A proj
 - `plastic_patch` generates review patches with `cm patch`, including `clean` and `integration` filters for branch review workflows. It does not expose patch apply.
 - Bash safety rails block `cm diff` and unsafe interactive `cm merge --merge` usage.
 - Merge tooling surfaces Plastic `FILE_CONFLICT` records and merge-state metadata from `cm status`.
-- `plastic_mergeToBranch` performs the common safe closeout flow: resolve the source branch's parent as the default target, switch to the target branch, optionally update, merge a source branch non-interactively, verify merge state, and check in the merge result.
+- `plastic_mergeToBranch` performs the common safe closeout flow: resolve the source branch's parent as the default target, switch to the target branch, optionally update, merge a source branch non-interactively, verify merge state, and check in the merge result. It verifies the loaded target before merge/checkin and rejects final-branch mismatches; Plastic checkins stay on the branch where they were created, so switching afterward is not a Git-style integration.
 - `plastic_finalizeMerge` supports reviewed/manual-resolution flows where Plastic still needs merge metadata finalized before checkin.
 
 ## Patch generation examples
