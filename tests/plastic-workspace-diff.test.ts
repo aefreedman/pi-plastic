@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
-import { diffFile, diffRevisions, runWithAbortSignal, workspaceDiff } from "../src/plastic-core.ts";
+import { __plasticDiffInternals, diffFile, diffRevisions, runWithAbortSignal, workspaceDiff } from "../src/plastic-core.ts";
 
 class FakeChildProcess extends EventEmitter {
   readonly stdout = new PassThrough();
@@ -27,6 +27,8 @@ function fakeCommands(calls: Call[]) {
           `CH${statusSeparator}changed.txt${statusSeparator}False${statusSeparator}41${statusSeparator}NO_MERGES`,
           `PR${statusSeparator}private.txt${statusSeparator}False${statusSeparator}0${statusSeparator}NO_MERGES`,
           `AD${statusSeparator}added.txt${statusSeparator}False${statusSeparator}0${statusSeparator}NO_MERGES`,
+          `AD${statusSeparator}added-empty.txt${statusSeparator}False${statusSeparator}0${statusSeparator}NO_MERGES`,
+          `AD${statusSeparator}über added.txt${statusSeparator}False${statusSeparator}0${statusSeparator}NO_MERGES`,
           `DE${statusSeparator}deleted.txt${statusSeparator}False${statusSeparator}42${statusSeparator}NO_MERGES`,
           `CH${statusSeparator}nodata.txt${statusSeparator}False${statusSeparator}43${statusSeparator}NO_MERGES`,
           `MV${statusSeparator}100%${statusSeparator}source moved.txt${statusSeparator}moved destination.txt${statusSeparator}False${statusSeparator}44${statusSeparator}NO_MERGES`,
@@ -36,6 +38,8 @@ function fakeCommands(calls: Call[]) {
       }
       if (command === "cm" && args[0] === "cat") {
         if (args[1] === "revid:43") {
+          const destination = args.find((arg) => arg.startsWith("--file="))!.slice("--file=".length);
+          await writeFile(destination, "");
           proc.stderr.write("Historical data is unavailable because the item was loaded with --nodata.");
           proc.close(1);
           return;
@@ -46,6 +50,11 @@ function fakeCommands(calls: Call[]) {
         return;
       }
       if (args[0] === "-u") {
+        const [left, right] = await Promise.all([readFile(args[1]), readFile(args[2])]);
+        if (left.equals(right)) {
+          proc.close(0);
+          return;
+        }
         proc.stdout.write("--- temporary-left\n+++ temporary-right\n@@ -1 +1 @@\n-base\n+workspace\n");
         proc.close(1);
         return;
@@ -98,14 +107,33 @@ const jsonPayload = (result: unknown): Record<string, unknown> => {
 
 const root = await mkdtemp(join(tmpdir(), "pi-plastic-workspace-diff-"));
 try {
-  for (const name of ["changed.txt", "private.txt", "added.txt", "nodata.txt", "moved destination.txt"]) {
+  for (const name of ["changed.txt", "private.txt", "added.txt", "nodata.txt", "moved destination.txt", "über added.txt"]) {
     await writeFile(join(root, name), `workspace ${name}\n`);
   }
+  await writeFile(join(root, "added-empty.txt"), "");
 
   const privateCalls: Call[] = [];
   const privateResult = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "private.txt", workdir: root, format: "text" }), { spawn: fakeCommands(privateCalls) });
   assert.match(String(privateResult), /empty before private\/new file/, "Explicitly selected private files must compare against an empty base with a private/new label.");
   assert.equal(privateCalls.filter((call) => call.command === "cm" && call.args[0] === "cat").length, 0, "Private/new files must not materialize a historical base.");
+
+  const addedEmptyText = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "added-empty.txt", workdir: root, format: "text" }), { spawn: fakeCommands([]) });
+  assert.match(String(addedEmptyText), /Added file is empty/, "An added empty file must not be rendered as generic unchanged text.");
+  const addedEmptyJson = jsonPayload(await runWithAbortSignal(undefined, () => diffFile.execute({ path: "added-empty.txt", workdir: root, format: "json" }), { spawn: fakeCommands([]) }));
+  assert.equal((addedEmptyJson.data as Record<string, unknown>).status, "added-empty", "Focused JSON must expose added-empty semantics.");
+  assert.equal((addedEmptyJson.data as Record<string, unknown>).comparisonKind, "workspace-added", "Focused JSON must retain the workspace-added comparison kind.");
+
+  const unicodeCalls: Call[] = [];
+  const unicodeResult = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "über added.txt", workdir: root, format: "text" }), { spawn: fakeCommands(unicodeCalls) });
+  assert.match(String(unicodeResult), /--- über added\.txt \(empty before add\)\n\+\+\+ über added\.txt \(workspace\)/, "Normalized headers must retain logical Unicode labels.");
+  const unicodeBackendCall = unicodeCalls.find((call) => call.args[0] === "-u");
+  assert(unicodeBackendCall && unicodeBackendCall.args.every((arg) => /^[\x20-\x7e]*$/.test(arg)), "The diff backend must receive only ASCII-safe materialized operands for a Unicode workspace path.");
+
+  const historicalUnicodeCalls: Call[] = [];
+  const historicalUnicode = await runWithAbortSignal(undefined, () => diffRevisions.execute({ leftRevision: "über file.txt#cs:1", rightRevision: "über file.txt#cs:2", workdir: root, format: "text" }), { spawn: fakeCommands(historicalUnicodeCalls) });
+  assert.match(String(historicalUnicode), /--- über file\.txt@cs:1\n\+\+\+ über file\.txt@cs:2/, "Historical normalized headers must retain logical Unicode labels.");
+  const historicalUnicodeBackendCall = historicalUnicodeCalls.find((call) => call.args[0] === "-u");
+  assert(historicalUnicodeBackendCall && historicalUnicodeBackendCall.args.every((arg) => /^[\x20-\x7e]*$/.test(arg)), "The diff backend must receive only ASCII-safe materialized operands for a Unicode historical path.");
 
   const changedCalls: Call[] = [];
   await runWithAbortSignal(undefined, () => diffFile.execute({ path: "changed.txt", workdir: root, format: "text" }), { spawn: fakeCommands(changedCalls) });
@@ -120,6 +148,13 @@ try {
     /Plastic cannot supply historical\/base bytes.*update\/refresh the workspace or use plastic_diffRevisions/i,
     "Focused --nodata diffs must explain why the base is unavailable and how to proceed.",
   );
+  const failedCatOutput = join(root, "package-owned-failed-cat-output.tmp");
+  await assert.rejects(
+    () => runWithAbortSignal(undefined, () => __plasticDiffInternals.materializeRevision("revid:43", failedCatOutput, root), { spawn: fakeCommands([]) }),
+    /Historical data is unavailable/,
+    "Failed cm cat --file retrieval must surface the backend failure after cleanup.",
+  );
+  await assert.rejects(() => readFile(failedCatOutput), /ENOENT/, "Failed cm cat --file retrieval must remove its failure-created package-owned output.");
 
   await assert.rejects(
     () => workspaceDiff.execute({ workdir: root, format: "text" }),
@@ -159,7 +194,7 @@ try {
 
   const defaultBatch = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, allPending: true, format: "text" }), { spawn: fakeCommands([]) });
   assert.match(String(defaultBatch), /Files considered: 3/, "Explicit whole-workspace review must keep a small default file count.");
-  assert.match(String(defaultBatch), /Skipped 2 pending item/, "The default whole-workspace bound must report omitted candidates.");
+  assert.match(String(defaultBatch), /Skipped 4 pending item/, "The default whole-workspace bound must report omitted candidates.");
 
   const batchCalls: Call[] = [];
   const batchResult = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, allPending: true, maxFiles: 20, format: "text" }), { spawn: fakeCommands(batchCalls) });
@@ -169,8 +204,14 @@ try {
   assert(batchCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:44"), "Moved files must materialize their status revision before destination comparison.");
   assert.doesNotMatch(String(batchResult), /private\.txt \(private\)/, "Batch review must exclude private files by default.");
   const batchStatusCalls = batchCalls.filter((call) => call.command === "cm" && call.args[0] === "status");
+  assert.match(String(batchResult), /added-empty\.txt \(added\)\nAdded file is empty/, "Workspace text output must expose added-empty semantics.");
   assert.equal(batchStatusCalls.length, 1, "Workspace review must run status exactly once.");
   assert.deepEqual(batchStatusCalls[0].args, ["status", "--machinereadable", "--includeRevId", `--fieldseparator=${statusSeparator}`], "Pending-item status must request the explicit separator exactly once.");
+
+  const addedEmptyWorkspaceJson = jsonPayload(await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["added-empty.txt"], format: "json" }), { spawn: fakeCommands([]) }));
+  const addedEmptyOutcome = ((addedEmptyWorkspaceJson.data as Record<string, unknown>).outcomes as Array<Record<string, unknown>>)[0];
+  assert.equal(addedEmptyOutcome.status, "added-empty", "Workspace JSON must expose added-empty semantics.");
+  assert.equal(addedEmptyOutcome.comparisonKind, "workspace-added", "Workspace JSON must retain comparisonKind for an added empty file.");
 
   const selectedPrivateCalls: Call[] = [];
   const selectedPrivate = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["private.txt"], format: "text" }), { spawn: fakeCommands(selectedPrivateCalls) });

@@ -82,7 +82,7 @@ plastic_diffFile(path="<workspace-path>", revision="cs:<number>")
 plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```
 
-The typed diff tools own historical `cm cat --file` materialization and cleanup; do not create agent-authored temporary files for ordinary diffs.
+The typed diff tools own historical `cm cat --file` materialization and cleanup; do not create agent-authored temporary files for ordinary diffs. `cm cat --raw` is unsupported for this workflow. Use typed retrieval first; `cm cat --file` is the byte-preserving low-level fallback only when a typed tool cannot represent the case.
 
 ## Commit Message Format
 

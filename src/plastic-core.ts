@@ -5,7 +5,7 @@ import { tool } from "./pi-tool-compat";
 import { promises as fs, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "os";
 import { dirname, extname, isAbsolute, join, relative, resolve, win32 } from "path";
-import { parsePlasticStatusBranch } from "./plastic-workspace";
+import { discoverPlasticWorkspace, parsePlasticSelector, parsePlasticStatusBranch } from "./plastic-workspace";
 
 type SpawnResult = {
     stdout: string;
@@ -31,6 +31,10 @@ const getCmExecutable = (): string => resolveExecutable(process.env, "PI_PLASTIC
 // `diff -u` has compatible exit semantics on Windows GNU diff and macOS BSD diff.
 // Keep the executable name configurable rather than assuming a .exe suffix or package-manager path.
 const getDiffExecutable = (): string => resolveExecutable(process.env, "PI_PLASTIC_DIFF_EXECUTABLE", "diff");
+const PLASTIC_PATCH_EXECUTABLE_ENV = "PI_PLASTIC_PATCH_EXECUTABLE";
+// Plastic's server/backend determines whether a moved item is encoded as a
+// move or as delete/add records. Do not claim either without a live fixture.
+const PATCH_MOVE_REPRESENTATION = "backend-determined" as const;
 
 const executableNotFoundError = (command: string, error: Error): Error =>
 {
@@ -1194,16 +1198,178 @@ const assertNonBlankPatchValue = (name: keyof PatchCommandArgs, value: string | 
     }
 };
 
-const resolvePatchToolPath = (toolPath?: string): string =>
+const resolvePatchToolPath = (
+    toolPath?: string,
+    environment: ExecutableEnvironment = process.env,
+    platform: NodeJS.Platform = process.platform,
+): string =>
 {
+    // A per-call path is deliberately the strongest override: callers may
+    // select a known patch-capable executable without changing process policy.
     if (toolPath?.trim())
     {
         return toolPath.trim();
     }
 
-    // Keep cm patch on the same configurable portable diff executable used by
-    // text-only file diffs. `diff` remains a PATH lookup on both platforms.
-    return getDiffExecutable();
+    const configuredPatchExecutable = environment[PLASTIC_PATCH_EXECUTABLE_ENV]?.trim();
+    if (configuredPatchExecutable)
+    {
+        return configuredPatchExecutable;
+    }
+
+    if (platform === "win32")
+    {
+        // GnuWin32 diff 2.8.7 is known to reject cm patch directory operands.
+        // Do not inherit PI_PLASTIC_DIFF_EXECUTABLE here: that setting remains
+        // for text diffs and may name the incompatible executable.
+        throw new Error(
+            "cm patch requires a patch-capable non-GUI diff executable on Windows. Set PI_PLASTIC_PATCH_EXECUTABLE to a verified tool (for example Git's diff.exe), or pass toolPath for this one call. PI_PLASTIC_DIFF_EXECUTABLE is used only for text diffs and is not a safe Windows patch default.",
+        );
+    }
+
+    // Existing non-Windows GNU/POSIX configurations are compatible with cm
+    // patch, so retain this limited compatibility fallback while keeping the
+    // patch-specific environment variable authoritative.
+    return resolveExecutable(environment, "PI_PLASTIC_DIFF_EXECUTABLE", "diff");
+};
+
+type ResolvedPatchBranchSpecs = Pick<PatchCommandArgs, "source" | "destination">;
+
+// Repository selectors are a single cm argv value, so spaces within a repository
+// name are not shell separators. Require non-empty @-separated components without
+// edge whitespace, while retaining Plastic's valid internal spaces and punctuation.
+const isSafePatchRepositorySelector = (repository: string | undefined): repository is string =>
+{
+    if (!repository || repository !== repository.trim() || /[\u0000-\u001f\u007f-\u009f]/.test(repository))
+    {
+        return false;
+    }
+
+    return repository.split("@").every((component) => /^[^@\s](?:[^@]*[^@\s])?$/.test(component));
+};
+
+const qualifyPatchBranchSpec = (branchSpec: string, repository?: string): string =>
+{
+    const normalizedBranchSpec = branchSpec.trim();
+    if (!/^br:\/.+/i.test(normalizedBranchSpec) || normalizedBranchSpec.includes("@"))
+    {
+        return normalizedBranchSpec;
+    }
+
+    if (!isSafePatchRepositorySelector(repository))
+    {
+        throw new Error(
+            `Cannot safely qualify unqualified branch selector '${normalizedBranchSpec}' against this workspace. Use the exact repository-qualified syntax 'br:/<branch>@<repository>@<server>'.`,
+        );
+    }
+
+    return `${normalizedBranchSpec}@${repository}`;
+};
+
+const resolvePatchBranchSpecs = async (args: PatchCommandArgs, cwd: string): Promise<ResolvedPatchBranchSpecs> =>
+{
+    const branchSpecs = [args.source, args.destination].filter((value): value is string => Boolean(value && /^br:\/.+/i.test(value.trim())));
+    const needsQualification = branchSpecs.some((value) => !value.includes("@"));
+    if (!needsQualification)
+    {
+        return { source: args.source.trim(), ...(args.destination ? { destination: args.destination.trim() } : {}) };
+    }
+
+    const workspace = await discoverPlasticWorkspace(cwd);
+    if (workspace.kind !== "found")
+    {
+        throw new Error("Cannot safely qualify an unqualified branch selector because the current Plastic workspace repository is unavailable. Use exact repository-qualified syntax 'br:/<branch>@<repository>@<server>'.");
+    }
+
+    const selectorText = await fs.readFile(join(workspace.value.plasticDir, "plastic.selector"), "utf8").catch(() => undefined);
+    const selector = selectorText === undefined ? { kind: "not_found" as const } : parsePlasticSelector(selectorText);
+    const repository = selector.kind === "found" ? selector.value.repository : undefined;
+    return {
+        source: qualifyPatchBranchSpec(args.source, repository),
+        ...(args.destination ? { destination: qualifyPatchBranchSpec(args.destination, repository) } : {}),
+    };
+};
+
+type PatchOutputStaging = {
+    requestedOutput: string;
+    stagingOutput: string;
+    cleanup: () => Promise<void>;
+};
+
+const ensurePatchOutputDoesNotExist = async (requestedOutput: string): Promise<void> =>
+{
+    const existing = await fs.lstat(requestedOutput).catch((error: unknown) =>
+    {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw error;
+    });
+    if (existing)
+    {
+        throw new Error(`Refusing to overwrite existing patch output '${requestedOutput}'. Choose a new output path.`);
+    }
+};
+
+const createPatchOutputStaging = async (requestedOutput: string): Promise<PatchOutputStaging> =>
+{
+    await ensurePatchOutputDoesNotExist(requestedOutput);
+    let stagingDirectory: string;
+    try
+    {
+        stagingDirectory = await fs.mkdtemp(join(dirname(requestedOutput), ".pi-plastic-patch-"));
+    }
+    catch (error)
+    {
+        throw new Error(`Cannot create package-owned patch staging beside '${requestedOutput}'. Ensure its parent directory exists and is writable. ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    return {
+        requestedOutput,
+        stagingOutput: join(stagingDirectory, "patch-output"),
+        cleanup: async () => fs.rm(stagingDirectory, { recursive: true, force: true }),
+    };
+};
+
+const validatePatchStagingOutput = async (stagingOutput: string): Promise<void> =>
+{
+    const patchStat = await fs.lstat(stagingOutput).catch(() => null);
+    if (!patchStat?.isFile())
+    {
+        throw new Error("Plastic reported patch generation success but did not create package-owned staging output.");
+    }
+};
+
+// Creating a hard link is atomic and fails if the requested path appeared
+// after our preflight. Unlike rename(), it can never replace an existing file.
+const publishPatchOutput = async (stagingOutput: string, requestedOutput: string): Promise<void> =>
+{
+    await validatePatchStagingOutput(stagingOutput);
+    try
+    {
+        await fs.link(stagingOutput, requestedOutput);
+    }
+    catch (error)
+    {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === "EEXIST")
+        {
+            throw new Error(`Refusing to overwrite existing patch output '${requestedOutput}'. Choose a new output path.`);
+        }
+        throw new Error(`Could not atomically publish patch output '${requestedOutput}'. ${error instanceof Error ? error.message : String(error)}`);
+    }
+};
+
+const runPatchOutputTransaction = async (requestedOutput: string, generate: (stagingOutput: string) => Promise<void>): Promise<void> =>
+{
+    const staging = await createPatchOutputStaging(requestedOutput);
+    try
+    {
+        await generate(staging.stagingOutput);
+        await publishPatchOutput(staging.stagingOutput, staging.requestedOutput);
+    }
+    finally
+    {
+        await staging.cleanup();
+    }
 };
 
 const buildPatchCommandArgs = (args: PatchCommandArgs): string[] =>
@@ -1254,6 +1420,12 @@ export const __plasticProcessInternals = {
 export const __plasticPatchInternals = {
     buildPatchCommandArgs,
     resolvePatchToolPath,
+    qualifyPatchBranchSpec,
+    resolvePatchBranchSpecs,
+    createPatchOutputStaging,
+    publishPatchOutput,
+    runPatchOutputTransaction,
+    PATCH_MOVE_REPRESENTATION,
 };
 
 export const __plasticCheckinInternals = {
@@ -1350,7 +1522,7 @@ const boundDiffOutput = (output: string): Pick<TextDiffResult, "output" | "trunc
 const runPortableTextDiff = async (
     leftPath: string,
     rightPath: string,
-    cwd: string,
+    _cwd: string,
     leftLabel: string,
     rightLabel: string,
 ): Promise<TextDiffResult> =>
@@ -1361,42 +1533,74 @@ const runPortableTextDiff = async (
         return { backend: "diff", changed: !leftContent.equals(rightContent), binary: true, output: "", truncated: false, totalChars: 0 };
     }
 
-    const { stdout, stderr, exitCode, aborted, stdoutTruncated, stdoutTotalChars } = await spawnAndCollect(
-        getDiffExecutable(),
-        ["-u", leftPath, rightPath],
-        cwd,
-        undefined,
-        getActiveAbortSignal(),
-        { ...commandExecutionStorage.getStore(), outputLimitChars: DIFF_OUTPUT_MAX_CHARS },
-    );
-    if (aborted)
+    // Do not pass either workspace or historical source paths to diff: a
+    // Unicode workspace path reproduces an Invalid argument failure in the
+    // configured Windows GnuWin32 backend. Labels intentionally stay out of
+    // argv and are restored by stableDiffHeaders below.
+    const materializationDir = await createAsciiTempDirectory("pi-plastic-diff-");
+    const materializedLeftPath = join(materializationDir, `left${safeTempExtension(leftPath)}`);
+    const materializedRightPath = join(materializationDir, `right${safeTempExtension(rightPath)}`);
+    try
     {
-        throw new Error("Text diff was aborted.");
-    }
-    if (exitCode > 1)
-    {
-        const diagnostic = [stdout, stderr].filter(Boolean).join("\n").trim();
-        const sanitized = diagnostic
-            .split(leftPath).join(leftLabel)
-            .split(rightPath).join(rightLabel);
-        throw new Error(sanitized || `Text diff failed with exit code ${exitCode}.`);
-    }
-
-    const normalized = stableDiffHeaders(stdout, leftLabel, rightLabel);
-    const bounded = stdoutTruncated
-        ? {
-            output: `${normalized}\n\n[Diff output truncated at ${DIFF_OUTPUT_MAX_CHARS} characters; inspect a narrower file or generate a review patch for the complete change.]`,
-            truncated: true,
-            totalChars: stdoutTotalChars ?? normalized.length,
+        await Promise.all([
+            fs.writeFile(materializedLeftPath, leftContent),
+            fs.writeFile(materializedRightPath, rightContent),
+        ]);
+        const { stdout, stderr, exitCode, aborted, stdoutTruncated, stdoutTotalChars } = await spawnAndCollect(
+            getDiffExecutable(),
+            ["-u", materializedLeftPath, materializedRightPath],
+            materializationDir,
+            undefined,
+            getActiveAbortSignal(),
+            { ...commandExecutionStorage.getStore(), outputLimitChars: DIFF_OUTPUT_MAX_CHARS },
+        );
+        if (aborted)
+        {
+            throw new Error("Text diff was aborted.");
         }
-        : boundDiffOutput(normalized);
-    return { backend: "diff", changed: exitCode === 1, binary: false, ...bounded };
+        if (exitCode > 1)
+        {
+            const diagnostic = [stdout, stderr].filter(Boolean).join("\n").trim();
+            const sanitized = diagnostic
+                .split(materializedLeftPath).join(leftLabel)
+                .split(materializedRightPath).join(rightLabel);
+            throw new Error(sanitized || `Text diff failed with exit code ${exitCode}.`);
+        }
+
+        const normalized = stableDiffHeaders(stdout, leftLabel, rightLabel);
+        const bounded = stdoutTruncated
+            ? {
+                output: `${normalized}\n\n[Diff output truncated at ${DIFF_OUTPUT_MAX_CHARS} characters; inspect a narrower file or generate a review patch for the complete change.]`,
+                truncated: true,
+                totalChars: stdoutTotalChars ?? normalized.length,
+            }
+            : boundDiffOutput(normalized);
+        return { backend: "diff", changed: exitCode === 1, binary: false, ...bounded };
+    }
+    finally
+    {
+        await fs.rm(materializationDir, { recursive: true, force: true });
+    }
 };
 
 const safeTempExtension = (pathValue: string): string =>
 {
     const extension = extname(pathValue);
     return /^\.[A-Za-z0-9]{1,12}$/.test(extension) ? extension : ".tmp";
+};
+
+const isAsciiPath = (pathValue: string): boolean => /^[\x20-\x7e]*$/.test(pathValue);
+
+// GnuWin32 diff cannot reliably accept Unicode operands. Keep every package
+// materialization path ASCII-only; labels are restored after the backend exits.
+const createAsciiTempDirectory = async (prefix: string): Promise<string> =>
+{
+    const temporaryRoot = tmpdir();
+    if (!isAsciiPath(temporaryRoot))
+    {
+        throw new Error("Text diff requires an ASCII-safe temporary directory because the configured backend cannot reliably accept Unicode paths. Set TEMP and TMP to a writable ASCII-only path.");
+    }
+    return fs.mkdtemp(join(temporaryRoot, prefix));
 };
 
 const materializeRevision = async (revision: string, destination: string, workdir?: string): Promise<void> =>
@@ -1406,16 +1610,19 @@ const materializeRevision = async (revision: string, destination: string, workdi
     try
     {
         await runCm(["cat", revision, `--file=${destination}`], workdir);
+        const destinationStat = await fs.stat(destination).catch(() => null);
+        if (!destinationStat?.isFile())
+        {
+            throw new Error("Plastic did not materialize the requested historical file content.");
+        }
     }
     catch (error)
     {
+        // cm cat --file can leave a zero-byte output on failure. The destination
+        // is package-owned, so remove it before surfacing a sanitized diagnostic.
+        await fs.rm(destination, { force: true }).catch(() => undefined);
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(message.split(destination).join("<package-owned-temp-file>"));
-    }
-    const destinationStat = await fs.stat(destination).catch(() => null);
-    if (!destinationStat?.isFile())
-    {
-        throw new Error("Plastic did not materialize the requested historical file content.");
     }
 };
 
@@ -1439,10 +1646,10 @@ const formatTextDiff = async (
 ): Promise<string> =>
 {
     const result = boundTextDiffResult(unboundedResult, normalizeDiffResponseMaxChars(maxChars));
-    const status = result.binary ? (result.changed ? "binary-different" : "unchanged") : (result.changed ? "changed" : "unchanged");
+    const status = result.binary ? (result.changed ? "binary-different" : "unchanged") : (result.changed ? "changed" : (comparisonKind === "workspace-added" ? "added-empty" : "unchanged"));
     const text = result.binary
         ? (result.changed ? "Binary content differs; a text diff is unavailable." : "No differences.")
-        : (result.changed ? result.output : "No differences.");
+        : (result.changed ? result.output : (status === "added-empty" ? "Added file is empty; no text diff hunks." : "No differences."));
     const data = {
         comparisonKind,
         ...comparisonMetadata,
@@ -1514,6 +1721,8 @@ export const __plasticDiffInternals = {
     boundDiffOutput,
     runPortableTextDiff,
     safeTempExtension,
+    isAsciiPath,
+    createAsciiTempDirectory,
     materializeRevision,
     isNoDataError,
     withWorkspaceBaseUnavailableDiagnostic,
@@ -2692,44 +2901,77 @@ export const diff = tool({
 });
 
 export const patch = tool({
-    description: "Generate a Plastic SCM patch with the configured portable diff backend and optional clean/integration filtering (cm patch).",
+    description: "Generate a Plastic SCM review patch with a patch-specific non-GUI diff backend; branch selectors are qualified to the current workspace repository and requested outputs publish atomically without overwrite (cm patch).",
     args: {
-        source: tool.schema.string().min(1).describe("Source changeset or branch spec, for example a changeset spec or branch spec selected from the current workspace."),
+        source: tool.schema.string().min(1).describe("Source changeset or branch spec. Unqualified br:/ selectors are qualified only from the exact current workspace repository."),
         destination: tool.schema.string().optional().describe("Optional second changeset or branch spec for two-spec patch generation."),
-        output: tool.schema.string().optional().describe("Optional output file path. If omitted, patch content is printed to stdout."),
-        toolPath: tool.schema.string().optional().describe("Optional path to the diff executable used by cm patch. Defaults to PI_PLASTIC_DIFF_EXECUTABLE or diff on PATH."),
+        output: tool.schema.string().optional().describe("Optional new output file path. The package stages then atomically publishes it and refuses any existing path. If omitted, patch content is returned."),
+        toolPath: tool.schema.string().optional().describe("Optional patch-capable non-GUI diff executable for this call (highest priority). Otherwise use PI_PLASTIC_PATCH_EXECUTABLE; non-Windows may safely fall back to PI_PLASTIC_DIFF_EXECUTABLE/diff."),
         clean: tool.schema.boolean().optional().describe("Exclude content that arrived via merges and include only direct checkins."),
         integration: tool.schema.boolean().optional().describe("Show branch changes pending integration into the parent branch."),
         workdir: workdirArg,
     },
     async execute(args)
     {
+        // Validate before staging or launching any process, including direct
+        // callers that bypass the TypeBox schema layer.
+        assertRequiredPatchValue("source", args.source);
+        assertNonBlankPatchValue("destination", args.destination);
+        assertNonBlankPatchValue("output", args.output);
+        assertNonBlankPatchValue("toolPath", args.toolPath);
+
         const cwd = args.workdir ?? process.cwd();
-        const tempDir = args.output ? null : await fs.mkdtemp(join(tmpdir(), "plastic-patch-"));
-        const requestedOutput = args.output ?? join(tempDir!, "review.patch");
-        const resolvedOutput = isAbsolute(requestedOutput) ? requestedOutput : resolve(cwd, requestedOutput);
+        const toolPath = resolvePatchToolPath(args.toolPath);
+        const branchSpecs = await resolvePatchBranchSpecs(args, cwd);
+        const temporaryOutputDirectory = args.output ? null : await fs.mkdtemp(join(tmpdir(), "plastic-patch-"));
+        const requestedOutput = args.output
+            ? (isAbsolute(args.output) ? args.output : resolve(cwd, args.output))
+            : join(temporaryOutputDirectory!, "review.patch");
+        let commandOutput = "";
+
+        const generate = async (stagingOutput: string): Promise<void> =>
+        {
+            const cmdArgs = buildPatchCommandArgs({
+                ...args,
+                ...branchSpecs,
+                output: stagingOutput,
+                toolPath,
+            });
+            try
+            {
+                commandOutput = await runCm(cmdArgs, args.workdir);
+            }
+            catch (error)
+            {
+                const message = error instanceof Error ? error.message : String(error);
+                throw new Error(message.split(stagingOutput).join("<package-owned-staging-file>"));
+            }
+            await validatePatchStagingOutput(stagingOutput);
+        };
 
         try
         {
-            const cmdArgs = buildPatchCommandArgs({ ...args, output: requestedOutput, toolPath: resolvePatchToolPath(args.toolPath) });
-            const commandOutput = await runCm(cmdArgs, args.workdir);
-            const patchStat = await fs.stat(resolvedOutput).catch(() => null);
-            if (!patchStat?.isFile())
+            if (args.output)
             {
-                throw new Error(`Plastic reported patch generation success but did not create '${requestedOutput}'.`);
+                await runPatchOutputTransaction(requestedOutput, generate);
+            }
+            else
+            {
+                await generate(requestedOutput);
             }
 
-            const patchBytes = await fs.readFile(resolvedOutput);
+            const patchBytes = await fs.readFile(requestedOutput);
             const isText = isUtf8(patchBytes);
             const patchText = isText ? patchBytes.toString("utf8") : "";
             const bounded = boundDiffOutput(patchText);
             const binaryLimited = /Binary files? .* differ|cannot diff|binary (?:content|file) (?:is )?not supported/i.test(`${patchText}\n${commandOutput}`);
             const metadata = {
                 status: patchBytes.length === 0 ? "empty" : (binaryLimited ? "generated-with-binary-warning" : "generated"),
-                output: args.output ? requestedOutput : null,
+                output: args.output ? args.output : null,
                 bytes: patchBytes.length,
                 empty: patchBytes.length === 0,
                 binaryLimited: !isText || binaryLimited,
+                moveRepresentation: PATCH_MOVE_REPRESENTATION,
                 truncated: !args.output && bounded.truncated,
                 content: args.output ? null : bounded.output,
             };
@@ -2737,9 +2979,9 @@ export const patch = tool({
         }
         finally
         {
-            if (tempDir)
+            if (temporaryOutputDirectory)
             {
-                await fs.rm(tempDir, { recursive: true, force: true });
+                await fs.rm(temporaryOutputDirectory, { recursive: true, force: true });
             }
         }
     },
@@ -2764,7 +3006,7 @@ export const diffRevisions = tool({
         const cwd = args.workdir ?? process.cwd();
         const leftLabel = args.leftRevision.includes("#") ? args.leftRevision.replace("#", "@") : args.leftRevision;
         const rightLabel = args.rightRevision.includes("#") ? args.rightRevision.replace("#", "@") : args.rightRevision;
-        const tempDir = await fs.mkdtemp(join(tmpdir(), "plastic-core-"));
+        const tempDir = await createAsciiTempDirectory("plastic-core-");
         const leftPath = join(tempDir, `left${safeTempExtension(args.leftRevision)}`);
         const rightPath = join(tempDir, `right${safeTempExtension(args.rightRevision)}`);
 
@@ -2824,7 +3066,7 @@ const diffPendingWorkspaceFile = async (
         throw new Error(`Plastic status identified '${args.path}' as deleted but did not provide its base revision ID.`);
     }
 
-    const tempDir = await fs.mkdtemp(join(tmpdir(), "plastic-core-"));
+    const tempDir = await createAsciiTempDirectory("plastic-core-");
     const basePath = join(tempDir, `base${safeTempExtension(workspacePath)}`);
     const emptyWorkspacePath = join(tempDir, `workspace${safeTempExtension(workspacePath)}`);
     try
@@ -2893,7 +3135,7 @@ export const diffFile = tool({
             }
             const displayPath = isAbsolute(args.path) ? toCommandPath(workspacePath, cwd) : args.path;
             const revision = resolveDiffFileRevision(displayPath || args.path, args.revision);
-            const tempDir = await fs.mkdtemp(join(tmpdir(), "plastic-core-"));
+            const tempDir = await createAsciiTempDirectory("plastic-core-");
             const basePath = join(tempDir, `base${safeTempExtension(workspacePath)}`);
             try
             {
@@ -3140,10 +3382,10 @@ export const workspaceDiff = tool({
                 const remaining = Math.max(0, WORKSPACE_DIFF_CONTENT_MAX_CHARS - totalOutputChars);
                 const perFile = boundWorkspaceDiffResult(compared.result, maxChars);
                 const bounded = boundWorkspaceDiffResult(perFile, remaining);
-                const status = bounded.binary ? (bounded.changed ? "binary-different" : "unchanged") : (bounded.changed ? "changed" : "unchanged");
+                const status = bounded.binary ? (bounded.changed ? "binary-different" : "unchanged") : (bounded.changed ? "changed" : (compared.comparisonKind === "workspace-added" ? "added-empty" : "unchanged"));
                 const diffOutput = bounded.changed && !bounded.binary ? bounded.output : undefined;
-                outcomes.push({ path: displayPath, kind: item.kind, status, changed: bounded.changed, binary: bounded.binary, truncated: bounded.truncated, totalChars: bounded.totalChars, ...(diffOutput ? { diff: diffOutput } : {}) });
-                const body = bounded.binary ? (bounded.changed ? "Binary content differs; a text diff is unavailable." : "No differences.") : (bounded.changed ? bounded.output : "No differences.");
+                outcomes.push({ path: displayPath, kind: item.kind, comparisonKind: compared.comparisonKind, status, changed: bounded.changed, binary: bounded.binary, truncated: bounded.truncated, totalChars: bounded.totalChars, ...(diffOutput ? { diff: diffOutput } : {}) });
+                const body = bounded.binary ? (bounded.changed ? "Binary content differs; a text diff is unavailable." : "No differences.") : (bounded.changed ? bounded.output : (status === "added-empty" ? "Added file is empty; no text diff hunks." : "No differences."));
                 const section = `### ${displayPath} (${item.kind})\n${body}`;
                 textSections.push(section);
                 totalOutputChars += section.length;

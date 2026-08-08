@@ -34,8 +34,10 @@ cm find changeset "where branch = '<branch-name>' order by changesetid desc limi
 
 ```text
 plastic_patch(source="<branch-spec>", integration=true)
-plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<patch-file>")
+plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<new-patch-file>")
 ```
+
+  On Windows configure `PI_PLASTIC_PATCH_EXECUTABLE` (or one-call `toolPath`) to a verified patch-capable non-GUI executable; do not rely on the text-diff/GnuWin32 setting. Use a repository-qualified `br:/...@<repository>@<server>` selector when the current workspace selector cannot supply the exact repository. Requested output is staged and atomically published only when successful.
 
 - When change-boundary evidence is needed, inspect specific files first and opt into multi-file output explicitly:
 

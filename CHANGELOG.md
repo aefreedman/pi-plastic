@@ -9,6 +9,12 @@ and this project follows semantic versioning for public package releases.
 
 ### Fixed
 
+- Made historical and workspace text diffs Unicode-safe for the configured Windows backend: package-owned ASCII materializations are the only operands passed to `diff`, while returned unified headers retain stable logical Unicode labels.
+- Report an added empty pending file as `added-empty` with explicit text/JSON/workspace semantics instead of generic unchanged.
+- Clean package-owned `cm cat --file` outputs after retrieval failures, including failure-created zero-byte files; public guidance now treats `cm cat --raw` as unsupported and names typed retrieval or `cm cat --file` as the byte-preserving fallback.
+- Documented patch moved-item encoding as backend-determined (move-aware or delete/add) rather than claiming unverified runtime behavior.
+- Hardened `plastic_patch` on Windows: it now uses the dedicated `PI_PLASTIC_PATCH_EXECUTABLE` policy (or an explicit `toolPath`) instead of silently reusing the incompatible GnuWin32 text-diff backend, qualifies unqualified branch selectors against the exact current workspace repository, and rejects ambiguous selectors before `cm patch`.
+- Made requested patch output transactional: existing paths are rejected before generation; package-owned sibling staging is validated and atomically published only on success, with failed and zero-byte staging artifacts removed.
 - Reject branch-switch and merge-closeout success when the workspace is not actually on the requested target branch, including checks after target update, before merge checkin, and after checkin.
 - Clarify that Plastic merge checkins belong to the branch loaded in the workspace and cannot be integrated by switching branches afterward like a Git fast-forward.
 

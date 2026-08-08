@@ -73,9 +73,9 @@ Pi 0.82 and newer use canonical `sourceInfo` provenance to identify this package
 The Bash guards run only in Pi processes that actually load this package. A project-local install does not protect a delegated child process whose working directory resolves different project settings. Install `pi-plastic` at user scope (the default `pi install`, without `-l`) when subagents and sessions in arbitrary workspaces must inherit the guards. Restart existing Pi processes after installation or source changes.
 
 - `plastic_branchCreate` supports an explicit parent branch independent of the loaded workspace branch, defaults relative names to the current branch when no parent is supplied, and rejects top-level paths unless `allowRootBranch=true` is explicit.
-- `plastic_diff` remains a disabled alias by design. Use `plastic_status` for changed-path listing; do not diff as routine post-edit validation or checkin preflight. When change-boundary evidence is needed, use `plastic_diffFile` for one exact file, `plastic_workspaceDiff` with selected paths or explicit `allPending=true`, or `plastic_diffRevisions` for an explicit historical pair. Diff responses use small defaults and caller-controlled `maxChars` bounds.
+- `plastic_diff` remains a disabled alias by design. Use `plastic_status` for changed-path listing; do not diff as routine post-edit validation or checkin preflight. When change-boundary evidence is needed, use `plastic_diffFile` for one exact file, `plastic_workspaceDiff` with selected paths or explicit `allPending=true`, or `plastic_diffRevisions` for an explicit historical pair. Diff responses use small defaults and caller-controlled `maxChars` bounds. Historical and workspace bytes are copied to ASCII-safe package-owned paths before the backend runs, while normalized headers retain the logical Unicode labels.
 - Preflight is not routine confirmation. Use it for ambiguous or broad mutation scope, moved/deleted path rewriting, compound operations, or explicit preview requests; otherwise rely on exact targets and the tools' runtime guards.
-- `plastic_patch` generates review patches with `cm patch`, including `clean` and `integration` filters for branch review workflows. It does not expose patch apply.
+- `plastic_patch` generates review patches with `cm patch`, including `clean` and `integration` filters for branch review workflows. It does not expose patch apply. Unqualified `br:/...` selectors are qualified only with the current workspace selector's exact repository; otherwise pass `br:/<branch>@<repository>@<server>`.
 - Bash safety rails block `cm diff` and unsafe interactive `cm merge --merge` usage.
 - Merge tooling surfaces Plastic `FILE_CONFLICT` records and merge-state metadata from `cm status`.
 - `plastic_mergeToBranch` performs the common safe closeout flow: resolve the source branch's parent as the default target, switch to the target branch, optionally update, merge a source branch non-interactively, verify merge state, and check in the merge result. It verifies the loaded target before merge/checkin and rejects final-branch mismatches; Plastic checkins stay on the branch where they were created, so switching afterward is not a Git-style integration.
@@ -90,7 +90,7 @@ plastic_patch(source="<left-spec>", destination="<right-spec>")
 plastic_patch(source="<branch-spec>", toolPath="<path-to-diff-tool>")
 ```
 
-If `output` is omitted, Plastic prints patch content to stdout. If `output` is provided, Plastic writes a new patch file and refuses to overwrite an existing file. Inspect patches before sharing them because they can contain source code, binary content, local paths, or secrets that were present in the changed files.
+If `output` is omitted, the package returns patch content. If `output` is provided, it must be a new path: the package generates into a package-owned sibling staging file, validates it, and atomically publishes it without overwriting an existing path. Plastic/server patch output may encode a moved item either as a move or as delete/add records; `pi-plastic` does not claim a representation without a live backend fixture. Inspect patches before sharing them because they can contain source code, binary content, local paths, or secrets that were present in the changed files.
 
 ## Included skill
 
@@ -141,8 +141,9 @@ Project-local installation protects only Pi processes that load those project se
 - Node.js 22.19.0 or newer
 - Pi 0.82.0 or newer; the current development and eval baseline is Pi 0.83
 - Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`, or `PI_PLASTIC_CM_EXECUTABLE` set to its full executable path
-- GNU/POSIX-compatible `diff` available on `PATH`, or `PI_PLASTIC_DIFF_EXECUTABLE` set to its full executable path (including paths containing spaces), for text-only diff and patch tools. Pi does not discover Git Bash paths automatically.
-- A configured Plastic workspace for workspace-scoped operations
+- GNU/POSIX-compatible `diff` available on `PATH`, or `PI_PLASTIC_DIFF_EXECUTABLE` set to its full executable path (including paths containing spaces), for text-only diff tools. Pi does not discover Git Bash paths automatically.
+- For patch generation, `toolPath` is the one-call highest-priority override, followed by `PI_PLASTIC_PATCH_EXECUTABLE`. On Windows, set one to a verified patch-capable non-GUI executable such as Git's `diff.exe`; the package deliberately does not reuse `PI_PLASTIC_DIFF_EXECUTABLE`/GnuWin32 as a patch default. On non-Windows only, the patch policy safely falls back to `PI_PLASTIC_DIFF_EXECUTABLE` or `diff`.
+- A configured Plastic workspace for workspace-scoped operations. Text diffs require an ASCII-safe temporary directory; if the configured backend cannot accept Unicode paths, set `TEMP` and `TMP` to a writable ASCII-only location.
 - `pi-file-discovery` is an optional independently loaded integration. When its `discover_candidate_files` tool is active, it receives the advisory Plastic ignore/cloak filter through the shared global capability protocol; when absent, `pi-plastic` loads without file-discovery filtering. The tarball does not embed linked sibling workspaces or `node_modules` paths.
 
 ## Testing
