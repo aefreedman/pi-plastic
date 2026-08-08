@@ -107,13 +107,13 @@ pi install npm:@aefree/pi-plastic
 Install a pinned GitHub release over HTTPS:
 
 ```bash
-pi install git:github.com/aefreedman/pi-plastic@v0.5.1
+pi install git:github.com/aefreedman/pi-plastic@v0.5.3
 ```
 
 Equivalent SSH install:
 
 ```bash
-pi install git:git@github.com:aefreedman/pi-plastic@v0.5.1
+pi install git:git@github.com/aefreedman/pi-plastic@v0.5.3
 ```
 
 To intentionally track the moving default branch instead of a release tag:
@@ -142,7 +142,7 @@ Project-local installation protects only Pi processes that load those project se
 - Pi 0.82.0 or newer; the current development and eval baseline is Pi 0.83
 - Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`, or `PI_PLASTIC_CM_EXECUTABLE` set to its full executable path
 - GNU/POSIX-compatible `diff` available on `PATH`, or `PI_PLASTIC_DIFF_EXECUTABLE` set to its full executable path (including paths containing spaces), for text-only diff tools. Pi does not discover Git Bash paths automatically.
-- For patch generation, `toolPath` is the one-call highest-priority override, followed by `PI_PLASTIC_PATCH_EXECUTABLE`. On Windows, set one to a verified patch-capable non-GUI executable such as Git's `diff.exe`; the package deliberately does not reuse `PI_PLASTIC_DIFF_EXECUTABLE`/GnuWin32 as a patch default. On non-Windows only, the patch policy safely falls back to `PI_PLASTIC_DIFF_EXECUTABLE` or `diff`.
+- For patch generation, `toolPath` is the one-call highest-priority override, followed by `PI_PLASTIC_PATCH_EXECUTABLE`. On Windows, set one to a verified patch-capable non-GUI executable such as Git's `diff.exe`; the package deliberately does not reuse `PI_PLASTIC_DIFF_EXECUTABLE`/GnuWin32 as a patch default. On non-Windows, the patch policy falls back to `PI_PLASTIC_DIFF_EXECUTABLE` or `diff`; verify that the resolved executable supports Plastic's patch arguments. Plastic-backed macOS patch validation is still pending.
 - A configured Plastic workspace for workspace-scoped operations. Text diffs require an ASCII-safe temporary directory; if the configured backend cannot accept Unicode paths, set `TEMP` and `TMP` to a writable ASCII-only location.
 - `pi-file-discovery` is an optional independently loaded integration. When its `discover_candidate_files` tool is active, it receives the advisory Plastic ignore/cloak filter through the shared global capability protocol; when absent, `pi-plastic` loads without file-discovery filtering. The tarball does not embed linked sibling workspaces or `node_modules` paths.
 

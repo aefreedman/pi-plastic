@@ -1,6 +1,6 @@
 {
   "name": "@aefree/pi-plastic",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
@@ -15,10 +15,8 @@
     "index.ts",
     "extensions/",
     "src/",
-    "references/",
     "skills/",
     "CHANGELOG.md",
-    "CONTRIBUTING.md",
     "LICENSE",
     "README.md",
     "SECURITY.md"

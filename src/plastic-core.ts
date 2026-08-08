@@ -1227,9 +1227,9 @@ const resolvePatchToolPath = (
         );
     }
 
-    // Existing non-Windows GNU/POSIX configurations are compatible with cm
-    // patch, so retain this limited compatibility fallback while keeping the
-    // patch-specific environment variable authoritative.
+    // Retain the pre-existing non-Windows fallback while keeping the patch-specific
+    // environment variable authoritative. The caller must verify that the resolved
+    // executable supports the local Plastic client's patch argument contract.
     return resolveExecutable(environment, "PI_PLASTIC_DIFF_EXECUTABLE", "diff");
 };
 
@@ -2906,7 +2906,7 @@ export const patch = tool({
         source: tool.schema.string().min(1).describe("Source changeset or branch spec. Unqualified br:/ selectors are qualified only from the exact current workspace repository."),
         destination: tool.schema.string().optional().describe("Optional second changeset or branch spec for two-spec patch generation."),
         output: tool.schema.string().optional().describe("Optional new output file path. The package stages then atomically publishes it and refuses any existing path. If omitted, patch content is returned."),
-        toolPath: tool.schema.string().optional().describe("Optional patch-capable non-GUI diff executable for this call (highest priority). Otherwise use PI_PLASTIC_PATCH_EXECUTABLE; non-Windows may safely fall back to PI_PLASTIC_DIFF_EXECUTABLE/diff."),
+        toolPath: tool.schema.string().optional().describe("Optional patch-capable non-GUI diff executable for this call (highest priority). Otherwise use PI_PLASTIC_PATCH_EXECUTABLE; non-Windows falls back to PI_PLASTIC_DIFF_EXECUTABLE/diff, which must support the local Plastic patch argument contract."),
         clean: tool.schema.boolean().optional().describe("Exclude content that arrived via merges and include only direct checkins."),
         integration: tool.schema.boolean().optional().describe("Show branch changes pending integration into the parent branch."),
         workdir: workdirArg,
