@@ -5,13 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows semantic versioning for public package releases.
 
-## Unreleased
+## [0.5.3] - 2026-08-09
 
 ### Changed
 
 - Clarified executable routing: macOS bare `diff` is PATH-dependent and may be GNU Diffutils or Apple BSD `diff`; text-diff selection does not auto-select `gdiff`. Plastic 11 macOS validation confirmed that Apple BSD `/usr/bin/diff` supports text diffs but rejects `cm patch`'s `--binary` argument, so `plastic_patch` now identifies that contract failure and directs callers to the separate GNU Diffutils-compatible patch executable policy.
-
-## [0.5.3] - 2026-08-08
 
 ### Fixed
 
