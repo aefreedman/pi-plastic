@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { tool } from "./pi-tool-compat";
 import { promises as fs, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "os";
-import { dirname, extname, isAbsolute, join, relative, resolve, win32 } from "path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, win32 } from "path";
 import { discoverPlasticWorkspace, parsePlasticSelector, parsePlasticStatusBranch } from "./plastic-workspace";
 
 type SpawnResult = {
@@ -1329,12 +1329,19 @@ const createPatchOutputStaging = async (requestedOutput: string): Promise<PatchO
     };
 };
 
-const validatePatchStagingOutput = async (stagingOutput: string): Promise<void> =>
+const validatePatchStagingOutput = async (stagingOutput: string, requireContent = false): Promise<void> =>
 {
     const patchStat = await fs.lstat(stagingOutput).catch(() => null);
     if (!patchStat?.isFile())
     {
         throw new Error("Plastic reported patch generation success but did not create package-owned staging output.");
+    }
+    if (requireContent && patchStat.size === 0)
+    {
+        // An omitted output may intentionally report an empty patch. A caller
+        // who requested a file, however, must never receive a zero-byte file
+        // that is indistinguishable from a failed/truncated backend outcome.
+        throw new Error("Refusing to publish an empty patch output. Plastic produced no patch bytes; rerun without output to inspect the empty result or verify the patch backend.");
     }
 };
 
@@ -1342,7 +1349,7 @@ const validatePatchStagingOutput = async (stagingOutput: string): Promise<void> 
 // after our preflight. Unlike rename(), it can never replace an existing file.
 const publishPatchOutput = async (stagingOutput: string, requestedOutput: string): Promise<void> =>
 {
-    await validatePatchStagingOutput(stagingOutput);
+    await validatePatchStagingOutput(stagingOutput, true);
     try
     {
         await fs.link(stagingOutput, requestedOutput);
@@ -1370,6 +1377,40 @@ const runPatchOutputTransaction = async (requestedOutput: string, generate: (sta
     {
         await staging.cleanup();
     }
+};
+
+const redactPatchStagingOutput = (message: string, stagingOutput: string): string =>
+{
+    const stagingPaths = new Set([stagingOutput]);
+    try
+    {
+        // macOS commonly exposes /var through the canonical /private/var path.
+        // cm may report the latter even though it received the former.
+        stagingPaths.add(join(realpathSync.native(dirname(stagingOutput)), basename(stagingOutput)));
+    }
+    catch
+    {
+        // The staging parent normally exists; retain raw-path redaction if it does not.
+    }
+
+    return Array.from(stagingPaths)
+        .sort((left, right) => right.length - left.length)
+        .reduce((redacted, path) => redacted.split(path).join("<package-owned-staging-file>"), message);
+};
+
+const withPatchBackendContractDiagnostic = (error: unknown, toolPath: string, stagingOutput: string): Error =>
+{
+    const message = redactPatchStagingOutput(error instanceof Error ? error.message : String(error), stagingOutput);
+    // Plastic 11 on macOS invokes its patch backend with --binary. Apple's BSD
+    // /usr/bin/diff rejects that flag, while GNU diffutils accepts it. Detect
+    // the observed contract failure instead of guessing from a path or OS.
+    if (/unrecognized option [`']?--binary/i.test(message))
+    {
+        return new Error(
+            `${message}\n\nPlastic patch requires a diff executable that accepts --binary. '${toolPath}' rejected that argument. Configure PI_PLASTIC_PATCH_EXECUTABLE (or this call's toolPath) to a verified GNU diffutils-compatible non-GUI diff executable. Text diff configuration is independent; Apple BSD diff may still be used for text-only diffs.`,
+        );
+    }
+    return new Error(message);
 };
 
 const buildPatchCommandArgs = (args: PatchCommandArgs): string[] =>
@@ -1425,6 +1466,7 @@ export const __plasticPatchInternals = {
     createPatchOutputStaging,
     publishPatchOutput,
     runPatchOutputTransaction,
+    withPatchBackendContractDiagnostic,
     PATCH_MOVE_REPRESENTATION,
 };
 
@@ -2943,8 +2985,7 @@ export const patch = tool({
             }
             catch (error)
             {
-                const message = error instanceof Error ? error.message : String(error);
-                throw new Error(message.split(stagingOutput).join("<package-owned-staging-file>"));
+                throw withPatchBackendContractDiagnostic(error, toolPath, stagingOutput);
             }
             await validatePatchStagingOutput(stagingOutput);
         };

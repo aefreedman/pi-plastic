@@ -20,6 +20,13 @@ cm switch --silent --noinput <branch-spec>
 
 Agent preference: use runtime `plastic_*` methods first; keep shell commands as manual fallback.
 
+## Patch Backend Rejects `--binary` on macOS
+
+- Symptom: `plastic_patch(...)` reports that its diff executable rejected `--binary` and names `PI_PLASTIC_PATCH_EXECUTABLE`.
+- With Plastic 11 on macOS, this is the observed result when `cm patch` uses Apple BSD `/usr/bin/diff`: that executable works for text-only diffs but rejects the patch backend's `--binary` argument.
+- Set `PI_PLASTIC_PATCH_EXECUTABLE` to a verified GNU Diffutils-compatible non-GUI executable, or pass that executable as `toolPath` for one call. Keep `PI_PLASTIC_DIFF_EXECUTABLE` configured separately for text-only review tools.
+- This is a macOS diagnostic, not validation of Windows patch backends or two-spec patch behavior; verify those locally.
+
 ## Code Review Creation Failed
 
 - Use GUI or document changeset in plan/issue tracker.
