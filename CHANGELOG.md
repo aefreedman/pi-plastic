@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows semantic versioning for public package releases.
 
+## [0.5.4] - 2026-08-13
+
+### Fixed
+
+- Recognize both `smartbranch` and `br` branch forms in Plastic workspace selectors, including quoted values produced by different checkout workflows.
+- Use a valid local selector as the footer's authoritative branch source instead of launching an unnecessary `cm status` process; malformed or missing branch selectors retain the bounded CLI fallback.
+
 ## [0.5.3] - 2026-08-09
 
 ### Changed

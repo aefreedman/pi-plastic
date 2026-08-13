@@ -78,7 +78,8 @@ const parseSelectorValue = (line: string, key: string): string | undefined => {
 /** Parse the local selector without treating it as proof that a workspace exists. */
 export function parsePlasticSelector(content: string): ParseOutcome<PlasticSelector> {
   let repository: string | undefined;
-  let branch: string | undefined;
+  let smartBranch: string | undefined;
+  let explicitBranch: string | undefined;
   let sawBranchKey = false;
 
   for (const line of content.split(/\r?\n/)) {
@@ -86,13 +87,18 @@ export function parsePlasticSelector(content: string): ParseOutcome<PlasticSelec
     if (/^\s*repository(?:\s|$)/i.test(line)) repository = parseSelectorValue(line, "repository");
     if (/^\s*smartbranch(?:\s|$)/i.test(line)) {
       sawBranchKey = true;
-      branch = parseSelectorValue(line, "smartbranch");
+      smartBranch = parseSelectorValue(line, "smartbranch");
+    }
+    if (/^\s*br(?:\s|$)/i.test(line)) {
+      sawBranchKey = true;
+      explicitBranch = parseSelectorValue(line, "br");
     }
   }
 
   if (!sawBranchKey) return { kind: "not_found" };
+  const branch = smartBranch ?? explicitBranch;
   if (!branch || /[\u0000-\u001f\u007f]/.test(branch)) {
-    return { kind: "malformed", reason: "Selector smartbranch is blank or contains control characters." };
+    return { kind: "malformed", reason: "Selector branch is blank or contains control characters." };
   }
 
   return {

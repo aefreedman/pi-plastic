@@ -4,7 +4,7 @@ Pi tools, footer status, and skill guidance for Plastic SCM / Unity Version Cont
 
 ## Plastic branch footer status
 
-When Pi starts inside a Plastic workspace, this package adds a themed `Plastic <branch>` status to Pi's built-in footer. It discovers the nearest enclosing `.plastic/plastic.workspace`, reads the local selector as a fast credential-free fallback, and confirms the branch with a bounded `cm status` call. Selector changes and successful same-workspace `plastic_*` tools refresh the status; sibling workspaces are ignored.
+When Pi starts inside a Plastic workspace, this package adds a themed `Plastic <branch>` status to Pi's built-in footer. It discovers the nearest enclosing `.plastic/plastic.workspace` and reads either the selector's `smartbranch` or `br` form as the credential-free branch source. A bounded `cm status` call is used only when the selector has no valid branch. Selector changes and successful same-workspace `plastic_*` tools refresh the status; sibling workspaces are ignored.
 
 The extension owns only the `plastic-branch` status key. It does not replace Pi's footer or suppress Pi's Git branch display, so Git and Plastic information can appear together in nested workspaces. If the Plastic marker exists but neither the selector nor `cm` yields a branch, the footer shows `Plastic branch unavailable`. Non-Plastic directories show no Plastic status.
 
@@ -107,13 +107,13 @@ pi install npm:@aefree/pi-plastic
 Install a pinned GitHub release over HTTPS:
 
 ```bash
-pi install git:github.com/aefreedman/pi-plastic@v0.5.3
+pi install git:github.com/aefreedman/pi-plastic@v0.5.4
 ```
 
 Equivalent SSH install:
 
 ```bash
-pi install git:git@github.com/aefreedman/pi-plastic@v0.5.3
+pi install git:git@github.com/aefreedman/pi-plastic@v0.5.4
 ```
 
 To intentionally track the moving default branch instead of a release tag:

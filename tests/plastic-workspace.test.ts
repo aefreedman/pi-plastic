@@ -40,7 +40,20 @@ try {
     kind: "found",
     value: { repository: "sanitized-repository@sanitized-server", branch: "/main/feature/footer" },
   });
+  assert.deepEqual(parsePlasticSelector('repository "sample"\n  path "/"\n  smartbranch "/main"\n'), {
+    kind: "found",
+    value: { repository: "sample", branch: "/main" },
+  });
+  assert.deepEqual(parsePlasticSelector('repository "sample"\n  path "/"\n  br "/main"\n  co "/main"\n'), {
+    kind: "found",
+    value: { repository: "sample", branch: "/main" },
+  });
+  assert.deepEqual(parsePlasticSelector('br "/main/explicit"\nsmartbranch "/main/smart"\n'), {
+    kind: "found",
+    value: { branch: "/main/smart" },
+  }, "smartbranch should take precedence when both branch forms appear");
   assert.equal(parsePlasticSelector("repository sample@server\n  path /\n").kind, "not_found");
+  assert.equal(parsePlasticSelector('co "/main"\n').kind, "not_found", "checkout metadata alone is not a branch selector");
   assert.equal(parsePlasticSelector("smartbranch \n").kind, "malformed");
   assert.equal(parsePlasticSelector("smartbranch /main/bad\u0007branch\n").kind, "malformed");
 

@@ -55,14 +55,16 @@ const runTimers = async (delay: number): Promise<void> => {
     timer.cleared = true;
     timer.callback();
   }
-  await new Promise((resolve) => setImmediate(resolve));
+  // Refreshes are intentionally detached from watcher callbacks. Drain the short
+  // promise chain used by discovery, selector I/O, and watcher rebinding.
+  for (let index = 0; index < 4; index++) await new Promise((resolve) => setImmediate(resolve));
 };
 
 {
   timers.length = 0;
   const harness = new FooterHarness();
   harness.statuses.set("foreign-status", "keep me");
-  let confirmation = "/main/from-cm@repo@server\n";
+  let selectorBranch = "/main/from-selector";
   let confirmCount = 0;
   let watcherClosed = 0;
   let watcherChange: (() => void) | undefined;
@@ -70,50 +72,50 @@ const runTimers = async (delay: number): Promise<void> => {
 
   createPlasticBranchStatusExtension({
     discoverWorkspace: async (cwd) => cwd.startsWith("/sibling") ? workspace("/sibling") : workspace("/workspace"),
-    readSelector: async () => "repository repo@server\n  path /\n    smartbranch /main/from-selector\n",
+    readSelector: async () => `repository repo@server\n  path /\n    smartbranch "${selectorBranch}"\n`,
     watchDirectory: (_path, onChange, onError) => {
       watcherChange = onChange;
       watcherError = onError;
       return { close: () => { watcherClosed++; } };
     },
-    confirmBranch: async () => { confirmCount++; return confirmation; },
+    confirmBranch: async () => { confirmCount++; return "/main/from-cm@repo@server\n"; },
     setTimeout: schedule,
     clearTimeout: clear,
     platform: "linux",
   })(harness.api as any);
 
   await harness.emit("session_start", { reason: "startup" });
-  assert.match(harness.statuses.get("plastic-branch") ?? "", /\/main\/from-cm/);
+  assert.match(harness.statuses.get("plastic-branch") ?? "", /\/main\/from-selector/);
   assert.equal(harness.statuses.get("foreign-status"), "keep me");
   assert.equal(harness.setFooterCalls, 0);
-  assert.equal(confirmCount, 1);
+  assert.equal(confirmCount, 0, "a valid selector should avoid launching cm");
 
-  confirmation = "/main/after-selector-replacement@repo@server\n";
+  selectorBranch = "/main/after-selector-replacement";
   watcherChange?.();
   watcherChange?.();
   await runTimers(150);
-  assert.equal(confirmCount, 2, "coalesced watcher events should run one refresh");
+  assert.equal(confirmCount, 0, "selector refreshes should not launch cm");
   assert.match(harness.statuses.get("plastic-branch") ?? "", /after-selector-replacement/);
   assert.ok(watcherClosed >= 1, "workspace watcher should be rebound after a directory event");
 
   await harness.emit("tool_result", { toolCallId: "same", toolName: "plastic_switchBranch", input: { workdir: "." }, isError: false });
   await harness.emit("tool_execution_end", { toolCallId: "same", toolName: "plastic_switchBranch", isError: false });
   await runTimers(150);
-  assert.equal(confirmCount, 3, "same-workspace Plastic tools should refresh");
+  assert.equal(confirmCount, 0, "same-workspace Plastic tool refreshes should keep using the selector");
 
   await harness.emit("tool_result", { toolCallId: "sibling", toolName: "plastic_status", input: { workdir: "/sibling" }, isError: false });
   await harness.emit("tool_execution_end", { toolCallId: "sibling", toolName: "plastic_status", isError: false });
   await runTimers(150);
-  assert.equal(confirmCount, 3, "sibling-workspace tools must not refresh this footer");
+  assert.equal(confirmCount, 0, "sibling-workspace tools must not refresh this footer");
 
   await harness.emit("tool_result", { toolCallId: "sibling-alias", toolName: "plastic_status", input: { cwd: "/sibling", workdir: "/sibling" }, isError: false });
   await harness.emit("tool_execution_end", { toolCallId: "sibling-alias", toolName: "plastic_status", isError: false });
   await runTimers(150);
-  assert.equal(confirmCount, 3, "normalized effective workdir should control sibling filtering");
+  assert.equal(confirmCount, 0, "normalized effective workdir should control sibling filtering");
 
   watcherError?.();
   await runTimers(150);
-  assert.equal(confirmCount, 4, "watcher errors should trigger bounded revalidation");
+  assert.equal(confirmCount, 0, "watcher error revalidation should keep using the selector");
 
   await harness.emit("session_shutdown", { reason: "reload" });
   assert.equal(harness.statuses.has("plastic-branch"), false);
@@ -203,7 +205,7 @@ const runTimers = async (delay: number): Promise<void> => {
   const watched: Array<{ path: string; change: () => void; closed: boolean }> = [];
   createPlasticBranchStatusExtension({
     discoverWorkspace: async () => innerPresent ? workspace("/workspace/inner") : workspace("/workspace"),
-    readSelector: async (path) => path.includes("/inner/") ? "smartbranch /main/inner\n" : "smartbranch /main/outer\n",
+    readSelector: async (path) => path.replace(/\\/g, "/").includes("/inner/") ? "smartbranch /main/inner\n" : "smartbranch /main/outer\n",
     watchDirectory: (path, onChange) => {
       const handle = { path, change: onChange, closed: false };
       watched.push(handle);

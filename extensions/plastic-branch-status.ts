@@ -219,7 +219,8 @@ export function createPlasticBranchStatusExtension(overrides: Partial<BranchStat
       if (!active || generation !== ownedGeneration || refreshSequence !== ownedRefresh) return;
 
       const hasSelectorBranch = selectorBranch ? displayBranch(selectorBranch) : false;
-      if (!hasSelectorBranch) displayUnavailable();
+      if (hasSelectorBranch) return;
+      displayUnavailable();
 
       const controller = new AbortController();
       confirmationController = controller;
