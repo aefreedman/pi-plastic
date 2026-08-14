@@ -94,6 +94,8 @@ const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       normalizeWorkdirAliases(input);
       assignAlias(input, "includeRevId", ["include_rev_id"]);
       assignAlias(input, "machineReadable", ["machine_readable", "machine"]);
+      assignAlias(input, "maxItems", ["max_items"]);
+      assignAlias(input, "includeRaw", ["include_raw"]);
       return input;
     },
   },

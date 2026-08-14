@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows semantic versioning for public package releases.
 
+## Unreleased
+
+## [0.5.5] - 2026-08-14
+
+### Changed
+
+- Made `plastic_status(machineReadable=true, format="json")` return compact parsed pending-item records, aggregate counts, and bounded-item metadata, with package-owned field separation and revision IDs. It returns at most 100 items by default (configurable up to 500); raw, unbounded Plastic output is omitted by default and available with `includeRaw=true` only for diagnostics.
+
 ## [0.5.4] - 2026-08-13
 
 ### Fixed

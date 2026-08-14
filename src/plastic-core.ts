@@ -326,6 +326,20 @@ type PendingItemSummary = {
     privatePaths: string[];
 };
 
+type MachineReadableStatusItem = {
+    statusCode: string;
+    kind: PendingItemKind;
+    path: string;
+    isDirectory: boolean;
+    revisionId?: string;
+    sourcePath?: string;
+};
+
+type MachineReadableStatusSummary = Omit<PendingItemSummary, "privatePaths">;
+
+const MACHINE_READABLE_STATUS_DEFAULT_MAX_ITEMS = 100;
+const MACHINE_READABLE_STATUS_MAX_ITEMS = 500;
+
 type PrivateAutoAddSelection = {
     candidatePaths: string[];
     blockedPaths: Array<{ path: string; reason: string }>;
@@ -683,6 +697,22 @@ const getMachineReadablePendingItems = async (workdir?: string): Promise<Pending
     const cwd = workdir ?? process.cwd();
     const output = await runCmRaw(["status", "--machinereadable", "--includeRevId", `--fieldseparator=${STATUS_FIELD_SEPARATOR}`], workdir);
     return parseMachineReadablePendingItems(output, cwd);
+};
+
+const toMachineReadableStatusItems = (pendingItems: PendingItem[]): MachineReadableStatusItem[] =>
+    pendingItems.map((item) => ({
+        statusCode: item.statusCode,
+        kind: item.kind,
+        path: item.workspacePath,
+        isDirectory: item.isDirectory,
+        ...(item.revisionId ? { revisionId: item.revisionId } : {}),
+        ...(item.sourceWorkspacePath ? { sourcePath: item.sourceWorkspacePath } : {}),
+    }));
+
+const toMachineReadableStatusSummary = (pendingItems: PendingItem[], cwd: string): MachineReadableStatusSummary =>
+{
+    const { privatePaths: _privatePaths, ...summary } = summarizePendingItems(pendingItems, cwd);
+    return summary;
 };
 
 const summarizePendingItems = (pendingItems: PendingItem[], cwd?: string): PendingItemSummary =>
@@ -2375,7 +2405,9 @@ export const status = tool({
     args: {
         workdir: workdirArg,
         includeRevId: tool.schema.boolean().optional().describe("Include revision IDs in the status output when supported."),
-        machineReadable: tool.schema.boolean().optional().describe("Return machine-readable status output when supported."),
+        machineReadable: tool.schema.boolean().optional().describe("Return parsed, machine-readable pending status records when supported."),
+        maxItems: tool.schema.number().int().min(1).max(MACHINE_READABLE_STATUS_MAX_ITEMS).optional().describe(`Maximum parsed items in machine-readable JSON (default ${MACHINE_READABLE_STATUS_DEFAULT_MAX_ITEMS}, maximum ${MACHINE_READABLE_STATUS_MAX_ITEMS}).`),
+        includeRaw: tool.schema.boolean().optional().describe("Include unbounded raw machine-readable Plastic output in JSON diagnostics. Applies only when machineReadable=true."),
         short: tool.schema.boolean().optional().describe("Use short status output."),
         format: outputFormatArg,
     },
@@ -2396,15 +2428,32 @@ export const status = tool({
 
         if (args.machineReadable)
         {
-            cmdArgs.push("--machinereadable");
+            // Package-owned separators make paths with whitespace unambiguous, and
+            // revision IDs let agents safely identify the base of moved/deleted items.
+            if (!cmdArgs.includes("--includeRevId"))
+            {
+                cmdArgs.push("--includeRevId");
+            }
+            cmdArgs.push("--machinereadable", `--fieldseparator=${STATUS_FIELD_SEPARATOR}`);
             const machineOutput = await runCmRaw(cmdArgs, args.workdir);
+            const cwd = args.workdir ?? process.cwd();
+            const pendingItems = parseMachineReadablePendingItems(machineOutput, cwd);
+            const maxItems = args.maxItems ?? MACHINE_READABLE_STATUS_DEFAULT_MAX_ITEMS;
+            const returnedItems = pendingItems.slice(0, maxItems);
             return toStructuredResult(
                 "status",
                 format,
                 machineOutput,
                 {
-                    rawOutput: machineOutput,
                     machineReadable: true,
+                    items: toMachineReadableStatusItems(returnedItems),
+                    itemCount: {
+                        total: pendingItems.length,
+                        returned: returnedItems.length,
+                        omitted: pendingItems.length - returnedItems.length,
+                    },
+                    summary: toMachineReadableStatusSummary(pendingItems, cwd),
+                    ...(args.includeRaw ? { rawOutput: machineOutput } : {}),
                 },
                 args.workdir,
             );

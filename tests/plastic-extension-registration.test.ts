@@ -11,6 +11,8 @@ function main(): void {
   assert.match(indexText, /core\.runWithAbortSignal\(signal, async \(\) => coreTool\.execute\(normalizedParams\)\)/, "plastic tools should propagate abort signals into core execution");
   assert.doesNotMatch(indexText, /authorizationToken|authorizationProvenance|ctx\.ui\.confirm/, "Plastic tool registration must not implement token or UI-confirmation approvals");
 
+  assert.match(indexText, /assignAlias\(input, "includeRaw", \["include_raw"\]\);/, "plastic_status should normalize include_raw");
+  assert.match(indexText, /assignAlias\(input, "maxItems", \["max_items"\]\);/, "plastic_status should normalize max_items");
   assert.match(indexText, /assignAlias\(input, "message", \["comment", "comments"\]\);/, "plastic_checkin should normalize comment aliases");
   assert.match(indexText, /assignAlias\(input, "pendingChanges", \["pending_changes"\]\);/, "plastic_switchBranch should normalize pending_changes");
   assert.match(indexText, /"patch",/, "plastic_patch should be included in registered exports");
