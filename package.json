@@ -1,6 +1,6 @@
 {
   "name": "@aefree/pi-plastic",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"
@@ -18,8 +18,7 @@
     "skills/",
     "CHANGELOG.md",
     "LICENSE",
-    "README.md",
-    "SECURITY.md"
+    "README.md"
   ],
   "pi": {
     "extensions": [
