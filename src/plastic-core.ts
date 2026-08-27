@@ -32,6 +32,7 @@ const getCmExecutable = (): string => resolveExecutable(process.env, "PI_PLASTIC
 // Keep the executable name configurable rather than assuming a .exe suffix or package-manager path.
 const getDiffExecutable = (): string => resolveExecutable(process.env, "PI_PLASTIC_DIFF_EXECUTABLE", "diff");
 const PLASTIC_PATCH_EXECUTABLE_ENV = "PI_PLASTIC_PATCH_EXECUTABLE";
+type PatchExecutableProbe = (command: string) => Promise<boolean>;
 // Plastic's server/backend determines whether a moved item is encoded as a
 // move or as delete/add records. Do not claim either without a live fixture.
 const PATCH_MOVE_REPRESENTATION = "backend-determined" as const;
@@ -1228,6 +1229,49 @@ const assertNonBlankPatchValue = (name: keyof PatchCommandArgs, value: string | 
     }
 };
 
+const probePatchExecutable = async (command: string): Promise<boolean> =>
+{
+    try
+    {
+        // This establishes only that the configured executable can launch.
+        // `cm patch` remains the authoritative verifier for its --binary contract.
+        const result = await spawnAndCollect(command, ["--version"], process.cwd(), undefined, AbortSignal.timeout(3000), {
+            abortKillDelayMs: 100,
+            outputLimitChars: 1024,
+        });
+        return !result.aborted;
+    }
+    catch
+    {
+        return false;
+    }
+};
+
+export const getPatchBackendCapabilityWarning = async (
+    environment: ExecutableEnvironment = process.env,
+    platform: NodeJS.Platform = process.platform,
+    probe: PatchExecutableProbe = probePatchExecutable,
+): Promise<string | undefined> =>
+{
+    const configuredPatchExecutable = environment[PLASTIC_PATCH_EXECUTABLE_ENV]?.trim();
+    if (configuredPatchExecutable)
+    {
+        if (await probe(configuredPatchExecutable))
+        {
+            return undefined;
+        }
+
+        return "Pi Plastic capability warning: the configured PI_PLASTIC_PATCH_EXECUTABLE could not be launched. Set it to a verified patch-capable non-GUI diff executable, or remove the override to use this platform's documented fallback. The configured path is not shown for privacy.";
+    }
+
+    if (platform === "win32")
+    {
+        return "Pi Plastic capability warning: plastic_patch requires PI_PLASTIC_PATCH_EXECUTABLE on Windows. Set it to a verified patch-capable non-GUI diff executable (for example Git's diff.exe). PI_PLASTIC_DIFF_EXECUTABLE is only for text diffs.";
+    }
+
+    return undefined;
+};
+
 const resolvePatchToolPath = (
     toolPath?: string,
     environment: ExecutableEnvironment = process.env,
@@ -1491,6 +1535,7 @@ export const __plasticProcessInternals = {
 export const __plasticPatchInternals = {
     buildPatchCommandArgs,
     resolvePatchToolPath,
+    getPatchBackendCapabilityWarning,
     qualifyPatchBranchSpec,
     resolvePatchBranchSpecs,
     createPatchOutputStaging,

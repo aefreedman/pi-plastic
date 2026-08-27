@@ -34,7 +34,7 @@ const assertThrows = (fn: () => void, expectedMessage: string, message: string):
 
 const main = async (): Promise<void> =>
 {
-    const { buildPatchCommandArgs, resolvePatchToolPath, qualifyPatchBranchSpec, resolvePatchBranchSpecs, runPatchOutputTransaction, withPatchBackendContractDiagnostic, PATCH_MOVE_REPRESENTATION } = __plasticPatchInternals;
+    const { buildPatchCommandArgs, resolvePatchToolPath, getPatchBackendCapabilityWarning, qualifyPatchBranchSpec, resolvePatchBranchSpecs, runPatchOutputTransaction, withPatchBackendContractDiagnostic, PATCH_MOVE_REPRESENTATION } = __plasticPatchInternals;
 
     // Command construction must not promise a Plastic patch move encoding: that
     // is server/backend output and requires a controlled live fixture to prove.
@@ -50,6 +50,17 @@ const main = async (): Promise<void> =>
         "PI_PLASTIC_PATCH_EXECUTABLE",
         "Expected Windows patching to reject the text-diff/GnuWin32 fallback before cm patch",
     );
+    const invalidOverrideWarning = await getPatchBackendCapabilityWarning(
+        { PI_PLASTIC_PATCH_EXECUTABLE: "/private-machine/invalid-diff" },
+        "linux",
+        async () => false,
+    );
+    assert(invalidOverrideWarning?.includes("PI_PLASTIC_PATCH_EXECUTABLE"), "Expected an invalid configured patch override warning.");
+    assert(!invalidOverrideWarning?.includes("/private-machine/invalid-diff"), "Expected configured patch override warning to redact its path.");
+    assert(await getPatchBackendCapabilityWarning({ PI_PLASTIC_PATCH_EXECUTABLE: "/tools/patch-diff" }, "linux", async () => true) === undefined, "Expected a launchable configured patch override to remain silent.");
+    assert(await getPatchBackendCapabilityWarning({}, "linux", async () => false) === undefined, "Expected optional non-Windows patch fallback absence to remain silent.");
+    const missingWindowsWarning = await getPatchBackendCapabilityWarning({}, "win32", async () => false);
+    assert(missingWindowsWarning?.includes("requires PI_PLASTIC_PATCH_EXECUTABLE on Windows"), "Expected Windows to warn before patch use when its required setting is missing.");
     assert(__plasticProcessInternals.resolveDiffExecutable({ PI_PLASTIC_DIFF_EXECUTABLE: "C:\\GnuWin32\\bin\\diff.exe" }) === "C:\\GnuWin32\\bin\\diff.exe", "Expected the ordinary text-diff policy to remain independent.");
     const diagnosticStagingDirectory = await mkdtemp(join(tmpdir(), "pi-plastic-patch-diagnostic-"));
     try

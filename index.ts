@@ -656,6 +656,28 @@ function metadataDescription(node: CoreSchemaNode): string {
   return node.metadata?.description ?? "Allowed values.";
 }
 
+type CapabilityDiagnosticContext = {
+  hasUI?: boolean;
+  ui?: { notify?: (message: string, level: "warning") => void };
+};
+
+type PatchCapabilityWarningGetter = () => Promise<string | undefined>;
+
+export const __plasticCapabilityDiagnosticInternals = {
+  createPatchCapabilityWarningNotifier(getWarning: PatchCapabilityWarningGetter = () => core.getPatchBackendCapabilityWarning()) {
+    let emitted = false;
+    return async (ctx: CapabilityDiagnosticContext): Promise<void> => {
+      if (emitted || !ctx.hasUI || typeof ctx.ui?.notify !== "function") return;
+      const warning = await getWarning();
+      if (!warning) return;
+      emitted = true;
+      ctx.ui.notify(warning, "warning");
+    };
+  },
+};
+
+const notifyPatchCapabilityWarning = __plasticCapabilityDiagnosticInternals.createPatchCapabilityWarningNotifier();
+
 function buildParameters(args: Record<string, unknown> | undefined): TSchema {
   if (!args || Object.keys(args).length === 0) {
     return EMPTY_PARAMETERS;
@@ -770,7 +792,8 @@ export default function plasticTools(pi: ExtensionAPI) {
     },
   });
 
-  pi.on("session_start", (_event, ctx) => {
+  pi.on("session_start", async (_event, ctx) => {
+    await notifyPatchCapabilityWarning(ctx as CapabilityDiagnosticContext);
     const ownership = getEffectivePlasticToolOwnership(pi.getAllTools(), EXTENSION_SOURCE_PATH);
     const active = pi.getActiveTools();
     const mode = getPlasticToolLoadingMode();

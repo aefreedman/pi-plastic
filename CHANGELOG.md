@@ -7,6 +7,10 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Fixed
+
+- Warn once per interactive Pi runtime when a configured `PI_PLASTIC_PATCH_EXECUTABLE` cannot launch or Windows lacks its required patch backend setting. Warnings redact configured paths; `plastic_patch` retains its existing tool-time validation.
+
 ## [0.5.5] - 2026-08-14
 
 ### Changed
