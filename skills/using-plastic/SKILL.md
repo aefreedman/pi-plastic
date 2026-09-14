@@ -10,6 +10,8 @@ Purpose: PlasticSCM operations for Unity workflows.
 
 Never run `cm diff` in Pi. It may launch GUI windows and block the CLI agent.
 
+`cm cat --file=<path>` writes to that path and can overwrite existing files; `--file` is never an input selector. Never point it at a canonical workspace file during inspection or review, even when piping stdout elsewhere. Use typed diff tools for baseline comparisons. If a typed tool cannot represent a required export, read the [historical export rules](references/changeset-operations.md#historical-export-fallback) first. A changeset number is not a file revision ID; never turn `cs:<number>` into `revid:<number>`.
+
 Never run interactive `cm merge --merge` flows. Use `plastic_merge` (preferred) or explicitly pass `--nointeractiveresolution --mergetype=try` (safe default). Use source/destination policy flags only as explicit overrides.
 
 Treat `plastic_merge` success as provisional until `plastic_status` confirms there are no merge-in-progress hints. Pending merge links are expected until the merge result is checked in; merge-in-progress hints are not. If files are manually resolved and validated but checkin is blocked by Plastic merge metadata, use `plastic_finalizeMerge` with an explicit source/destination policy before retrying checkin.

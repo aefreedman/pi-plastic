@@ -84,6 +84,20 @@ plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevisio
 
 The typed diff tools own historical `cm cat --file` materialization and cleanup; do not create agent-authored temporary files for ordinary diffs. `cm cat --raw` is unsupported for this workflow. Use typed retrieval first; `cm cat --file` is the byte-preserving low-level fallback only when a typed tool cannot represent the case.
 
+## Historical Export Fallback
+
+Use this fallback only when typed retrieval cannot represent the required case. For an ordinary workspace-base comparison, omit `revision` from `plastic_diffFile`; for a changeset comparison, supply its `revision="cs:<number>"` argument.
+
+`cm cat <revspec> --file=<output-file>` writes historical bytes to the output file and can overwrite it. `--file` does not select the source. Piping this command to `Set-Content` or redirecting stdout does not change the destination or protect it: with `--file`, the file contents are written there rather than to stdout.
+
+Before a necessary manual export:
+
+- Verify the source selector. `revid:<id>` means an actual file revision ID, not a workspace changeset number. Use a verified repository/server-qualified revision ID, or a file-qualified `<path>#cs:<number>` selector for a file at a changeset.
+- Create a new unique temporary directory outside the workspace and select a new absolute output path within it. Confirm that the destination does not exist. Never use a canonical workspace path or an existing baseline as the export destination.
+- Export directly to that temporary destination; do not combine `--file` with a stdout pipeline to capture the content. Check command success and the exported content before comparison. Keep comparison baselines immutable.
+
+If an export overwrites a workspace file, stop further exports and edits, record the exact command and destination, and inspect pending status. A clean status after exporting base revisions can mean pending work was erased; it does not prove successful review. Report the incident before attempting recovery, and preserve unrelated user changes.
+
 ## Commit Message Format
 
 Use conventional commits from ../../_shared/references/conventional-commits.md.

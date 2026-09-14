@@ -33,6 +33,8 @@ plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevisio
 
 The diff tools materialize historical bytes and remove their temporary files internally. Added and explicitly selected private/new files use an empty base; an added empty file is reported as `added-empty`, not generic unchanged. Changed, moved, and deleted records use their status revision ID when available. A `--nodata` item cannot supply historical/base bytes: refresh the workspace or use two known file-qualified revisions. `plastic_workspaceDiff` requires selected paths or `allPending=true` and returns per-file unavailable outcomes instead of aborting the batch. Text-diff tools use bounded GNU/POSIX text diff, materialize backend operands to ASCII-safe package paths while preserving logical Unicode output labels, treat valid Unity YAML as text, and report genuine binary content explicitly. Do not construct `cm cat` temporary-file recipes for ordinary review. `cm cat --raw` is unsupported in this workflow; typed retrieval owns cleanup, and `cm cat --file` is the byte-preserving low-level fallback only when needed.
 
+`cm cat --file` is a filesystem write: its argument is the output destination, never the source file. Pointing it at a working file overwrites pending changes even if stdout is piped to a temporary file. Reviewers must use typed comparisons for ordinary baseline review; a necessary unsupported export must follow the [historical export rules](changeset-operations.md#historical-export-fallback), with a new absolute temporary destination outside the workspace and a verified file revision selector.
+
 ## Metadata Listing (No GUI Diff)
 
 Use changeset metadata to understand branch activity:

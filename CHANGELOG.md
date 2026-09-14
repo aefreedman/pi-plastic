@@ -7,6 +7,10 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Fixed
+
+- Clarify that `cm cat --file` writes to and can overwrite its destination, including when stdout is redirected. Route ordinary baseline reviews through typed diff tools, require new external temporary destinations for necessary manual exports, and distinguish changeset numbers from file revision IDs.
+
 ## [0.6.0] - 2026-09-14
 
 ### Added
