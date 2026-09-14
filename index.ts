@@ -68,6 +68,7 @@ const PLASTIC_EXPORTS = [
   "branchCreate",
   "switchBranch",
   "merge",
+  "mergeBranches",
   "mergeToBranch",
   "finalizeMerge",
   "currentBranch",
@@ -221,6 +222,11 @@ const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       normalizeWorkdirAliases(input);
       assignAlias(input, "cherrypicking", ["cherry_picking", "cherryPicking"]);
       return input;
+    },
+  },
+  mergeBranches: {
+    prepareArguments(args) {
+      return normalizeOutputFormatAlias(normalizeArgs(args));
     },
   },
   mergeToBranch: {
@@ -714,7 +720,7 @@ export default function plasticTools(pi: ExtensionAPI) {
       },
       async execute(_toolCallId, params, signal, _onUpdate, ctx) {
         const normalizedParams = normalizeArgs(params);
-        if (normalizedParams.workdir === undefined && ctx?.cwd) {
+        if (exportName !== "mergeBranches" && normalizedParams.workdir === undefined && ctx?.cwd) {
           normalizedParams.workdir = ctx.cwd;
         }
         const result = await core.runWithAbortSignal(signal, async () => coreTool.execute(normalizedParams));

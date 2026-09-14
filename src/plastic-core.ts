@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { isUtf8 } from "node:buffer";
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { tool } from "./pi-tool-compat";
 import { promises as fs, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "os";
@@ -14,6 +15,8 @@ type SpawnResult = {
     aborted: boolean;
     stdoutTruncated?: boolean;
     stdoutTotalChars?: number;
+    stderrTruncated?: boolean;
+    stderrTotalChars?: number;
 };
 
 const abortSignalStorage = new AsyncLocalStorage<AbortSignal | undefined>();
@@ -236,6 +239,8 @@ const spawnAndCollect = async (
             aborted,
             stdoutTruncated: stdoutResult.truncated,
             stdoutTotalChars: stdoutResult.totalChars,
+            stderrTruncated: stderrResult.truncated,
+            stderrTotalChars: stderrResult.totalChars,
         };
     }
     finally
@@ -4504,6 +4509,300 @@ export const merge = tool({
             args.workdir,
             warnings,
         );
+    },
+});
+
+type QualifiedServerBranch = {
+    raw: string;
+    branch: string;
+    repository: string;
+    server: string;
+};
+
+type ServerMergeRecord = {
+    operation: string;
+    fields: string[];
+};
+
+type ServerMergeParse = {
+    records: ServerMergeRecord[];
+    malformed: boolean;
+    unknownOperations: string[];
+    changesets: Array<{ id: string; branch: string; repository: string; mount: string }>;
+    isAlreadyConnected: boolean;
+    hasConflict: boolean;
+};
+
+const SERVER_MERGE_OUTPUT_LIMIT = 16_384;
+const serverMergeControlPattern = /[\u0000-\u001f\u007f-\u009f]/;
+const serverMergeCapabilityTokens = ["--to", "--merge", "--nointeractiveresolution", "--machinereadable", "--startlineseparator", "--endlineseparator", "--fieldseparator"];
+
+const assertSafeServerMergeValue = (name: string, value: string): string =>
+{
+    const trimmed = value.trim();
+    if (!trimmed || serverMergeControlPattern.test(value))
+    {
+        throw new Error(`${name} must be non-empty and must not contain control characters.`);
+    }
+
+    return trimmed;
+};
+
+const parseQualifiedServerBranch = (name: string, value: string): QualifiedServerBranch =>
+{
+    const raw = assertSafeServerMergeValue(name, value);
+    if (!raw.startsWith("br:/"))
+    {
+        throw new Error(`${name} must use fully qualified syntax 'br:/<branch>@<repository>@<server>'.`);
+    }
+
+    const lastAt = raw.lastIndexOf("@");
+    const previousAt = raw.lastIndexOf("@", lastAt - 1);
+    if (previousAt <= 3 || lastAt <= previousAt + 1 || lastAt === raw.length - 1)
+    {
+        throw new Error(`${name} must use fully qualified syntax 'br:/<branch>@<repository>@<server>'.`);
+    }
+
+    const branch = raw.slice(3, previousAt);
+    const repository = raw.slice(previousAt + 1, lastAt);
+    const server = raw.slice(lastAt + 1);
+    if (!branch.startsWith("/") || branch.endsWith("/") || [branch, repository, server].some((part) => !part || part !== part.trim() || serverMergeControlPattern.test(part)))
+    {
+        throw new Error(`${name} must use fully qualified syntax 'br:/<branch>@<repository>@<server>'.`);
+    }
+
+    return { raw, branch, repository, server };
+};
+
+const createServerMergeSeparators = (): { start: string; end: string; field: string } =>
+{
+    const nonce = randomBytes(16).toString("hex");
+    return {
+        start: `__PI_PLASTIC_MERGE_START_${nonce}__`,
+        end: `__PI_PLASTIC_MERGE_END_${nonce}__`,
+        field: `__PI_PLASTIC_MERGE_FIELD_${nonce}__`,
+    };
+};
+
+const parseServerMergeOutput = (output: string, separators: { start: string; end: string; field: string }): ServerMergeParse =>
+{
+    const records: ServerMergeRecord[] = [];
+    const unknownOperations = new Set<string>();
+    let malformed = false;
+    let cursor = 0;
+
+    while (true)
+    {
+        const start = output.indexOf(separators.start, cursor);
+        if (start < 0)
+        {
+            break;
+        }
+        const payloadStart = start + separators.start.length;
+        const end = output.indexOf(separators.end, payloadStart);
+        if (end < 0)
+        {
+            malformed = true;
+            break;
+        }
+        const payload = output.slice(payloadStart, end);
+        if (!payload || payload.includes(separators.start) || payload.includes(separators.end))
+        {
+            malformed = true;
+        }
+        else
+        {
+            const fields = payload.split(separators.field);
+            const operation = fields[0] ?? "";
+            if (!operation || fields.some((field) => field.length === 0))
+            {
+                malformed = true;
+            }
+            else
+            {
+                records.push({ operation, fields });
+                if (!["FILE_SRC", "CHANGESET", "STATUS", "FILE_CONFLICT"].includes(operation))
+                {
+                    unknownOperations.add(operation);
+                }
+            }
+        }
+        cursor = end + separators.end.length;
+    }
+
+    if (output.includes(separators.end) && records.length === 0)
+    {
+        malformed = true;
+    }
+
+    const changesets: Array<{ id: string; branch: string; repository: string; mount: string }> = [];
+    for (const record of records.filter((record) => record.operation === "CHANGESET"))
+    {
+        const match = record.fields[1]?.match(/^cs:(\d+)@(?<branch>\/[^@]+)@(?<repository>[^@]+) \(mount:'(?<mount>[^']+)'\)$/);
+        if (!match?.groups)
+        {
+            malformed = true;
+            continue;
+        }
+        changesets.push({
+            id: match[1]!,
+            branch: match.groups.branch!,
+            repository: match.groups.repository!,
+            mount: match.groups.mount!,
+        });
+    }
+
+    const statusRecords = records.filter((record) => record.operation === "STATUS");
+    const isAlreadyConnected = statusRecords.length === 1
+        && statusRecords[0]!.fields.length === 3
+        && statusRecords[0]!.fields[1] === "ALREADY_CONNECTED"
+        && statusRecords[0]!.fields[2] === "No merges detected";
+    const hasConflict = records.some((record) => record.operation === "FILE_CONFLICT");
+    return { records, malformed, unknownOperations: [...unknownOperations], changesets, isAlreadyConnected, hasConflict };
+};
+
+const formatServerMergeResult = async (
+    format: OutputFormat,
+    outcome: "preflight" | "completed" | "no-op" | "conflict" | "uncertain" | "unsupported",
+    text: string,
+    data: Record<string, unknown>,
+): Promise<string> =>
+{
+    if (format === "text")
+    {
+        return text;
+    }
+    return `## merge-branches\n\n\`\`\`json\n${JSON.stringify({
+        ok: outcome === "completed" || outcome === "preflight" || outcome === "no-op",
+        action: "merge-branches",
+        outcome,
+        toolVersion: TOOL_VERSION,
+        cliVersion: await getCmVersion(),
+        data,
+    }, null, 2)}\n\`\`\``;
+};
+
+const getServerMergeCapability = async (): Promise<{ supported: boolean; diagnostics: string }> =>
+{
+    const result = await spawnAndCollect(getCmExecutable(), ["help", "merge"], process.cwd(), undefined, getActiveAbortSignal(), {
+        ...(commandExecutionStorage.getStore() ?? {}),
+        outputLimitChars: SERVER_MERGE_OUTPUT_LIMIT,
+    });
+    const output = [result.stdout, result.stderr].filter(Boolean).join("\n");
+    const missing = serverMergeCapabilityTokens.filter((token) => !output.includes(token));
+    if (result.aborted || result.exitCode !== 0 || result.stdoutTruncated || result.stderrTruncated || missing.length > 0)
+    {
+        return { supported: false, diagnostics: `Local cm help merge capability check did not prove required syntax${missing.length > 0 ? `: missing ${missing.join(", ")}` : "."}` };
+    }
+    return { supported: true, diagnostics: "Local cm help merge advertised the required merge-to and machine-readable syntax. Server capability remains unverified until dispatch." };
+};
+
+export const mergeBranches = tool({
+    description: "Perform one bounded workspace-free server-side merge between explicitly qualified branches; merge-link and xlink effects remain unverified.",
+    args: {
+        source: tool.schema.string().min(1).describe("Fully qualified source branch: br:/<branch>@<repository>@<server>."),
+        target: tool.schema.string().min(1).describe("Fully qualified target branch in the same repository/server as source."),
+        message: tool.schema.string().min(1).describe("Non-empty changeset comment; no editor fallback is allowed."),
+        preflight: tool.schema.boolean().optional().describe("Render the exact command only; does not contact Plastic or analyze remote conflicts."),
+        format: outputFormatArg,
+    },
+    async execute(args)
+    {
+        const format = args.format ?? "text";
+        const source = parseQualifiedServerBranch("source", args.source);
+        const target = parseQualifiedServerBranch("target", args.target);
+        const message = assertSafeServerMergeValue("message", args.message);
+        if (source.repository !== target.repository || source.server !== target.server)
+        {
+            throw new Error("source and target must identify the same exact repository and server.");
+        }
+        if (source.branch === target.branch)
+        {
+            throw new Error("source and target must identify different branches.");
+        }
+
+        const separators = createServerMergeSeparators();
+        const command = [
+            "merge", source.raw, `--to=${target.raw}`, "--merge", `-c=${message}`, "--nointeractiveresolution", "--machinereadable",
+            `--startlineseparator=${separators.start}`, `--endlineseparator=${separators.end}`, `--fieldseparator=${separators.field}`,
+        ];
+        const requestedIdentity = { source: source.raw, target: target.raw, repository: source.repository, server: source.server };
+        if (args.preflight)
+        {
+            return formatServerMergeResult(format, "preflight", [
+                "## Server Merge Preflight",
+                "",
+                "- Would run: yes",
+                "- Remote analysis: not performed",
+                `- Command: cm ${command.join(" ")}`,
+            ].join("\n"), { wouldRun: true, requestedIdentity, command: ["cm", ...command] });
+        }
+
+        const capability = await getServerMergeCapability();
+        if (!capability.supported)
+        {
+            return formatServerMergeResult(format, "unsupported", "## Server Merge Unsupported\n\n- No merge command was dispatched because local client syntax could not be proven.", {
+                requestedIdentity,
+                capability,
+                dispatched: false,
+            });
+        }
+
+        const attempt = await spawnAndCollect(getCmExecutable(), command, process.cwd(), undefined, getActiveAbortSignal(), {
+            ...(commandExecutionStorage.getStore() ?? {}),
+            outputLimitChars: SERVER_MERGE_OUTPUT_LIMIT,
+        });
+        const output = [attempt.stdout, attempt.stderr].filter(Boolean).join("\n");
+        const parsed = parseServerMergeOutput(output, separators);
+        const matchingChangesets = parsed.changesets.filter((changeset) => changeset.branch === target.branch && changeset.repository === target.repository && changeset.mount === "/");
+        const effect = "not-proven";
+        const diagnostics = output.slice(0, 4_000);
+        const baseData = {
+            requestedIdentity,
+            capability,
+            command: ["cm", ...command],
+            dispatched: true,
+            exitCode: attempt.exitCode,
+            aborted: attempt.aborted,
+            outputTruncated: Boolean(attempt.stdoutTruncated || attempt.stderrTruncated),
+            records: parsed.records,
+            diagnostics,
+            mergeLinkIdentity: "unverified",
+            xlinkEffects: "unverified",
+            effect,
+        };
+
+        const ambiguous = attempt.aborted || attempt.stdoutTruncated || attempt.stderrTruncated || parsed.malformed
+            || parsed.unknownOperations.length > 0 || parsed.changesets.length > 1
+            || (parsed.changesets.length > 0 && matchingChangesets.length !== 1)
+            || (parsed.hasConflict && parsed.changesets.length > 0)
+            || (parsed.isAlreadyConnected && (parsed.changesets.length > 0 || parsed.hasConflict));
+        if (!ambiguous && attempt.exitCode === 0 && matchingChangesets.length === 1 && !parsed.hasConflict && !parsed.isAlreadyConnected)
+        {
+            const changeset = matchingChangesets[0]!;
+            return formatServerMergeResult(format, "completed", `## Server Merge Completed\n\n- Created target changeset: cs:${changeset.id}\n- Merge-link identity: unverified\n- Xlink effects: unverified`, {
+                ...baseData,
+                createdChangeset: changeset,
+                effect: "changeset-created",
+            });
+        }
+        if (!ambiguous && attempt.exitCode === 0 && parsed.isAlreadyConnected && parsed.changesets.length === 0 && !parsed.hasConflict)
+        {
+            return formatServerMergeResult(format, "no-op", "## Server Merge No-op\n\n- Plastic reported ALREADY_CONNECTED.\n- Effect: not independently verified.", baseData);
+        }
+        if (!ambiguous && attempt.exitCode !== 0 && parsed.hasConflict && parsed.changesets.length === 0)
+        {
+            return formatServerMergeResult(format, "conflict", "## Server Merge Conflict\n\n- Plastic reported a file conflict.\n- Effect: uncertain; inspect the server before any retry.", { ...baseData, effect: "uncertain" });
+        }
+        return formatServerMergeResult(format, "uncertain", "## Server Merge Uncertain\n\n- The command may have had an effect, but its bounded output does not prove a safe classification.\n- Do not retry automatically; inspect server state first.", {
+            ...baseData,
+            effect: "uncertain",
+            parseWarnings: {
+                malformed: parsed.malformed,
+                unknownOperations: parsed.unknownOperations,
+                matchingChangesetCount: matchingChangesets.length,
+            },
+        });
     },
 });
 

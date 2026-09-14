@@ -36,6 +36,7 @@ Removing the approval layer does not relax Plastic safety guards. Command allowl
 - `plastic_branchCreate`
 - `plastic_switchBranch`
 - `plastic_merge`
+- `plastic_mergeBranches`
 - `plastic_mergeToBranch`
 - `plastic_finalizeMerge`
 - `plastic_currentBranch`
@@ -54,7 +55,7 @@ Removing the approval layer does not relax Plastic safety guards. Command allowl
 
 ## Dynamic tool loading
 
-The package exposes 29 public `plastic_*` tools. `plastic_workspaceCreate` is intentionally not registered or discoverable until the package provides a paired, safe workspace-cleanup capability. `plastic_tool_search` is a package-owned loader that searches the explicit Plastic capability catalog, reports bounded matches and safety guidance, and additively enables selected tools for the next model request.
+The package exposes 30 public `plastic_*` tools. `plastic_workspaceCreate` is intentionally not registered or discoverable until the package provides a paired, safe workspace-cleanup capability. `plastic_tool_search` is a package-owned loader that searches the explicit Plastic capability catalog, reports bounded matches and safety guidance, and additively enables selected tools for the next model request.
 
 The default **balanced** session set keeps `plastic_tool_search`, `plastic_status`, and `plastic_currentBranch` active. The other Plastic tools remain registered but inactive until selected; built-in and other-extension tools are not removed. Previous loader additions on the active session branch are restored on startup, resume, fork, and reload.
 
@@ -80,6 +81,7 @@ The Bash guards run only in Pi processes that actually load this package. A proj
 - `plastic_patch` generates review patches with `cm patch`, including `clean` and `integration` filters for branch review workflows. It does not expose patch apply. Unqualified `br:/...` selectors are qualified only with the current workspace selector's exact repository; otherwise pass `br:/<branch>@<repository>@<server>`.
 - Bash safety rails block `cm diff` and unsafe interactive `cm merge --merge` usage.
 - Merge tooling surfaces Plastic `FILE_CONFLICT` records and merge-state metadata from `cm status`.
+- `plastic_mergeBranches` is a separate workspace-free server-side route. It requires fully repository/server-qualified source and target branches in the same exact repository/server and a nonempty message. Its optional preflight only renders the command; it does not analyze remote conflicts. A completed result proves one emitted root-mount target changeset for this dispatch, not source merge-link identity, exclusive target-head ownership, server capability beyond the dispatch, rollback, or xlink effects. No-op and conflict records do not independently prove that no server effect occurred. The route has no workspace fallback, retries, target-head unification, xlink policy, shelve mode, or conflict-policy override; undetected server-side xlink effects remain possible.
 - `plastic_mergeToBranch` performs the common safe closeout flow: resolve the source branch's parent as the default target, switch to the target branch, optionally update, merge a source branch non-interactively, verify merge state, and check in the merge result. It verifies the loaded target before merge/checkin and rejects final-branch mismatches; Plastic checkins stay on the branch where they were created, so switching afterward is not a Git-style integration.
 - `plastic_finalizeMerge` supports reviewed/manual-resolution flows where Plastic still needs merge metadata finalized before checkin.
 

@@ -36,7 +36,7 @@ async function loadHarness(activeTools: string[], branchEntries: unknown[] = [],
 async function main(): Promise<void> {
   await withMode(undefined, async () => {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
-    assert.equal(harness.registry.size, 30, "all 29 public Plastic tools plus the loader should be registered");
+    assert.equal(harness.registry.size, 31, "all 30 public Plastic tools plus the loader should be registered");
     assert(harness.registry.has(PLASTIC_TOOL_SEARCH_NAME));
     assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", PLASTIC_TOOL_SEARCH_NAME, ...BALANCED_ACTIVE_PLASTIC_TOOL_NAMES]));
   });
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
 
   await withMode("all-active", async () => {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
-    assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", ...publicToolNames]), "all-active should expose all 29 current Plastic tools without the new loader");
+    assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", ...publicToolNames]), "all-active should expose all 30 current Plastic tools without the new loader");
   });
 
   await withMode("balanced", async () => {

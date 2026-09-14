@@ -7,6 +7,10 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Added
+
+- Add `plastic_mergeBranches` for one bounded, workspace-free server-side merge between explicitly same-repository/server qualified branches. The command-only preflight never contacts Plastic; completed results require one emitted root-mount target changeset and retain unverified merge-link/xlink effects and uncertain no-op/conflict effects.
+
 ### Fixed
 
 - Stop workspace merge closeout before target-side mutation when its required switch is canceled for pending changes; the blocked result now includes typed pending context and `checkedIn: false`.
