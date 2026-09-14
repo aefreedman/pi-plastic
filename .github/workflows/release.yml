@@ -72,4 +72,21 @@ jobs:
           set -euo pipefail
           name="$(node -p "require('./package.json').name")"
           version="$(node -p "require('./package.json').version")"
-          test "$(npm view "${name}@${version}" gitHead)" = "$(git rev-parse HEAD)"
+          expected_head="$(git rev-parse HEAD)"
+          for attempt in 1 2 3 4 5 6; do
+            set +e
+            published_head="$(npm view "${name}@${version}" gitHead 2>&1)"
+            npm_status=$?
+            set -e
+            if [[ ${npm_status} -eq 0 ]]; then
+              test "${published_head}" = "${expected_head}"
+              exit 0
+            fi
+            if [[ ${published_head} =~ E404 ]] && [[ ${attempt} -lt 6 ]]; then
+              echo "${name}@${version} is not yet visible in the npm registry; retrying availability check (${attempt}/6)." >&2
+              sleep $((attempt * 5))
+              continue
+            fi
+            printf '%s\n' "${published_head}" >&2
+            exit "${npm_status}"
+          done

@@ -406,6 +406,37 @@ const findCanonicalExistingAncestor = (absolutePath: string): string | null =>
     }
 };
 
+const toFilesystemIdentityPath = async (absolutePath: string): Promise<string> =>
+{
+    let candidate = absolutePath;
+    const missingSegments: string[] = [];
+    while (true)
+    {
+        try
+        {
+            const canonicalAncestor = (await fs.realpath(candidate)).replace(/\\/g, "/");
+            return missingSegments.reduce((identityPath, segment) => join(identityPath, segment), canonicalAncestor).replace(/\\/g, "/");
+        }
+        catch (error)
+        {
+            const code = (error as NodeJS.ErrnoException).code;
+            if (code !== "ENOENT" && code !== "ENOTDIR")
+            {
+                throw error;
+            }
+
+            const parent = dirname(candidate);
+            if (parent === candidate)
+            {
+                throw error;
+            }
+
+            missingSegments.unshift(basename(candidate));
+            candidate = parent;
+        }
+    }
+};
+
 const toggleFirstAsciiLetterCase = (value: string): string | null =>
 {
     const index = value.search(/[A-Za-z]/);
@@ -1814,9 +1845,10 @@ const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): Pendi
         });
         return workspaceRepository;
     };
-    const getXlinkRepository = (candidate: string): Promise<RepositoryIdentity | null> =>
+    const getXlinkRepository = async (candidate: string): Promise<RepositoryIdentity | null> =>
     {
-        const key = toPathComparisonKeyFromAbsolutePath(candidate);
+        // Use the physical identity for cache keys, but keep candidate lexical for cm.
+        const key = toPathComparisonKeyFromAbsolutePath(await toFilesystemIdentityPath(candidate));
         let lookup = xlinkLookups.get(key);
         if (!lookup)
         {
@@ -1851,15 +1883,22 @@ const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): Pendi
                 throw new Error(`Plastic status did not provide a base revision ID for '${item.workspacePath}'.`);
             }
             const root = await getWorkspaceRoot();
+            const rootIdentity = await toFilesystemIdentityPath(root);
             const ownershipPath = item.kind === "moved" && item.sourceWorkspacePath
                 ? toNormalizedAbsolutePath(item.sourceWorkspacePath, cwd)
                 : item.normalizedPath;
-            if (!isWithinPathScope(toPathComparisonKeyFromAbsolutePath(ownershipPath), toPathComparisonKeyFromAbsolutePath(root)))
+            if (!isWithinPathScope(
+                toPathComparisonKeyFromAbsolutePath(await toFilesystemIdentityPath(ownershipPath)),
+                toPathComparisonKeyFromAbsolutePath(rootIdentity),
+            ))
             {
                 throw new Error(`Plastic cannot resolve an owning repository for '${item.workspacePath}' outside the requested workspace.`);
             }
             let candidate = dirname(ownershipPath);
-            while (isWithinPathScope(toPathComparisonKeyFromAbsolutePath(candidate), toPathComparisonKeyFromAbsolutePath(root)))
+            while (isWithinPathScope(
+                toPathComparisonKeyFromAbsolutePath(await toFilesystemIdentityPath(candidate)),
+                toPathComparisonKeyFromAbsolutePath(rootIdentity),
+            ))
             {
                 // A missing ancestor can be a removed Xlink mount. Status does not
                 // retain ownership, so parent-repository fallback would be unsafe.
@@ -1873,7 +1912,8 @@ const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): Pendi
                     item.baseRepository = `${repository.repository}@${repository.server}`;
                     return `revid:${item.revisionId}@rep:${repository.repository}@repserver:${repository.server}`;
                 }
-                if (candidate === root)
+                if (toPathComparisonKeyFromAbsolutePath(await toFilesystemIdentityPath(candidate))
+                    === toPathComparisonKeyFromAbsolutePath(rootIdentity))
                 {
                     break;
                 }

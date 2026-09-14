@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -211,6 +211,7 @@ const jsonPayload = (result: unknown): Record<string, unknown> => {
 };
 
 const root = await mkdtemp(join(tmpdir(), "pi-plastic-workspace-diff-"));
+const workspaceAlias = `${root}-alias`;
 const noMarkerRoot = await mkdtemp(join(tmpdir(), "pi-plastic-no-marker-"));
 try {
   await mkdir(join(root, ".plastic"));
@@ -283,6 +284,15 @@ try {
     "A deleted path below a removed Xlink mount must fail unavailable rather than use the parent repository.",
   );
   assert(!collisionCalls.some((call) => call.args[0] === "cat" && call.args[1].startsWith("revid:88")), "Ambiguous ownership must not materialize any revision.");
+
+  // Workspace discovery resolves the alias to its physical root while Plastic status
+  // reports the lexical alias. Containment and ownership lookup must use one identity.
+  await symlink(root, workspaceAlias, process.platform === "win32" ? "junction" : "dir");
+  const aliasCollisionRoot = join(workspaceAlias, "collision");
+  const aliasCalls: Call[] = [];
+  const aliasXlinkDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/one.txt", workdir: aliasCollisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(aliasCalls, aliasCollisionRoot) });
+  assert.match(String(aliasXlinkDiff), /XLINK ONE CSHARP/, "A real filesystem alias must resolve Xlink ownership rather than rejecting the lexical status path as outside the physical workspace.");
+  assert(aliasCalls.some((call) => call.command === "cm" && call.args[0] === "xlink" && call.args.at(-1)?.startsWith(aliasCollisionRoot.replace(/\\/g, "/"))), "Xlink commands must retain the caller's lexical workspace path.");
 
   const changedCalls: Call[] = [];
   await runWithAbortSignal(undefined, () => diffFile.execute({ path: "changed.txt", workdir: root, format: "text" }), { spawn: fakeCommands(changedCalls) });
@@ -420,6 +430,7 @@ try {
 } finally {
   await Promise.all([
     rm(root, { recursive: true, force: true }),
+    rm(workspaceAlias, { recursive: true, force: true }),
     rm(noMarkerRoot, { recursive: true, force: true }),
   ]);
 }
