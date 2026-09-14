@@ -2607,30 +2607,54 @@ const buildMergeInProgressCheckinMessage = async (originalMessage: string, workd
     return lines.join("\n");
 };
 
-const resolveBranchParentName = async (branch: string, workdir?: string): Promise<string | undefined> =>
+type BranchParentLookupOutcome =
+    | { kind: "resolved"; branch: string; parent: string }
+    | { kind: "no-parent-or-not-found"; branch: string; attemptedCandidates: string[] }
+    | { kind: "command-failed"; branch: string; attemptedCandidates: string[]; diagnostics: string[] };
+
+const resolveBranchParentName = async (branch: string, workdir?: string): Promise<BranchParentLookupOutcome> =>
 {
-    const normalizedBranch = normalizeBranchSpecForComparison(branch);
-    const candidates = Array.from(new Set([branch.trim(), normalizedBranch, `br:${normalizedBranch}`]
-        .filter((candidate) => candidate.length > 0)));
+    const requestedBranch = branch.trim();
+    // A qualified selector is identity-bearing input; never strip its repository/server.
+    const normalizedBranch = normalizeBranchSpecForComparison(requestedBranch);
+    const candidates = Array.from(new Set(
+        (requestedBranch.includes("@")
+            ? [requestedBranch]
+            : [requestedBranch, normalizedBranch, `br:${normalizedBranch}`])
+            .filter((candidate) => candidate.length > 0),
+    ));
+    const diagnostics: string[] = [];
 
     for (const candidate of candidates)
     {
-        const output = await runCmRaw([
-            "find",
-            "branch",
-            `where ${cmWhereEquals("name", candidate)}`,
-            "--format={parent}",
-            "--nototal",
-        ], workdir).catch(() => "");
-        const lines = normalizeFindOutputLines(output);
-        const parent = lines[0]?.trim();
-        if (parent)
+        try
         {
-            return parent;
+            const output = await runCmRaw([
+                "find",
+                "branch",
+                `where ${cmWhereEquals("name", candidate)}`,
+                "--format={parent}",
+                "--nototal",
+            ], workdir);
+            const lines = normalizeFindOutputLines(output);
+            const parent = lines[0]?.trim();
+            if (parent)
+            {
+                return { kind: "resolved", branch: requestedBranch, parent };
+            }
+        }
+        catch (error)
+        {
+            diagnostics.push(normalizeErrorMessage(error).slice(0, 256));
         }
     }
 
-    return undefined;
+    if (diagnostics.length > 0)
+    {
+        return { kind: "command-failed", branch: requestedBranch, attemptedCandidates: candidates, diagnostics: diagnostics.slice(0, 3) };
+    }
+
+    return { kind: "no-parent-or-not-found", branch: requestedBranch, attemptedCandidates: candidates };
 };
 
 const resolveCurrentBranchName = async (workdir?: string): Promise<string> =>
@@ -4426,11 +4450,15 @@ export const mergeToBranch = tool({
         const format = args.format ?? "text";
         const startingBranch = await resolveCurrentBranchName(args.workdir);
         const sourceBranch = args.source ?? startingBranch;
-        const resolvedParentBranch = args.target ? undefined : await resolveBranchParentName(sourceBranch, args.workdir);
-        if (!args.target && !resolvedParentBranch)
+        const parentLookup = args.target ? undefined : await resolveBranchParentName(sourceBranch, args.workdir);
+        if (!args.target && parentLookup?.kind !== "resolved")
         {
-            throw new Error(`Unable to resolve the parent branch for ${sourceBranch}. Pass target explicitly.`);
+            const details = parentLookup?.kind === "command-failed"
+                ? ` Plastic lookup failed: ${parentLookup.diagnostics.join(" | ")}`
+                : " Plastic returned no parent row; this can mean either a root branch or no matching branch.";
+            throw new Error(`Unable to resolve the parent branch for ${sourceBranch}. Pass target explicitly.${details}`);
         }
+        const resolvedParentBranch = parentLookup?.kind === "resolved" ? parentLookup.parent : undefined;
         const targetBranch = args.target ?? resolvedParentBranch!;
         const strategy: MergeConflictStrategy = args.strategy ?? "auto";
         const updateTarget = args.updateTarget ?? true;

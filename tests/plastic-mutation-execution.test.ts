@@ -83,4 +83,29 @@ assert.equal(canceledCloseoutCalls.filter((call) => ["switch", "update", "merge"
 assert.equal(canceledCloseoutCalls.filter((call) => call.args[0] === "status").length, 2,
   "canceled closeout should only inspect branch identity and pending state");
 
+const failedLookupCalls: SpawnCall[] = [];
+await assert.rejects(
+  runWithAbortSignal(
+    undefined,
+    () => mergeToBranch.execute({ source: "/source", workdir }),
+    {
+      spawn: ((command: string, args: readonly string[], options: { cwd: string }) => {
+        failedLookupCalls.push({ command, args: [...args], cwd: options.cwd });
+        const child = new EventEmitter() as any;
+        const failedLookup = args[0] === "find";
+        child.stdout = Readable.from([failedLookup ? "" : "Branch: /source\n"]);
+        child.stderr = Readable.from(failedLookup ? ["fixture parent lookup failure"] : []);
+        child.stdin = undefined;
+        child.kill = () => true;
+        process.nextTick(() => child.emit("close", failedLookup ? 1 : 0));
+        return child;
+      }) as any,
+    },
+  ),
+  /Plastic lookup failed: fixture parent lookup failure/,
+  "failed parent lookup must remain diagnostic rather than silently becoming a missing parent",
+);
+assert.equal(failedLookupCalls.filter((call) => ["switch", "update", "merge", "checkin", "shelveset"].includes(call.args[0] ?? "")).length, 0,
+  "failed parent lookup must not dispatch a closeout mutation");
+
 console.log("PASS: Plastic direct mutation execution tests passed");
