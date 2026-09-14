@@ -119,6 +119,28 @@ function stressCommands(calls: Call[]) {
   }) as typeof import("node:child_process").spawn;
 }
 
+function emptyStatusCommands(calls: Call[]) {
+  return ((command: string, args: string[]) => {
+    const proc = new FakeChildProcess();
+    calls.push({ command, args });
+    queueMicrotask(() => proc.close(0));
+    return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
+  }) as typeof import("node:child_process").spawn;
+}
+
+async function assertNoUnhandledRejection(action: () => Promise<unknown>): Promise<void> {
+  const rejections: unknown[] = [];
+  const onUnhandledRejection = (reason: unknown) => rejections.push(reason);
+  process.on("unhandledRejection", onUnhandledRejection);
+  try {
+    await action();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(rejections.length, 0, "Lazy ownership discovery must not leave an unhandled rejection.");
+  } finally {
+    process.off("unhandledRejection", onUnhandledRejection);
+  }
+}
+
 function xlinkCollisionCommands(calls: Call[], root: string) {
   const statuses = [
     `CH${statusSeparator}${join(root, "parent.txt")}${statusSeparator}False${statusSeparator}77${statusSeparator}NO_MERGES`,
@@ -189,6 +211,7 @@ const jsonPayload = (result: unknown): Record<string, unknown> => {
 };
 
 const root = await mkdtemp(join(tmpdir(), "pi-plastic-workspace-diff-"));
+const noMarkerRoot = await mkdtemp(join(tmpdir(), "pi-plastic-no-marker-"));
 try {
   await mkdir(join(root, ".plastic"));
   await writeFile(join(root, ".plastic", "plastic.workspace"), "synthetic workspace marker\n");
@@ -196,6 +219,10 @@ try {
     await writeFile(join(root, name), `workspace ${name}\n`);
   }
   await writeFile(join(root, "added-empty.txt"), "");
+
+  await writeFile(join(noMarkerRoot, "private.txt"), "workspace private.txt\n");
+  await assertNoUnhandledRejection(() => runWithAbortSignal(undefined, () => diffFile.execute({ path: "private.txt", workdir: noMarkerRoot, format: "text" }), { spawn: fakeCommands([]) }));
+  await assertNoUnhandledRejection(() => runWithAbortSignal(undefined, () => workspaceDiff.execute({ allPending: true, workdir: noMarkerRoot, format: "text" }), { spawn: emptyStatusCommands([]) }));
 
   const privateCalls: Call[] = [];
   const privateResult = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "private.txt", workdir: root, format: "text" }), { spawn: fakeCommands(privateCalls) });
@@ -391,5 +418,8 @@ try {
 
   console.log("PASS: plastic workspace diff tests passed");
 } finally {
-  await rm(root, { recursive: true, force: true });
+  await Promise.all([
+    rm(root, { recursive: true, force: true }),
+    rm(noMarkerRoot, { recursive: true, force: true }),
+  ]);
 }

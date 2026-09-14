@@ -1786,14 +1786,19 @@ const isNotXlinkError = (error: unknown): boolean => /\bis not an xlink\.?\s*$/i
 
 const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): PendingBaseIdentityResolver =>
 {
-    const workspaceRoot = discoverPlasticWorkspace(cwd).then((outcome) =>
+    let workspaceRoot: Promise<string> | undefined;
+    const getWorkspaceRoot = (): Promise<string> =>
     {
-        if (outcome.kind !== "found")
+        workspaceRoot ??= discoverPlasticWorkspace(cwd).then((outcome) =>
         {
-            throw new Error(`Plastic cannot determine the workspace root for pending base resolution: ${outcome.kind === "unavailable" ? outcome.reason : "no workspace marker found"}.`);
-        }
-        return toNormalizedAbsolutePath(outcome.value.root, cwd);
-    });
+            if (outcome.kind !== "found")
+            {
+                throw new Error(`Plastic cannot determine the workspace root for pending base resolution: ${outcome.kind === "unavailable" ? outcome.reason : "no workspace marker found"}.`);
+            }
+            return toNormalizedAbsolutePath(outcome.value.root, cwd);
+        });
+        return workspaceRoot;
+    };
     const xlinkLookups = new Map<string, Promise<RepositoryIdentity | null>>();
     let workspaceRepository: Promise<RepositoryIdentity> | undefined;
     const getWorkspaceRepository = (): Promise<RepositoryIdentity> =>
@@ -1845,7 +1850,7 @@ const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): Pendi
             {
                 throw new Error(`Plastic status did not provide a base revision ID for '${item.workspacePath}'.`);
             }
-            const root = await workspaceRoot;
+            const root = await getWorkspaceRoot();
             const ownershipPath = item.kind === "moved" && item.sourceWorkspacePath
                 ? toNormalizedAbsolutePath(item.sourceWorkspacePath, cwd)
                 : item.normalizedPath;
