@@ -58,7 +58,7 @@ const runScenario = (scenario: Scenario): void => {
       encoding: "utf8",
       env: {
         ...process.env,
-        PATH: `${shellBin}:${process.env.PATH}`, 
+        PATH: `${shellBin}:${process.env.PATH}`,
         GITHUB_OUTPUT: outputFile,
         NPM_VIEW_STDOUT: scenario.stdout?.replaceAll(expectedHead, fixtureHead) ?? "",
         NPM_VIEW_STDERR: scenario.stderr ?? "",
