@@ -10,7 +10,7 @@ and this project follows semantic versioning for public package releases.
 ### Fixed
 
 - Stop workspace merge closeout before target-side mutation when its required switch is canceled for pending changes; the blocked result now includes typed pending context and `checkedIn: false`.
-- Preserve qualified parent-lookup selectors, query documented `name|parent` rows with repository scope, and report bounded `cm find` failures instead of silently treating them as a missing parent; root and missing branches now remain distinguishable.
+- Preserve qualified parent-lookup repository/server scope while matching documented local branch-name fields, and report bounded `cm find` failures instead of silently treating them as a missing parent; root and missing branches now remain distinguishable.
 
 ## [0.5.8] - 2026-09-15
 

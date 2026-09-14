@@ -83,6 +83,28 @@ assert.equal(canceledCloseoutCalls.filter((call) => ["switch", "update", "merge"
 assert.equal(canceledCloseoutCalls.filter((call) => call.args[0] === "status").length, 2,
   "canceled closeout should only inspect branch identity and pending state");
 
+async function runCanceledCloseoutFixture(pendingOutput: string): Promise<SpawnCall[]> {
+  const calls: SpawnCall[] = [];
+  await runWithAbortSignal(undefined, () => mergeToBranch.execute({ source: "/source", target: "/target", workdir }), {
+    spawn: ((command: string, args: readonly string[], options: { cwd: string }) => {
+      calls.push({ command, args: [...args], cwd: options.cwd });
+      const child = new EventEmitter() as any;
+      child.stdout = Readable.from([args.includes("--machinereadable") ? pendingOutput : "Branch: /source\n"]);
+      child.stderr = Readable.from([]);
+      child.stdin = undefined;
+      child.kill = () => true;
+      process.nextTick(() => child.emit("close", 0));
+      return child;
+    }) as any,
+  });
+  return calls;
+}
+for (const pendingOutput of ["PR private.txt False\n", "CH tracked.txt False\nPR private.txt False\n"]) {
+  const calls = await runCanceledCloseoutFixture(pendingOutput);
+  assert.equal(calls.filter((call) => ["switch", "update", "merge", "checkin", "shelveset"].includes(call.args[0] ?? "")).length, 0,
+    "explicit cancellation must stop closeout for private-only and mixed pending changes");
+}
+
 const failedLookupCalls: SpawnCall[] = [];
 await assert.rejects(
   runWithAbortSignal(
@@ -108,6 +130,29 @@ await assert.rejects(
 assert.equal(failedLookupCalls.filter((call) => ["switch", "update", "merge", "checkin", "shelveset"].includes(call.args[0] ?? "")).length, 0,
   "failed parent lookup must not dispatch a closeout mutation");
 
+for (const scenario of ["failed-switch", "wrong-target"] as const) {
+  const calls: SpawnCall[] = [];
+  await assert.rejects(
+    runWithAbortSignal(undefined, () => mergeToBranch.execute({ source: "/source", target: "/target", workdir }), {
+      spawn: ((command: string, args: readonly string[], options: { cwd: string }) => {
+        calls.push({ command, args: [...args], cwd: options.cwd });
+        const child = new EventEmitter() as any;
+        const isSwitch = args[0] === "switch";
+        const fails = scenario === "failed-switch" && isSwitch;
+        child.stdout = Readable.from([args.includes("--machinereadable") ? "" : "Branch: /source\n"]);
+        child.stderr = Readable.from(fails ? ["fixture switch failure"] : []);
+        child.stdin = undefined;
+        child.kill = () => true;
+        process.nextTick(() => child.emit("close", fails ? 1 : 0));
+        return child;
+      }) as any,
+    }),
+    scenario === "failed-switch" ? /fixture switch failure/ : /branch mismatch after cm switch/,
+  );
+  assert.equal(calls.filter((call) => call.args[0] === "update").length, 0, `${scenario} must stop before target update`);
+  assert.equal(calls.filter((call) => ["merge", "checkin"].includes(call.args[0] ?? "")).length, 0, `${scenario} must stop before merge/checkin`);
+}
+
 const resolvedLookupCalls: SpawnCall[] = [];
 const resolvedLookupPreflight = await runWithAbortSignal(
   undefined,
@@ -130,5 +175,40 @@ const resolvedLookupPreflight = await runWithAbortSignal(
 assert.match(String(resolvedLookupPreflight), /Target branch: \/parent@repo@server/, "verified name|parent rows should preserve qualified parent identity");
 assert.deepEqual(resolvedLookupCalls.find((call) => call.args[0] === "find")?.args.slice(-2), ["--format={name}|{parent}", "--nototal"],
   "parent lookup must request both branch identity and parent");
+assert.match(resolvedLookupCalls.find((call) => call.args[0] === "find")?.args[2] ?? "", /where name = '\/source' on repository 'repo@server'/,
+  "qualified selectors must query the local branch name in documented repository scope");
+
+async function runParentLookupFixture(source: string, findOutput: string, target?: string): Promise<{ result?: unknown; error?: unknown; calls: SpawnCall[] }> {
+  const calls: SpawnCall[] = [];
+  try {
+    const result = await runWithAbortSignal(undefined, () => mergeToBranch.execute({ source, ...(target ? { target } : {}), preflight: true, workdir }), {
+      spawn: ((command: string, args: readonly string[], options: { cwd: string }) => {
+        calls.push({ command, args: [...args], cwd: options.cwd });
+        const child = new EventEmitter() as any;
+        child.stdout = Readable.from([args[0] === "find" ? findOutput : args.includes("--machinereadable") ? "" : "Branch: /current\n"]);
+        child.stderr = Readable.from([]);
+        child.stdin = undefined;
+        child.kill = () => true;
+        process.nextTick(() => child.emit("close", 0));
+        return child;
+      }) as any,
+    });
+    return { result, calls };
+  } catch (error) {
+    return { error, calls };
+  }
+}
+
+const rootLookup = await runParentLookupFixture("/main", "/main|\n");
+assert.match(String(rootLookup.error), /\/main is a root branch with no parent/, "a matched root row must not be reported as not found");
+const missingLookup = await runParentLookupFixture("/missing", "");
+assert.match(String(missingLookup.error), /Plastic found no matching branch row/, "an empty result must be reported as not found");
+const malformedLookup = await runParentLookupFixture("/malformed", "missing-separator\n");
+assert.match(String(malformedLookup.error), /returned unusable output/, "malformed branch rows must be rejected");
+const ambiguousLookup = await runParentLookupFixture("/ambiguous", "/ambiguous|/main\n/ambiguous|/other\n");
+assert.match(String(ambiguousLookup.error), /returned unusable output/, "ambiguous branch rows must be rejected");
+const explicitTargetLookup = await runParentLookupFixture("/source", "/not-used|/main\n", "/target");
+assert.equal(explicitTargetLookup.calls.filter((call) => call.args[0] === "find").length, 0, "an explicit target must bypass parent lookup");
+assert.match(String(explicitTargetLookup.result), /Target branch: \/target/, "explicit target preflight should proceed without lookup");
 
 console.log("PASS: Plastic direct mutation execution tests passed");
