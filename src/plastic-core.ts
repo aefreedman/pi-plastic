@@ -1217,6 +1217,47 @@ const isSwitchBringBlockedForUnattended = (pendingChoice: "shelve" | "bring" | "
     return pendingChoice === "bring" && profile.hasTrackedPendingChanges;
 };
 
+type CanceledSwitchOutcome = {
+    kind: "canceled";
+    strategy: "cancel-with-pending";
+    branchBefore: string;
+    branchTarget: string;
+    pendingSummary: PendingSummary;
+    pendingSummaryDetailed: PendingItemSummary;
+    pendingPolicy: "cancel";
+    defaultedPolicy: boolean;
+    reason: string;
+};
+
+const createCanceledSwitchOutcome = (
+    branchBefore: string,
+    branchTarget: string,
+    pendingSummary: PendingSummary,
+    pendingSummaryDetailed: PendingItemSummary,
+    pendingChoice: "shelve" | "bring" | "cancel",
+    defaultedPolicy: boolean,
+): CanceledSwitchOutcome | undefined =>
+{
+    if (pendingChoice !== "cancel" || pendingSummaryDetailed.totalPending === 0 || isSameBranchSpec(branchBefore, branchTarget))
+    {
+        return undefined;
+    }
+
+    return {
+        kind: "canceled",
+        strategy: "cancel-with-pending",
+        branchBefore,
+        branchTarget,
+        pendingSummary,
+        pendingSummaryDetailed,
+        pendingPolicy: "cancel",
+        defaultedPolicy,
+        reason: defaultedPolicy
+            ? "Switch canceled because pending changes were detected and the default policy is cancel unless pendingChanges is set."
+            : "Switch canceled because pending changes were detected and pendingChanges was set to cancel.",
+    };
+};
+
 const canSwitchDirectWithPrivateOnlyPending = (
     pendingChoice: "shelve" | "bring" | "cancel",
     defaultedPolicy: boolean,
@@ -4047,11 +4088,17 @@ export const switchBranch = tool({
             throw new Error(reason);
         }
 
-        if (pendingChoice === "cancel")
+        const canceledOutcome = createCanceledSwitchOutcome(
+            branchBefore,
+            args.branch,
+            pendingSummary,
+            pendingSummaryDetailed,
+            pendingChoice,
+            defaulted,
+        );
+        if (canceledOutcome)
         {
-            const reason = defaulted
-                ? "Switch canceled because pending changes were detected and the default policy is cancel unless pendingChanges is set."
-                : "Switch canceled because pending changes were detected and pendingChanges was set to cancel.";
+            const reason = canceledOutcome.reason;
             if (preflight)
             {
                 return toStructuredResult(
@@ -4448,12 +4495,50 @@ export const mergeToBranch = tool({
             );
         }
 
+        // Inspect the cancel policy as typed data before any target-side mutation.
+        const pendingBeforeSwitchItems = await getMachineReadablePendingItems(args.workdir);
+        const pendingBeforeSwitchDetailed = summarizePendingItems(pendingBeforeSwitchItems, args.workdir ?? process.cwd());
+        const canceledSwitchOutcome = createCanceledSwitchOutcome(
+            startingBranch,
+            targetBranch,
+            toLegacyPendingSummary(pendingBeforeSwitchDetailed),
+            pendingBeforeSwitchDetailed,
+            "cancel",
+            false,
+        );
+        if (canceledSwitchOutcome)
+        {
+            return toStructuredResult(
+                "merge-to-branch",
+                format,
+                [
+                    "## Merge To Branch Blocked",
+                    "",
+                    `- Source branch: ${sourceBranch}`,
+                    `- Target branch: ${targetBranch}`,
+                    `- ${canceledSwitchOutcome.reason}`,
+                    "- No switch, update, merge, checkin, or shelveset command was run.",
+                ].join("\n"),
+                {
+                    sourceBranch,
+                    targetBranch,
+                    switchOutcome: canceledSwitchOutcome,
+                    checkedIn: false,
+                },
+                args.workdir,
+                [canceledSwitchOutcome.reason],
+                "Resolve or shelve pending changes before retrying the merge closeout.",
+            );
+        }
+
         const switchResult = await switchBranch.execute({
             branch: targetBranch,
             pendingChanges: "cancel",
             format: "json",
             workdir: args.workdir,
         });
+        const branchAfterSwitch = await resolveCurrentBranchName(args.workdir);
+        assertWorkspaceOnBranch(branchAfterSwitch, targetBranch, "branch switch and before target update");
         const updateResult = updateTarget ? await update.execute({ workdir: args.workdir }) : "(skipped)";
         const branchBeforeMerge = await resolveCurrentBranchName(args.workdir);
         assertWorkspaceOnBranch(branchBeforeMerge, targetBranch, "target update and before merge");
