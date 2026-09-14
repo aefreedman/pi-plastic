@@ -7,6 +7,8 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.5.7] - 2026-09-14
+
 ### Fixed
 
 - Bind automatic pending-file diff bases to the owning workspace or Xlink repository/server before materialization, preventing colliding revision IDs from another repository from producing plausible but unrelated diffs. Unresolved ownership is reported as unavailable.
