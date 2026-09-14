@@ -7,6 +7,13 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.5.8] - 2026-09-15
+
+### Fixed
+
+- Resolve pending-diff workspace containment and Xlink ownership by filesystem identity when a workspace is accessed through a real filesystem alias, while retaining the caller's lexical path for Plastic commands and displayed paths. Missing deleted or moved ownership ancestors still fail closed.
+- Retry only npm registry E404 availability checks for a bounded period after trusted publishing; a mismatched, malformed, or unauthorized release identity still fails immediately.
+
 ## [0.5.7] - 2026-09-14
 
 ### Fixed
