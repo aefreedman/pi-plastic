@@ -313,6 +313,7 @@ type PendingItem = {
     kind: PendingItemKind;
     revisionId?: string;
     sourceWorkspacePath?: string;
+    baseRepository?: string;
 };
 
 type PendingItemSummary = {
@@ -1741,6 +1742,122 @@ const materializeRevision = async (revision: string, destination: string, workdi
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(message.split(destination).join("<package-owned-temp-file>"));
     }
+};
+
+type PendingBaseIdentityResolver = {
+    resolve: (item: PendingItem) => Promise<string>;
+};
+
+const parseRepositorySelector = (output: string): string | null =>
+{
+    const match = output.match(/^\s*repository\s+(?:"([^"]+)"|(\S+))\s*$/mi);
+    const repository = match?.[1] ?? match?.[2];
+    return repository && /^[^\u0000-\u001f\u007f]+@[^\u0000-\u001f\u007f]+$/.test(repository) ? repository : null;
+};
+
+const parseXlinkRepositorySelector = (output: string): string | null =>
+{
+    // `cm xlink --show` reports wxlink:<serverpath>@<loaded-revision>@<repository>@<server>.
+    // Preserve the repository/server suffix intact because cloud server identities can contain @.
+    const match = output.match(/^.+?\s+-->\s+wxlink:.+?@(?:\d+|cs:\d+)@(.+)\s*$/mi);
+    const repository = match?.[1]?.trim();
+    return repository && /^[^\u0000-\u001f\u007f]+@[^\u0000-\u001f\u007f]+$/.test(repository) ? repository : null;
+};
+
+const isNotXlinkError = (error: unknown): boolean => /\bis not an xlink\.?\s*$/i.test(error instanceof Error ? error.message.trim() : String(error).trim());
+
+const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): PendingBaseIdentityResolver =>
+{
+    const root = toNormalizedAbsolutePath(".", cwd);
+    const xlinkLookups = new Map<string, Promise<string | null>>();
+    let workspaceRepository: Promise<string> | undefined;
+    const getWorkspaceRepository = (): Promise<string> =>
+    {
+        workspaceRepository ??= runCmRaw(["showselector"], workdir).then((output) =>
+        {
+            const repository = parseRepositorySelector(output);
+            if (!repository)
+            {
+                throw new Error("Plastic returned no repository/server identity for this workspace.");
+            }
+            return repository;
+        });
+        return workspaceRepository;
+    };
+    const getXlinkRepository = (candidate: string): Promise<string | null> =>
+    {
+        const key = toPathComparisonKeyFromAbsolutePath(candidate);
+        let lookup = xlinkLookups.get(key);
+        if (!lookup)
+        {
+            lookup = runCmRaw(["xlink", "--show", candidate], workdir)
+                .then((output) =>
+                {
+                    const repository = parseXlinkRepositorySelector(output);
+                    if (!repository)
+                    {
+                        throw new Error(`Plastic returned malformed Xlink ownership for '${candidate}'.`);
+                    }
+                    return repository;
+                })
+                .catch((error) =>
+                {
+                    if (isNotXlinkError(error))
+                    {
+                        return null;
+                    }
+                    throw error;
+                });
+            xlinkLookups.set(key, lookup);
+        }
+        return lookup;
+    };
+
+    return {
+        async resolve(item)
+        {
+            if (!item.revisionId)
+            {
+                throw new Error(`Plastic status did not provide a base revision ID for '${item.workspacePath}'.`);
+            }
+            const ownershipPath = item.kind === "moved" && item.sourceWorkspacePath
+                ? toNormalizedAbsolutePath(item.sourceWorkspacePath, cwd)
+                : item.normalizedPath;
+            if (!isWithinPathScope(toPathComparisonKeyFromAbsolutePath(ownershipPath), toPathComparisonKeyFromAbsolutePath(root)))
+            {
+                throw new Error(`Plastic cannot resolve an owning repository for '${item.workspacePath}' outside the requested workspace.`);
+            }
+            let candidate = dirname(ownershipPath);
+            while (isWithinPathScope(toPathComparisonKeyFromAbsolutePath(candidate), toPathComparisonKeyFromAbsolutePath(root)))
+            {
+                // A missing ancestor can be a removed Xlink mount. Status does not
+                // retain ownership, so parent-repository fallback would be unsafe.
+                if ((item.kind === "deleted" || item.kind === "moved") && !(await fs.stat(candidate).catch(() => null)))
+                {
+                    throw new Error(`Plastic cannot resolve the owning repository for '${item.workspacePath}' because an ownership ancestor is missing.`);
+                }
+                const repository = await getXlinkRepository(candidate);
+                if (repository)
+                {
+                    item.baseRepository = repository;
+                    return `revid:${item.revisionId}@rep:${repository}`;
+                }
+                if (candidate === root)
+                {
+                    break;
+                }
+                const parent = dirname(candidate);
+                if (parent === candidate)
+                {
+                    break;
+                }
+                candidate = parent;
+            }
+            const repository = await getWorkspaceRepository();
+            item.baseRepository = repository;
+            return `revid:${item.revisionId}@rep:${repository}`;
+        },
+    };
 };
 
 const normalizeDiffResponseMaxChars = (value: unknown): number =>
@@ -3172,6 +3289,7 @@ type WorkspacePendingDiff = {
 const diffPendingWorkspaceFile = async (
     args: { path: string; workdir?: string },
     pendingItem?: PendingItem,
+    baseIdentityResolver?: PendingBaseIdentityResolver,
 ): Promise<WorkspacePendingDiff> =>
 {
     const cwd = args.workdir ?? process.cwd();
@@ -3195,10 +3313,18 @@ const diffPendingWorkspaceFile = async (
             ? `${revisionPath} (empty before private/new file)`
             : workspaceBase.resolved.includes("#") ? workspaceBase.resolved.replace("#", "@") : `${revisionPath} (Plastic base)`;
     const rightLabel = isDeleted ? `${displayPath} (empty after delete)` : `${displayPath} (workspace)`;
-    const materializeSpec = pendingItem?.revisionId ? `revid:${pendingItem.revisionId}` : workspaceBase.resolved;
     if (isDeleted && !pendingItem?.revisionId)
     {
         throw new Error(`Plastic status identified '${args.path}' as deleted but did not provide its base revision ID.`);
+    }
+    let materializeSpec = workspaceBase.resolved;
+    if (pendingItem?.revisionId)
+    {
+        if (!baseIdentityResolver)
+        {
+            throw new Error(`Plastic cannot resolve the owning repository for '${args.path}'.`);
+        }
+        materializeSpec = await baseIdentityResolver.resolve(pendingItem);
     }
 
     const tempDir = await createAsciiTempDirectory("plastic-core-");
@@ -3304,14 +3430,14 @@ export const diffFile = tool({
         const workspacePath = toNormalizedAbsolutePath(args.path, cwd);
         const pendingItems = await getMachineReadablePendingItems(args.workdir);
         const pendingItem = pendingItems.find((item) => item.comparisonKey === toPathComparisonKeyFromAbsolutePath(workspacePath));
-        const compared = await diffPendingWorkspaceFile(args, pendingItem);
+        const compared = await diffPendingWorkspaceFile(args, pendingItem, createPendingBaseIdentityResolver(cwd, args.workdir));
         return formatTextDiff(
             "diffFile",
             args.format,
             compared.comparisonKind,
             compared.result,
             args.workdir,
-            { pendingKind: compared.pendingKind, isNew: compared.pendingKind === "private" || compared.pendingKind === "added", statusRevisionId: pendingItem?.revisionId },
+            { pendingKind: compared.pendingKind, isNew: compared.pendingKind === "private" || compared.pendingKind === "added", statusRevisionId: pendingItem?.revisionId, baseRepositoryResolved: Boolean(pendingItem?.baseRepository) },
             args.maxChars,
         );
     },
@@ -3490,6 +3616,7 @@ export const workspaceDiff = tool({
         const skippedByLimit = Math.max(0, candidates.length - maxFiles);
         candidates = candidates.slice(0, maxFiles);
 
+        const baseIdentityResolver = createPendingBaseIdentityResolver(cwd, args.workdir);
         const outcomes: Array<Record<string, unknown>> = [];
         const textSections: string[] = [];
         let totalOutputChars = 0;
@@ -3513,13 +3640,13 @@ export const workspaceDiff = tool({
             }
             try
             {
-                const compared = await diffPendingWorkspaceFile({ path, workdir: args.workdir }, item);
+                const compared = await diffPendingWorkspaceFile({ path, workdir: args.workdir }, item, baseIdentityResolver);
                 const remaining = Math.max(0, WORKSPACE_DIFF_CONTENT_MAX_CHARS - totalOutputChars);
                 const perFile = boundWorkspaceDiffResult(compared.result, maxChars);
                 const bounded = boundWorkspaceDiffResult(perFile, remaining);
                 const status = bounded.binary ? (bounded.changed ? "binary-different" : "unchanged") : (bounded.changed ? "changed" : (compared.comparisonKind === "workspace-added" ? "added-empty" : "unchanged"));
                 const diffOutput = bounded.changed && !bounded.binary ? bounded.output : undefined;
-                outcomes.push({ path: displayPath, kind: item.kind, comparisonKind: compared.comparisonKind, status, changed: bounded.changed, binary: bounded.binary, truncated: bounded.truncated, totalChars: bounded.totalChars, ...(diffOutput ? { diff: diffOutput } : {}) });
+                outcomes.push({ path: displayPath, kind: item.kind, comparisonKind: compared.comparisonKind, status, changed: bounded.changed, binary: bounded.binary, truncated: bounded.truncated, totalChars: bounded.totalChars, baseRepositoryResolved: Boolean(item.baseRepository), ...(diffOutput ? { diff: diffOutput } : {}) });
                 const body = bounded.binary ? (bounded.changed ? "Binary content differs; a text diff is unavailable." : "No differences.") : (bounded.changed ? bounded.output : (status === "added-empty" ? "Added file is empty; no text diff hunks." : "No differences."));
                 const section = `### ${displayPath} (${item.kind})\n${body}`;
                 textSections.push(section);

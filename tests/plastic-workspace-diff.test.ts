@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -36,8 +36,18 @@ function fakeCommands(calls: Call[]) {
         proc.close(0);
         return;
       }
+      if (command === "cm" && args[0] === "showselector") {
+        proc.stdout.write('repository "parent-repository@parent-server"\n  smartbranch "/main"\n');
+        proc.close(0);
+        return;
+      }
+      if (command === "cm" && args[0] === "xlink") {
+        proc.stderr.write(`'${args.at(-1)}' is not an xlink.`);
+        proc.close(1);
+        return;
+      }
       if (command === "cm" && args[0] === "cat") {
-        if (args[1] === "revid:43") {
+        if (args[1] === "revid:43@rep:parent-repository@parent-server" || args[1] === "revid:43") {
           const destination = args.find((arg) => arg.startsWith("--file="))!.slice("--file=".length);
           await writeFile(destination, "");
           proc.stderr.write("Historical data is unavailable because the item was loaded with --nodata.");
@@ -77,8 +87,18 @@ function stressCommands(calls: Call[]) {
         proc.close(0);
         return;
       }
+      if (command === "cm" && args[0] === "showselector") {
+        proc.stdout.write('repository "parent-repository@parent-server"\n  smartbranch "/main"\n');
+        proc.close(0);
+        return;
+      }
+      if (command === "cm" && args[0] === "xlink") {
+        proc.stderr.write(`'${args.at(-1)}' is not an xlink.`);
+        proc.close(1);
+        return;
+      }
       if (command === "cm" && args[0] === "cat") {
-        if (args[1] === "revid:99") {
+        if (args[1] === "revid:99@rep:parent-repository@parent-server") {
           proc.stderr.write(`Failure with JSON-sensitive text \\\" \\\\ ${"x".repeat(5_000)}`);
           proc.close(1);
           return;
@@ -90,6 +110,64 @@ function stressCommands(calls: Call[]) {
       }
       if (args[0] === "-u") {
         proc.stdout.write(`--- left\n+++ right\n${"+\\\"\\\\\n".repeat(30_000)}`);
+        proc.close(1);
+        return;
+      }
+      proc.close(0);
+    });
+    return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
+  }) as typeof import("node:child_process").spawn;
+}
+
+function xlinkCollisionCommands(calls: Call[], root: string) {
+  const statuses = [
+    `CH${statusSeparator}${join(root, "parent.txt")}${statusSeparator}False${statusSeparator}77${statusSeparator}NO_MERGES`,
+    `CH${statusSeparator}${join(root, "link-one", "one.txt")}${statusSeparator}False${statusSeparator}77${statusSeparator}NO_MERGES`,
+    `CH${statusSeparator}${join(root, "link-two", "two.txt")}${statusSeparator}False${statusSeparator}77${statusSeparator}NO_MERGES`,
+    `DE${statusSeparator}${join(root, "removed-xlink", "gone.txt")}${statusSeparator}False${statusSeparator}88${statusSeparator}NO_MERGES`,
+  ].join("\n");
+  const bases: Record<string, string> = {
+    "revid:77@rep:parent-repository@parent-server": "PARENT MARKDOWN\n",
+    "revid:77@rep:linked-repository@linked-server": "XLINK ONE CSHARP\n",
+    "revid:77@rep:linked-repository@other-server": "XLINK TWO CSHARP\n",
+  };
+  return ((command: string, args: string[]) => {
+    const proc = new FakeChildProcess();
+    calls.push({ command, args });
+    queueMicrotask(async () => {
+      if (command === "cm" && args[0] === "status") {
+        proc.stdout.write(statuses);
+        proc.close(0);
+        return;
+      }
+      if (command === "cm" && args[0] === "showselector") {
+        proc.stdout.write('repository "parent-repository@parent-server"\n  smartbranch "/main"\n');
+        proc.close(0);
+        return;
+      }
+      if (command === "cm" && args[0] === "xlink") {
+        const candidate = args.at(-1)!;
+        const repository = candidate.endsWith("link-one") ? "linked-repository@linked-server"
+          : candidate.endsWith("link-two") ? "linked-repository@other-server" : null;
+        if (!repository) {
+          proc.stderr.write(`'${candidate}' is not an xlink.`);
+          proc.close(1);
+          return;
+        }
+        proc.stdout.write(`${candidate} --> wxlink:linked:/@77@${repository}\n`);
+        proc.close(0);
+        return;
+      }
+      if (command === "cm" && args[0] === "cat") {
+        const base = bases[args[1]];
+        assert(base, `Unexpected unqualified or incorrect revision spec: ${args[1]}`);
+        await writeFile(args.find((arg) => arg.startsWith("--file="))!.slice("--file=".length), base);
+        proc.close(0);
+        return;
+      }
+      if (args[0] === "-u") {
+        const left = await readFile(args[1], "utf8");
+        proc.stdout.write(`--- left\n+++ right\n@@ -1 +1 @@\n-${left.trim()}\n+workspace\n`);
         proc.close(1);
         return;
       }
@@ -135,13 +213,37 @@ try {
   const historicalUnicodeBackendCall = historicalUnicodeCalls.find((call) => call.args[0] === "-u");
   assert(historicalUnicodeBackendCall && historicalUnicodeBackendCall.args.every((arg) => /^[\x20-\x7e]*$/.test(arg)), "The diff backend must receive only ASCII-safe materialized operands for a Unicode historical path.");
 
+  const collisionRoot = join(root, "collision");
+  await mkdir(join(collisionRoot, "link-one"), { recursive: true });
+  await mkdir(join(collisionRoot, "link-two"), { recursive: true });
+  await Promise.all([
+    writeFile(join(collisionRoot, "parent.txt"), "workspace\n"),
+    writeFile(join(collisionRoot, "link-one", "one.txt"), "workspace\n"),
+    writeFile(join(collisionRoot, "link-two", "two.txt"), "workspace\n"),
+  ]);
+  const collisionCalls: Call[] = [];
+  const xlinkFileDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/one.txt", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
+  assert.match(String(xlinkFileDiff), /XLINK ONE CSHARP/, "Focused workspace diffs must materialize the xlink base, not colliding parent bytes.");
+  const xlinkWorkspaceDiff = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ allPending: true, maxFiles: 3, workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
+  assert.match(String(xlinkWorkspaceDiff), /XLINK ONE CSHARP/);
+  assert.match(String(xlinkWorkspaceDiff), /XLINK TWO CSHARP/);
+  assert(collisionCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:77@rep:linked-repository@linked-server"), "Xlink bases must use a repository-qualified selector.");
+  assert(collisionCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:77@rep:linked-repository@other-server"), "Same-name repositories on different servers must retain distinct identities.");
+  assert(!collisionCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:77"), "Automatic pending diffs must never materialize a bare revision ID.");
+  await assert.rejects(
+    () => runWithAbortSignal(undefined, () => diffFile.execute({ path: "removed-xlink/gone.txt", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) }),
+    /owning repository.*ownership ancestor is missing/i,
+    "A deleted path below a removed Xlink mount must fail unavailable rather than use the parent repository.",
+  );
+  assert(!collisionCalls.some((call) => call.args[0] === "cat" && call.args[1].startsWith("revid:88")), "Ambiguous ownership must not materialize any revision.");
+
   const changedCalls: Call[] = [];
   await runWithAbortSignal(undefined, () => diffFile.execute({ path: "changed.txt", workdir: root, format: "text" }), { spawn: fakeCommands(changedCalls) });
-  assert(changedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:41"), "Changed files must use the status revision ID for safe base materialization.");
+  assert(changedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:41@rep:parent-repository@parent-server"), "Changed files must bind the status revision ID to the owning repository.");
 
   const deletedCalls: Call[] = [];
   await runWithAbortSignal(undefined, () => diffFile.execute({ path: "deleted.txt", workdir: root, format: "text" }), { spawn: fakeCommands(deletedCalls) });
-  assert(deletedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:42"), "Deleted files must materialize their status base before comparing it to empty content.");
+  assert(deletedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:42@rep:parent-repository@parent-server"), "Deleted files must bind their status base to the owning repository before comparison.");
 
   await assert.rejects(
     () => runWithAbortSignal(undefined, () => diffFile.execute({ path: "nodata.txt", workdir: root, format: "text" }), { spawn: fakeCommands([]) }),
@@ -201,7 +303,7 @@ try {
   assert.match(String(batchResult), /changed\.txt \(changed\)/);
   assert.match(String(batchResult), /nodata\.txt \(changed\)\nUnavailable: Plastic cannot supply historical\/base bytes/);
   assert.match(String(batchResult), /moved destination\.txt \(moved\)/, "Workspace review must compare a moved destination path.");
-  assert(batchCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:44"), "Moved files must materialize their status revision before destination comparison.");
+  assert(batchCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:44@rep:parent-repository@parent-server"), "Moved files must bind their status revision to the source owning repository before destination comparison.");
   assert.doesNotMatch(String(batchResult), /private\.txt \(private\)/, "Batch review must exclude private files by default.");
   const batchStatusCalls = batchCalls.filter((call) => call.command === "cm" && call.args[0] === "status");
   assert.match(String(batchResult), /added-empty\.txt \(added\)\nAdded file is empty/, "Workspace text output must expose added-empty semantics.");
