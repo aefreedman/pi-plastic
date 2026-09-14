@@ -25,8 +25,8 @@ function fakeCommands(calls: Call[]) {
       if (command === "cm" && args[0] === "status") {
         proc.stdout.write([
           `CH${statusSeparator}changed.txt${statusSeparator}False${statusSeparator}41${statusSeparator}NO_MERGES`,
-          `PR${statusSeparator}private.txt${statusSeparator}False${statusSeparator}0${statusSeparator}NO_MERGES`,
-          `AD${statusSeparator}added.txt${statusSeparator}False${statusSeparator}0${statusSeparator}NO_MERGES`,
+          `PR${statusSeparator}private.txt${statusSeparator}False${statusSeparator}45${statusSeparator}NO_MERGES`,
+          `AD${statusSeparator}added.txt${statusSeparator}False${statusSeparator}46${statusSeparator}NO_MERGES`,
           `AD${statusSeparator}added-empty.txt${statusSeparator}False${statusSeparator}0${statusSeparator}NO_MERGES`,
           `AD${statusSeparator}über added.txt${statusSeparator}False${statusSeparator}0${statusSeparator}NO_MERGES`,
           `DE${statusSeparator}deleted.txt${statusSeparator}False${statusSeparator}42${statusSeparator}NO_MERGES`,
@@ -47,7 +47,7 @@ function fakeCommands(calls: Call[]) {
         return;
       }
       if (command === "cm" && args[0] === "cat") {
-        if (args[1] === "revid:43@rep:parent-repository@parent-server" || args[1] === "revid:43") {
+        if (args[1] === "revid:43@rep:parent-repository@repserver:parent-server" || args[1] === "revid:43") {
           const destination = args.find((arg) => arg.startsWith("--file="))!.slice("--file=".length);
           await writeFile(destination, "");
           proc.stderr.write("Historical data is unavailable because the item was loaded with --nodata.");
@@ -98,7 +98,7 @@ function stressCommands(calls: Call[]) {
         return;
       }
       if (command === "cm" && args[0] === "cat") {
-        if (args[1] === "revid:99@rep:parent-repository@parent-server") {
+        if (args[1] === "revid:99@rep:parent-repository@repserver:parent-server") {
           proc.stderr.write(`Failure with JSON-sensitive text \\\" \\\\ ${"x".repeat(5_000)}`);
           proc.close(1);
           return;
@@ -124,12 +124,16 @@ function xlinkCollisionCommands(calls: Call[], root: string) {
     `CH${statusSeparator}${join(root, "parent.txt")}${statusSeparator}False${statusSeparator}77${statusSeparator}NO_MERGES`,
     `CH${statusSeparator}${join(root, "link-one", "one.txt")}${statusSeparator}False${statusSeparator}77${statusSeparator}NO_MERGES`,
     `CH${statusSeparator}${join(root, "link-two", "two.txt")}${statusSeparator}False${statusSeparator}77${statusSeparator}NO_MERGES`,
+    `CH${statusSeparator}${join(root, "link-one", "partial", "nested.cs")}${statusSeparator}False${statusSeparator}79${statusSeparator}NO_MERGES`,
+    `MV${statusSeparator}100%${statusSeparator}${join(root, "link-one", "source.cs")}${statusSeparator}${join(root, "link-one", "moved.cs")}${statusSeparator}False${statusSeparator}78${statusSeparator}NO_MERGES`,
     `DE${statusSeparator}${join(root, "removed-xlink", "gone.txt")}${statusSeparator}False${statusSeparator}88${statusSeparator}NO_MERGES`,
   ].join("\n");
   const bases: Record<string, string> = {
-    "revid:77@rep:parent-repository@parent-server": "PARENT MARKDOWN\n",
-    "revid:77@rep:linked-repository@linked-server": "XLINK ONE CSHARP\n",
-    "revid:77@rep:linked-repository@other-server": "XLINK TWO CSHARP\n",
+    "revid:77@rep:parent-repository@repserver:parent-server": "PARENT MARKDOWN\n",
+    "revid:77@rep:linked-repository@repserver:linked-server": "XLINK ONE CSHARP\n",
+    "revid:77@rep:linked-repository@repserver:other-server": "XLINK TWO CSHARP\n",
+    "revid:78@rep:linked-repository@repserver:linked-server": "XLINK MOVE CSHARP\n",
+    "revid:79@rep:partial-repository@repserver:cloud@partial-server": "PARTIAL XLINK CSHARP\n",
   };
   return ((command: string, args: string[]) => {
     const proc = new FakeChildProcess();
@@ -147,8 +151,9 @@ function xlinkCollisionCommands(calls: Call[], root: string) {
       }
       if (command === "cm" && args[0] === "xlink") {
         const candidate = args.at(-1)!;
-        const repository = candidate.endsWith("link-one") ? "linked-repository@linked-server"
-          : candidate.endsWith("link-two") ? "linked-repository@other-server" : null;
+        const repository = candidate.endsWith("partial") ? "partial-repository@cloud@partial-server"
+          : candidate.endsWith("link-one") ? "linked-repository@linked-server"
+            : candidate.endsWith("link-two") ? "linked-repository@other-server" : null;
         if (!repository) {
           proc.stderr.write(`'${candidate}' is not an xlink.`);
           proc.close(1);
@@ -185,6 +190,8 @@ const jsonPayload = (result: unknown): Record<string, unknown> => {
 
 const root = await mkdtemp(join(tmpdir(), "pi-plastic-workspace-diff-"));
 try {
+  await mkdir(join(root, ".plastic"));
+  await writeFile(join(root, ".plastic", "plastic.workspace"), "synthetic workspace marker\n");
   for (const name of ["changed.txt", "private.txt", "added.txt", "nodata.txt", "moved destination.txt", "über added.txt"]) {
     await writeFile(join(root, name), `workspace ${name}\n`);
   }
@@ -194,6 +201,10 @@ try {
   const privateResult = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "private.txt", workdir: root, format: "text" }), { spawn: fakeCommands(privateCalls) });
   assert.match(String(privateResult), /empty before private\/new file/, "Explicitly selected private files must compare against an empty base with a private/new label.");
   assert.equal(privateCalls.filter((call) => call.command === "cm" && call.args[0] === "cat").length, 0, "Private/new files must not materialize a historical base.");
+  assert.equal(privateCalls.filter((call) => call.command === "cm" && (call.args[0] === "xlink" || call.args[0] === "showselector")).length, 0, "Private files must skip ownership lookup even when status includes an ID.");
+  const addedCalls: Call[] = [];
+  await runWithAbortSignal(undefined, () => diffFile.execute({ path: "added.txt", workdir: root, format: "text" }), { spawn: fakeCommands(addedCalls) });
+  assert.equal(addedCalls.filter((call) => call.command === "cm" && (call.args[0] === "xlink" || call.args[0] === "showselector" || call.args[0] === "cat")).length, 0, "Added files must skip historical ownership lookup even when status includes an ID.");
 
   const addedEmptyText = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "added-empty.txt", workdir: root, format: "text" }), { spawn: fakeCommands([]) });
   assert.match(String(addedEmptyText), /Added file is empty/, "An added empty file must not be rendered as generic unchanged text.");
@@ -214,21 +225,30 @@ try {
   assert(historicalUnicodeBackendCall && historicalUnicodeBackendCall.args.every((arg) => /^[\x20-\x7e]*$/.test(arg)), "The diff backend must receive only ASCII-safe materialized operands for a Unicode historical path.");
 
   const collisionRoot = join(root, "collision");
-  await mkdir(join(collisionRoot, "link-one"), { recursive: true });
+  await mkdir(join(collisionRoot, "link-one", "partial"), { recursive: true });
+  await mkdir(join(collisionRoot, "link-one", "deep"), { recursive: true });
   await mkdir(join(collisionRoot, "link-two"), { recursive: true });
   await Promise.all([
     writeFile(join(collisionRoot, "parent.txt"), "workspace\n"),
     writeFile(join(collisionRoot, "link-one", "one.txt"), "workspace\n"),
+    writeFile(join(collisionRoot, "link-one", "partial", "nested.cs"), "workspace\n"),
+    writeFile(join(collisionRoot, "link-one", "moved.cs"), "workspace\n"),
     writeFile(join(collisionRoot, "link-two", "two.txt"), "workspace\n"),
   ]);
   const collisionCalls: Call[] = [];
   const xlinkFileDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/one.txt", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
   assert.match(String(xlinkFileDiff), /XLINK ONE CSHARP/, "Focused workspace diffs must materialize the xlink base, not colliding parent bytes.");
+  const subdirectoryDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "../one.txt", workdir: join(collisionRoot, "link-one", "deep"), format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
+  assert.match(String(subdirectoryDiff), /XLINK ONE CSHARP/, "Resolution from beneath an Xlink must inspect the enclosing mount up to the workspace root.");
+  const partialXlinkDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/partial/nested.cs", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
+  assert.match(String(partialXlinkDiff), /PARTIAL XLINK CSHARP/, "Nested partial Xlinks must resolve their nearest owning repository.");
+  const movedXlinkDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/moved.cs", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
+  assert.match(String(movedXlinkDiff), /XLINK MOVE CSHARP/, "Moved Xlink files must resolve the base from their source owner.");
   const xlinkWorkspaceDiff = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ allPending: true, maxFiles: 3, workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
   assert.match(String(xlinkWorkspaceDiff), /XLINK ONE CSHARP/);
   assert.match(String(xlinkWorkspaceDiff), /XLINK TWO CSHARP/);
-  assert(collisionCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:77@rep:linked-repository@linked-server"), "Xlink bases must use a repository-qualified selector.");
-  assert(collisionCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:77@rep:linked-repository@other-server"), "Same-name repositories on different servers must retain distinct identities.");
+  assert(collisionCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:77@rep:linked-repository@repserver:linked-server"), "Xlink bases must use the documented repository-qualified selector.");
+  assert(collisionCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:77@rep:linked-repository@repserver:other-server"), "Same-name repositories on different servers must retain distinct identities.");
   assert(!collisionCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:77"), "Automatic pending diffs must never materialize a bare revision ID.");
   await assert.rejects(
     () => runWithAbortSignal(undefined, () => diffFile.execute({ path: "removed-xlink/gone.txt", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) }),
@@ -239,11 +259,11 @@ try {
 
   const changedCalls: Call[] = [];
   await runWithAbortSignal(undefined, () => diffFile.execute({ path: "changed.txt", workdir: root, format: "text" }), { spawn: fakeCommands(changedCalls) });
-  assert(changedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:41@rep:parent-repository@parent-server"), "Changed files must bind the status revision ID to the owning repository.");
+  assert(changedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:41@rep:parent-repository@repserver:parent-server"), "Changed files must bind the status revision ID to the owning repository.");
 
   const deletedCalls: Call[] = [];
   await runWithAbortSignal(undefined, () => diffFile.execute({ path: "deleted.txt", workdir: root, format: "text" }), { spawn: fakeCommands(deletedCalls) });
-  assert(deletedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:42@rep:parent-repository@parent-server"), "Deleted files must bind their status base to the owning repository before comparison.");
+  assert(deletedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:42@rep:parent-repository@repserver:parent-server"), "Deleted files must bind their status base to the owning repository before comparison.");
 
   await assert.rejects(
     () => runWithAbortSignal(undefined, () => diffFile.execute({ path: "nodata.txt", workdir: root, format: "text" }), { spawn: fakeCommands([]) }),
@@ -303,7 +323,7 @@ try {
   assert.match(String(batchResult), /changed\.txt \(changed\)/);
   assert.match(String(batchResult), /nodata\.txt \(changed\)\nUnavailable: Plastic cannot supply historical\/base bytes/);
   assert.match(String(batchResult), /moved destination\.txt \(moved\)/, "Workspace review must compare a moved destination path.");
-  assert(batchCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:44@rep:parent-repository@parent-server"), "Moved files must bind their status revision to the source owning repository before destination comparison.");
+  assert(batchCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:44@rep:parent-repository@repserver:parent-server"), "Moved files must bind their status revision to the source owning repository before destination comparison.");
   assert.doesNotMatch(String(batchResult), /private\.txt \(private\)/, "Batch review must exclude private files by default.");
   const batchStatusCalls = batchCalls.filter((call) => call.command === "cm" && call.args[0] === "status");
   assert.match(String(batchResult), /added-empty\.txt \(added\)\nAdded file is empty/, "Workspace text output must expose added-empty semantics.");

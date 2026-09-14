@@ -1748,30 +1748,55 @@ type PendingBaseIdentityResolver = {
     resolve: (item: PendingItem) => Promise<string>;
 };
 
-const parseRepositorySelector = (output: string): string | null =>
-{
-    const match = output.match(/^\s*repository\s+(?:"([^"]+)"|(\S+))\s*$/mi);
-    const repository = match?.[1] ?? match?.[2];
-    return repository && /^[^\u0000-\u001f\u007f]+@[^\u0000-\u001f\u007f]+$/.test(repository) ? repository : null;
+type RepositoryIdentity = {
+    repository: string;
+    server: string;
 };
 
-const parseXlinkRepositorySelector = (output: string): string | null =>
+const parseRepositoryIdentity = (selector: string | undefined): RepositoryIdentity | null =>
+{
+    if (!selector || /[\u0000-\u001f\u007f]/.test(selector))
+    {
+        return null;
+    }
+    // Repository names cannot contain @; cloud server names can (for example,
+    // an organization-qualified cloud endpoint), so split only at the first @.
+    const separator = selector.indexOf("@");
+    if (separator <= 0 || separator === selector.length - 1)
+    {
+        return null;
+    }
+    return { repository: selector.slice(0, separator), server: selector.slice(separator + 1) };
+};
+
+const parseRepositorySelector = (output: string): RepositoryIdentity | null =>
+{
+    const match = output.match(/^\s*repository\s+(?:"([^"]+)"|(\S+))\s*$/mi);
+    return parseRepositoryIdentity(match?.[1] ?? match?.[2]);
+};
+
+const parseXlinkRepositorySelector = (output: string): RepositoryIdentity | null =>
 {
     // `cm xlink --show` reports wxlink:<serverpath>@<loaded-revision>@<repository>@<server>.
-    // Preserve the repository/server suffix intact because cloud server identities can contain @.
     const match = output.match(/^.+?\s+-->\s+wxlink:.+?@(?:\d+|cs:\d+)@(.+)\s*$/mi);
-    const repository = match?.[1]?.trim();
-    return repository && /^[^\u0000-\u001f\u007f]+@[^\u0000-\u001f\u007f]+$/.test(repository) ? repository : null;
+    return parseRepositoryIdentity(match?.[1]?.trim());
 };
 
 const isNotXlinkError = (error: unknown): boolean => /\bis not an xlink\.?\s*$/i.test(error instanceof Error ? error.message.trim() : String(error).trim());
 
 const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): PendingBaseIdentityResolver =>
 {
-    const root = toNormalizedAbsolutePath(".", cwd);
-    const xlinkLookups = new Map<string, Promise<string | null>>();
-    let workspaceRepository: Promise<string> | undefined;
-    const getWorkspaceRepository = (): Promise<string> =>
+    const workspaceRoot = discoverPlasticWorkspace(cwd).then((outcome) =>
+    {
+        if (outcome.kind !== "found")
+        {
+            throw new Error(`Plastic cannot determine the workspace root for pending base resolution: ${outcome.kind === "unavailable" ? outcome.reason : "no workspace marker found"}.`);
+        }
+        return toNormalizedAbsolutePath(outcome.value.root, cwd);
+    });
+    const xlinkLookups = new Map<string, Promise<RepositoryIdentity | null>>();
+    let workspaceRepository: Promise<RepositoryIdentity> | undefined;
+    const getWorkspaceRepository = (): Promise<RepositoryIdentity> =>
     {
         workspaceRepository ??= runCmRaw(["showselector"], workdir).then((output) =>
         {
@@ -1784,7 +1809,7 @@ const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): Pendi
         });
         return workspaceRepository;
     };
-    const getXlinkRepository = (candidate: string): Promise<string | null> =>
+    const getXlinkRepository = (candidate: string): Promise<RepositoryIdentity | null> =>
     {
         const key = toPathComparisonKeyFromAbsolutePath(candidate);
         let lookup = xlinkLookups.get(key);
@@ -1820,6 +1845,7 @@ const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): Pendi
             {
                 throw new Error(`Plastic status did not provide a base revision ID for '${item.workspacePath}'.`);
             }
+            const root = await workspaceRoot;
             const ownershipPath = item.kind === "moved" && item.sourceWorkspacePath
                 ? toNormalizedAbsolutePath(item.sourceWorkspacePath, cwd)
                 : item.normalizedPath;
@@ -1839,8 +1865,8 @@ const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): Pendi
                 const repository = await getXlinkRepository(candidate);
                 if (repository)
                 {
-                    item.baseRepository = repository;
-                    return `revid:${item.revisionId}@rep:${repository}`;
+                    item.baseRepository = `${repository.repository}@${repository.server}`;
+                    return `revid:${item.revisionId}@rep:${repository.repository}@repserver:${repository.server}`;
                 }
                 if (candidate === root)
                 {
@@ -1854,8 +1880,8 @@ const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): Pendi
                 candidate = parent;
             }
             const repository = await getWorkspaceRepository();
-            item.baseRepository = repository;
-            return `revid:${item.revisionId}@rep:${repository}`;
+            item.baseRepository = `${repository.repository}@${repository.server}`;
+            return `revid:${item.revisionId}@rep:${repository.repository}@repserver:${repository.server}`;
         },
     };
 };
@@ -3318,7 +3344,7 @@ const diffPendingWorkspaceFile = async (
         throw new Error(`Plastic status identified '${args.path}' as deleted but did not provide its base revision ID.`);
     }
     let materializeSpec = workspaceBase.resolved;
-    if (pendingItem?.revisionId)
+    if (pendingItem?.revisionId && !isAdded && !isPrivate)
     {
         if (!baseIdentityResolver)
         {
