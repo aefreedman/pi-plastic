@@ -108,4 +108,27 @@ await assert.rejects(
 assert.equal(failedLookupCalls.filter((call) => ["switch", "update", "merge", "checkin", "shelveset"].includes(call.args[0] ?? "")).length, 0,
   "failed parent lookup must not dispatch a closeout mutation");
 
+const resolvedLookupCalls: SpawnCall[] = [];
+const resolvedLookupPreflight = await runWithAbortSignal(
+  undefined,
+  () => mergeToBranch.execute({ source: "br:/source@repo@server", preflight: true, workdir }),
+  {
+    spawn: ((command: string, args: readonly string[], options: { cwd: string }) => {
+      resolvedLookupCalls.push({ command, args: [...args], cwd: options.cwd });
+      const child = new EventEmitter() as any;
+      const isFind = args[0] === "find";
+      const isPendingQuery = args.includes("--machinereadable");
+      child.stdout = Readable.from([isFind ? "/source|/parent\n" : isPendingQuery ? "" : "Branch: /source\n"]);
+      child.stderr = Readable.from([]);
+      child.stdin = undefined;
+      child.kill = () => true;
+      process.nextTick(() => child.emit("close", 0));
+      return child;
+    }) as any,
+  },
+);
+assert.match(String(resolvedLookupPreflight), /Target branch: \/parent@repo@server/, "verified name|parent rows should preserve qualified parent identity");
+assert.deepEqual(resolvedLookupCalls.find((call) => call.args[0] === "find")?.args.slice(-2), ["--format={name}|{parent}", "--nototal"],
+  "parent lookup must request both branch identity and parent");
+
 console.log("PASS: Plastic direct mutation execution tests passed");

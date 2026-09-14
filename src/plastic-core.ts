@@ -2610,7 +2610,44 @@ const buildMergeInProgressCheckinMessage = async (originalMessage: string, workd
 type BranchParentLookupOutcome =
     | { kind: "resolved"; branch: string; parent: string }
     | { kind: "no-parent-or-not-found"; branch: string; attemptedCandidates: string[] }
+    | { kind: "malformed-output"; branch: string; attemptedCandidates: string[]; diagnostics: string[] }
     | { kind: "command-failed"; branch: string; attemptedCandidates: string[]; diagnostics: string[] };
+
+type BranchParentRow = { name: string; parent?: string };
+
+const parseBranchParentRows = (output: string): BranchParentRow[] | undefined =>
+{
+    const lines = normalizeFindOutputLines(output);
+    const rows: BranchParentRow[] = [];
+    for (const line of lines)
+    {
+        const separator = line.indexOf("|");
+        if (separator <= 0 || line.indexOf("|", separator + 1) !== -1)
+        {
+            return undefined;
+        }
+        const name = line.slice(0, separator).trim();
+        const parent = line.slice(separator + 1).trim();
+        if (!name)
+        {
+            return undefined;
+        }
+        rows.push({ name, ...(parent ? { parent } : {}) });
+    }
+    return rows;
+};
+
+const branchRepositoryQualifier = (branch: string): string | undefined =>
+{
+    const match = branch.trim().match(/^(?:br:)?[^@]+(@.+)$/);
+    return match?.[1];
+};
+
+const branchRepositorySpec = (branch: string): string | undefined =>
+{
+    const qualifier = branchRepositoryQualifier(branch);
+    return qualifier?.slice(1);
+};
 
 const resolveBranchParentName = async (branch: string, workdir?: string): Promise<BranchParentLookupOutcome> =>
 {
@@ -2624,6 +2661,10 @@ const resolveBranchParentName = async (branch: string, workdir?: string): Promis
             .filter((candidate) => candidate.length > 0),
     ));
     const diagnostics: string[] = [];
+    const repositorySpec = branchRepositorySpec(requestedBranch);
+    const repositoryClause = repositorySpec
+        ? ` on repository '${repositorySpec.replace(/'/g, "''")}'`
+        : "";
 
     for (const candidate of candidates)
     {
@@ -2632,14 +2673,34 @@ const resolveBranchParentName = async (branch: string, workdir?: string): Promis
             const output = await runCmRaw([
                 "find",
                 "branch",
-                `where ${cmWhereEquals("name", candidate)}`,
-                "--format={parent}",
+                `where ${cmWhereEquals("name", candidate)}${repositoryClause}`,
+                "--format={name}|{parent}",
                 "--nototal",
             ], workdir);
-            const lines = normalizeFindOutputLines(output);
-            const parent = lines[0]?.trim();
-            if (parent)
+            const rows = parseBranchParentRows(output);
+            if (!rows || rows.length > 1)
             {
+                return {
+                    kind: "malformed-output",
+                    branch: requestedBranch,
+                    attemptedCandidates: candidates,
+                    diagnostics: [`Expected one name|parent row, received ${rows ? rows.length : "malformed"}.`],
+                };
+            }
+            const row = rows[0];
+            if (row && !isSameBranchSpec(row.name, candidate))
+            {
+                return {
+                    kind: "malformed-output",
+                    branch: requestedBranch,
+                    attemptedCandidates: candidates,
+                    diagnostics: ["Returned branch identity did not match the requested selector."],
+                };
+            }
+            if (row?.parent)
+            {
+                const qualifier = branchRepositoryQualifier(requestedBranch);
+                const parent = qualifier && !row.parent.includes("@") ? `${row.parent}${qualifier}` : row.parent;
                 return { kind: "resolved", branch: requestedBranch, parent };
             }
         }
@@ -4455,7 +4516,9 @@ export const mergeToBranch = tool({
         {
             const details = parentLookup?.kind === "command-failed"
                 ? ` Plastic lookup failed: ${parentLookup.diagnostics.join(" | ")}`
-                : " Plastic returned no parent row; this can mean either a root branch or no matching branch.";
+                : parentLookup?.kind === "malformed-output"
+                    ? ` Plastic lookup returned unusable output: ${parentLookup.diagnostics.join(" | ")}`
+                    : " Plastic returned no parent row; this can mean either a root branch or no matching branch.";
             throw new Error(`Unable to resolve the parent branch for ${sourceBranch}. Pass target explicitly.${details}`);
         }
         const resolvedParentBranch = parentLookup?.kind === "resolved" ? parentLookup.parent : undefined;
