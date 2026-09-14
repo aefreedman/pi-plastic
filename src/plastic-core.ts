@@ -13,6 +13,7 @@ type SpawnResult = {
     stderr: string;
     exitCode: number;
     aborted: boolean;
+    timedOut?: boolean;
     stdoutTruncated?: boolean;
     stdoutTotalChars?: number;
     stderrTruncated?: boolean;
@@ -66,7 +67,14 @@ export const runWithAbortSignal = async <T>(
     signal: AbortSignal | undefined,
     fn: () => Promise<T>,
     commandExecution?: SpawnAndCollectDependencies,
-): Promise<T> => abortSignalStorage.run(signal, () => commandExecutionStorage.run(commandExecution, fn));
+): Promise<T> =>
+{
+    const inheritedSignal = getActiveAbortSignal();
+    const inheritedExecution = commandExecutionStorage.getStore();
+    // Nested public-tool execution must retain an injected process seam and the
+    // outer abort signal instead of silently dropping either boundary.
+    return abortSignalStorage.run(signal ?? inheritedSignal, () => commandExecutionStorage.run(commandExecution ?? inheritedExecution, fn));
+};
 
 const writeInput = async (stdin: NodeJS.WritableStream | null | undefined, input: string): Promise<void> =>
 {
@@ -117,6 +125,7 @@ type SpawnAndCollectDependencies = {
     setTimeout?: (callback: () => void, delay: number) => NodeJS.Timeout;
     clearTimeout?: (timeout: NodeJS.Timeout) => void;
     abortKillDelayMs?: number;
+    timeoutMs?: number;
     outputLimitChars?: number;
 };
 
@@ -153,8 +162,10 @@ const spawnAndCollect = async (
     const stdoutPromise = readStream(proc.stdout, dependencies.outputLimitChars);
     const stderrPromise = readStream(proc.stderr, dependencies.outputLimitChars);
     let aborted = false;
+    let timedOut = false;
     let terminalSettled = false;
     let killTimeout: NodeJS.Timeout | undefined;
+    let operationTimeout: NodeJS.Timeout | undefined;
 
     let resolveExit: (exitCode: number) => void;
     let rejectExit: (error: Error) => void;
@@ -188,14 +199,13 @@ const spawnAndCollect = async (
     proc.once("error", onProcessError);
     proc.once("close", onProcessClose);
 
-    const onAbort = () =>
+    const terminate = () =>
     {
         if (terminalSettled)
         {
             return;
         }
 
-        aborted = true;
         try
         {
             proc.kill("SIGTERM");
@@ -220,8 +230,21 @@ const spawnAndCollect = async (
             }
         }, dependencies.abortKillDelayMs ?? 5000);
     };
+    const onAbort = () =>
+    {
+        aborted = true;
+        terminate();
+    };
 
     signal?.addEventListener("abort", onAbort, { once: true });
+    if (dependencies.timeoutMs !== undefined)
+    {
+        operationTimeout = scheduleTimeout(() =>
+        {
+            timedOut = true;
+            terminate();
+        }, dependencies.timeoutMs);
+    }
 
     try
     {
@@ -237,6 +260,7 @@ const spawnAndCollect = async (
             stderr: stderrResult.output,
             exitCode,
             aborted,
+            timedOut,
             stdoutTruncated: stdoutResult.truncated,
             stdoutTotalChars: stdoutResult.totalChars,
             stderrTruncated: stderrResult.truncated,
@@ -251,6 +275,10 @@ const spawnAndCollect = async (
         if (killTimeout)
         {
             cancelTimeout(killTimeout);
+        }
+        if (operationTimeout)
+        {
+            cancelTimeout(operationTimeout);
         }
     }
 };
@@ -4534,6 +4562,8 @@ type ServerMergeParse = {
 };
 
 const SERVER_MERGE_OUTPUT_LIMIT = 16_384;
+const SERVER_MERGE_HELP_TIMEOUT_MS = 3_000;
+const SERVER_MERGE_COMMAND_TIMEOUT_MS = 30_000;
 const serverMergeControlPattern = /[\u0000-\u001f\u007f-\u009f]/;
 const serverMergeCapabilityTokens = ["--to", "--merge", "--nointeractiveresolution", "--machinereadable", "--startlineseparator", "--endlineseparator", "--fieldseparator"];
 
@@ -4596,7 +4626,16 @@ const parseServerMergeOutput = (output: string, separators: { start: string; end
         const start = output.indexOf(separators.start, cursor);
         if (start < 0)
         {
+            if (output.slice(cursor).includes(separators.end) || output.slice(cursor).includes(separators.field))
+            {
+                malformed = true;
+            }
             break;
+        }
+        const prefix = output.slice(cursor, start);
+        if (prefix.includes(separators.end) || prefix.includes(separators.field))
+        {
+            malformed = true;
         }
         const payloadStart = start + separators.start.length;
         const end = output.indexOf(separators.end, payloadStart);
@@ -4624,40 +4663,66 @@ const parseServerMergeOutput = (output: string, separators: { start: string; end
                 if (!["FILE_SRC", "CHANGESET", "STATUS", "FILE_CONFLICT"].includes(operation))
                 {
                     unknownOperations.add(operation);
+                    malformed = true;
                 }
             }
         }
         cursor = end + separators.end.length;
     }
 
-    if (output.includes(separators.end) && records.length === 0)
-    {
-        malformed = true;
-    }
-
     const changesets: Array<{ id: string; branch: string; repository: string; mount: string }> = [];
-    for (const record of records.filter((record) => record.operation === "CHANGESET"))
+    let isAlreadyConnected = false;
+    let hasConflict = false;
+    for (const record of records)
     {
-        const match = record.fields[1]?.match(/^cs:(\d+)@(?<branch>\/[^@]+)@(?<repository>[^@]+) \(mount:'(?<mount>[^']+)'\)$/);
-        if (!match?.groups)
+        switch (record.operation)
         {
-            malformed = true;
-            continue;
+            case "FILE_SRC":
+                if (record.fields.length !== 5 || !record.fields[1]?.startsWith("/") || !record.fields.slice(2).every((field) => /^\d+$/.test(field)))
+                {
+                    malformed = true;
+                }
+                break;
+            case "CHANGESET":
+            {
+                if (record.fields.length !== 2)
+                {
+                    malformed = true;
+                    break;
+                }
+                const match = record.fields[1]?.match(/^cs:(\d+)@(?<branch>\/[^@]+)@(?<repository>[^@]+) \(mount:'(?<mount>[^']+)'\)$/);
+                if (!match?.groups)
+                {
+                    malformed = true;
+                    break;
+                }
+                changesets.push({
+                    id: match[1]!,
+                    branch: match.groups.branch!,
+                    repository: match.groups.repository!,
+                    mount: match.groups.mount!,
+                });
+                break;
+            }
+            case "STATUS":
+                if (record.fields.length !== 3 || record.fields[1] !== "ALREADY_CONNECTED" || record.fields[2] !== "No merges detected" || isAlreadyConnected)
+                {
+                    malformed = true;
+                }
+                isAlreadyConnected = true;
+                break;
+            case "FILE_CONFLICT":
+                if (record.fields.length !== 6 || !record.fields[1]?.startsWith("/") || !record.fields.slice(2).every((field) => /^\d+$/.test(field)))
+                {
+                    malformed = true;
+                }
+                hasConflict = true;
+                break;
+            default:
+                // Unknown operations were recorded above and make the response uncertain.
+                break;
         }
-        changesets.push({
-            id: match[1]!,
-            branch: match.groups.branch!,
-            repository: match.groups.repository!,
-            mount: match.groups.mount!,
-        });
     }
-
-    const statusRecords = records.filter((record) => record.operation === "STATUS");
-    const isAlreadyConnected = statusRecords.length === 1
-        && statusRecords[0]!.fields.length === 3
-        && statusRecords[0]!.fields[1] === "ALREADY_CONNECTED"
-        && statusRecords[0]!.fields[2] === "No merges detected";
-    const hasConflict = records.some((record) => record.operation === "FILE_CONFLICT");
     return { records, malformed, unknownOperations: [...unknownOperations], changesets, isAlreadyConnected, hasConflict };
 };
 
@@ -4677,7 +4742,6 @@ const formatServerMergeResult = async (
         action: "merge-branches",
         outcome,
         toolVersion: TOOL_VERSION,
-        cliVersion: await getCmVersion(),
         data,
     }, null, 2)}\n\`\`\``;
 };
@@ -4686,11 +4750,12 @@ const getServerMergeCapability = async (): Promise<{ supported: boolean; diagnos
 {
     const result = await spawnAndCollect(getCmExecutable(), ["help", "merge"], process.cwd(), undefined, getActiveAbortSignal(), {
         ...(commandExecutionStorage.getStore() ?? {}),
+        timeoutMs: SERVER_MERGE_HELP_TIMEOUT_MS,
         outputLimitChars: SERVER_MERGE_OUTPUT_LIMIT,
     });
     const output = [result.stdout, result.stderr].filter(Boolean).join("\n");
     const missing = serverMergeCapabilityTokens.filter((token) => !output.includes(token));
-    if (result.aborted || result.exitCode !== 0 || result.stdoutTruncated || result.stderrTruncated || missing.length > 0)
+    if (result.aborted || result.timedOut || result.exitCode !== 0 || result.stdoutTruncated || result.stderrTruncated || missing.length > 0)
     {
         return { supported: false, diagnostics: `Local cm help merge capability check did not prove required syntax${missing.length > 0 ? `: missing ${missing.join(", ")}` : "."}` };
     }
@@ -4750,6 +4815,7 @@ export const mergeBranches = tool({
 
         const attempt = await spawnAndCollect(getCmExecutable(), command, process.cwd(), undefined, getActiveAbortSignal(), {
             ...(commandExecutionStorage.getStore() ?? {}),
+            timeoutMs: SERVER_MERGE_COMMAND_TIMEOUT_MS,
             outputLimitChars: SERVER_MERGE_OUTPUT_LIMIT,
         });
         const output = [attempt.stdout, attempt.stderr].filter(Boolean).join("\n");
@@ -4764,15 +4830,17 @@ export const mergeBranches = tool({
             dispatched: true,
             exitCode: attempt.exitCode,
             aborted: attempt.aborted,
+            timedOut: attempt.timedOut,
             outputTruncated: Boolean(attempt.stdoutTruncated || attempt.stderrTruncated),
             records: parsed.records,
+            observedChangesets: parsed.changesets,
             diagnostics,
             mergeLinkIdentity: "unverified",
             xlinkEffects: "unverified",
             effect,
         };
 
-        const ambiguous = attempt.aborted || attempt.stdoutTruncated || attempt.stderrTruncated || parsed.malformed
+        const ambiguous = attempt.aborted || attempt.timedOut || attempt.stdoutTruncated || attempt.stderrTruncated || parsed.malformed
             || parsed.unknownOperations.length > 0 || parsed.changesets.length > 1
             || (parsed.changesets.length > 0 && matchingChangesets.length !== 1)
             || (parsed.hasConflict && parsed.changesets.length > 0)

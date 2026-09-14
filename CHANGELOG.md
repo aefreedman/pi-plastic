@@ -13,6 +13,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Fixed
 
+- Make `plastic_mergeBranches` JSON formatting side-effect free, enforce exact bounded machine-readable record framing/schema, and bound both local capability and merge process lifetimes without retrying uncertain dispatches.
 - Stop workspace merge closeout before target-side mutation when its required switch is canceled for pending changes; the blocked result now includes typed pending context and `checkedIn: false`.
 - Preserve qualified parent-lookup repository/server scope while matching documented local branch-name fields, and report bounded `cm find` failures instead of silently treating them as a missing parent; root and missing branches now remain distinguishable.
 

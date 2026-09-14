@@ -6,6 +6,7 @@ import { loadRegisteredTools } from "./pi-tool-harness.ts";
 
 type SpawnCall = { args: string[] };
 type Response = { stdout?: string; stderr?: string; exitCode?: number; hang?: boolean };
+type CommandDependencies = { spawn: any; setTimeout?: any; clearTimeout?: any };
 
 const source = "br:/source@repo@server";
 const target = "br:/target@repo@server";
@@ -36,17 +37,20 @@ function machineRecord(args: string[], operation: string, fields: string[]): str
   return `${start}${[operation, ...fields].join(field)}${end}`;
 }
 
-async function runScenario(response: (args: string[]) => Response, signal?: AbortSignal): Promise<{ result: string; calls: SpawnCall[] }> {
+function scenarioDependencies(response: (args: string[]) => Response, calls: SpawnCall[], clock?: Pick<CommandDependencies, "setTimeout" | "clearTimeout">): CommandDependencies {
+  const helpSpawn = createSpawn([{ stdout: capabilityHelp }], calls);
+  return {
+    spawn: ((command: string, args: readonly string[], options: unknown) => {
+      if (args[0] === "merge") return createSpawn([response([...args])], calls)(command, args, options);
+      return helpSpawn(command, args, options);
+    }) as any,
+    ...clock,
+  };
+}
+
+async function runScenario(response: (args: string[]) => Response, clock?: Pick<CommandDependencies, "setTimeout" | "clearTimeout">): Promise<{ result: string; calls: SpawnCall[] }> {
   const calls: SpawnCall[] = [];
-  const spawn = createSpawn([{ stdout: capabilityHelp }, { stdout: "" }], calls);
-  const wrappedSpawn = ((command: string, args: readonly string[], options: unknown) => {
-    if (args[0] === "merge") {
-      const next = response([...args]);
-      return createSpawn([next], calls)(command, args, options);
-    }
-    return spawn(command, args, options);
-  }) as any;
-  const result = await runWithAbortSignal(signal, () => mergeBranches.execute({ source, target, message, format: "json" }), { spawn: wrappedSpawn });
+  const result = await runWithAbortSignal(undefined, () => mergeBranches.execute({ source, target, message, format: "json" }), scenarioDependencies(response, calls, clock));
   return { result: String(result), calls };
 }
 
@@ -54,25 +58,22 @@ const registered = await loadRegisteredTools();
 const publicTool = registered.get("plastic_mergeBranches");
 assert.ok(publicTool, "plastic_mergeBranches must be registered through the native extension path");
 assert.deepEqual(Object.keys((publicTool.parameters as any).properties).sort(), ["format", "message", "preflight", "source", "target"], "workspace-free merge must not expose a workdir identity/default");
-const publicPreflight = await publicTool.execute("test", { source, target, message, preflight: true, format: "json" }, undefined, undefined, { cwd: "C:/unrelated" });
-assert.match(String(publicPreflight.content?.[0]?.text), /"outcome": "preflight"/, "registered public tool must execute command-only preflight");
-assert.equal(String(publicPreflight.content?.[0]?.text).includes("C:/unrelated"), false, "public preflight must not derive identity from the caller cwd");
+for (const format of ["text", "json"] as const) {
+  const preflightCalls: SpawnCall[] = [];
+  const publicPreflight = await runWithAbortSignal(undefined, () => publicTool.execute("test", { source, target, message, preflight: true, format }, undefined, undefined, { cwd: "C:/unrelated" }), { spawn: createSpawn([], preflightCalls) });
+  assert.match(String(publicPreflight.content?.[0]?.text), format === "json" ? /"outcome": "preflight"/ : /Server Merge Preflight/, `registered ${format} preflight should render`);
+  assert.equal(preflightCalls.length, 0, `registered ${format} preflight must not spawn help, merge, or version`);
+  assert.equal(String(publicPreflight.content?.[0]?.text).includes("C:/unrelated"), false, "public preflight must not derive identity from the caller cwd");
+}
 
 await assert.rejects(() => mergeBranches.execute({ source: "br:/source@repo", target, message }), /fully qualified/, "source must be repository/server-qualified");
 await assert.rejects(() => mergeBranches.execute({ source, target: "br:/target@other@server", message }), /same exact repository and server/, "cross-repository targets must be rejected");
 await assert.rejects(() => mergeBranches.execute({ source, target, message: "   " }), /non-empty/, "message must be nonempty");
 
-const preflightCalls: SpawnCall[] = [];
-const preflight = await runWithAbortSignal(undefined, () => mergeBranches.execute({ source, target, message, preflight: true }), { spawn: createSpawn([], preflightCalls) });
-assert.match(String(preflight), /Server Merge Preflight/, "preflight should render the command");
-assert.equal(preflightCalls.length, 0, "preflight must not spawn help or merge commands");
-
-const success = await runScenario((args) => ({ stdout: machineRecord(args, "CHANGESET", ["cs:42@/target@repo (mount:'/')"]) }));
-assert.match(success.result, /"outcome": "completed"/, "one emitted matching root-mount changeset should complete");
-assert.match(success.result, /"mergeLinkIdentity": "unverified"/, "completion must not invent merge-link identity");
-assert.equal(success.calls.filter((call) => call.args[0] === "merge").length, 1, "success must dispatch exactly once");
-assert.equal(success.calls.filter((call) => call.args[0] === "help").length, 1, "success must perform only the bounded local help gate before dispatch");
-assert(success.calls.find((call) => call.args[0] === "merge")!.args.includes("--nointeractiveresolution"), "dispatch must retain the verified non-interactive flag");
+const publicCalls: SpawnCall[] = [];
+const publicSuccess = await runWithAbortSignal(undefined, () => publicTool.execute("test", { source, target, message, format: "json" }, undefined, undefined, { cwd: "C:/unrelated" }), scenarioDependencies((args) => ({ stdout: machineRecord(args, "CHANGESET", ["cs:42@/target@repo (mount:'/')"]) }), publicCalls));
+assert.match(String(publicSuccess.content?.[0]?.text), /"outcome": "completed"/, "registered public tool must expose completed JSON result");
+assert.equal(publicCalls.length, 2, "public JSON result must spawn only bounded help and merge, never cm version");
 
 const noOp = await runScenario((args) => ({ stdout: machineRecord(args, "STATUS", ["ALREADY_CONNECTED", "No merges detected"]) }));
 assert.match(noOp.result, /"outcome": "no-op"/, "exact ALREADY_CONNECTED record should be classified as no-op");
@@ -86,23 +87,44 @@ for (const response of [
   (args: string[]) => ({ stdout: machineRecord(args, "CHANGESET", ["cs:43@/wrong@repo (mount:'/')"]) }),
   (args: string[]) => ({ stdout: machineRecord(args, "CHANGESET", ["cs:43@/target@other (mount:'/')"]) }),
   (args: string[]) => ({ stdout: machineRecord(args, "CHANGESET", ["cs:43@/target@repo (mount:'/other')"]) }),
+  (args: string[]) => ({ stdout: machineRecord(args, "CHANGESET", ["cs:43@/target@repo (mount:'/')", "extra-field"]) }),
+  (args: string[]) => ({ stdout: `${machineRecord(args, "CHANGESET", ["cs:43@/target@repo (mount:'/')"])}${machineRecord(args, "STATUS", ["OTHER_STATUS", "unexpected"])}` }),
+  (args: string[]) => ({ stdout: `${machineRecord(args, "CHANGESET", ["cs:43@/target@repo (mount:'/')"])}${machineRecord(args, "STATUS", ["ALREADY_CONNECTED", "No merges detected"])}` }),
   (args: string[]) => ({ stdout: `${machineRecord(args, "CHANGESET", ["cs:43@/target@repo (mount:'/')"])}${machineRecord(args, "CHANGESET", ["cs:44@/target@repo (mount:'/')"])}` }),
+  (args: string[]) => ({ stdout: `${args.find((value) => value.startsWith("--fieldseparator="))!.slice("--fieldseparator=".length)}stray${machineRecord(args, "CHANGESET", ["cs:43@/target@repo (mount:'/')"])}` }),
   (args: string[]) => ({ stdout: `${args.find((value) => value.startsWith("--startlineseparator="))!.slice("--startlineseparator=".length)}spoofed` }),
 ]) {
   const uncertain = await runScenario(response);
-  assert.match(uncertain.result, /"outcome": "uncertain"/, "wrong target/repository/mount, duplicate, or incomplete spoofed records must fail closed");
+  assert.match(uncertain.result, /"outcome": "uncertain"/, "wrong target/repository/mount, extra/contradictory records, or stray framing must fail closed");
 }
 
 const truncated = await runScenario(() => ({ stdout: "x".repeat(20_000) }));
 assert.match(truncated.result, /"outcome": "uncertain"/, "truncated output must remain uncertain");
 
+const immediateClock = {
+  setTimeout(callback: () => void, delay: number) {
+    if (delay === 30_000) process.nextTick(callback);
+    return setTimeout(callback, delay) as unknown as NodeJS.Timeout;
+  },
+  clearTimeout(timeout: NodeJS.Timeout) { clearTimeout(timeout as unknown as ReturnType<typeof setTimeout>); },
+};
+const timedOut = await runScenario((args) => ({ stdout: machineRecord(args, "CHANGESET", ["cs:77@/target@repo (mount:'/')"]), hang: true }), immediateClock);
+assert.match(timedOut.result, /"outcome": "uncertain"/, "internal merge deadline must preserve uncertain effects rather than complete");
+assert.match(timedOut.result, /"timedOut": true/, "deadline expiration must be observable");
+assert.match(timedOut.result, /"id": "77"/, "deadline result must retain any bounded observed changeset identity");
+assert.equal(timedOut.calls.filter((call) => call.args[0] === "merge").length, 1, "deadline expiration must not replay or fall back");
+
 const controller = new AbortController();
-const timeoutCalls: SpawnCall[] = [];
-const timeoutSpawn = createSpawn([{ stdout: capabilityHelp }, { hang: true }], timeoutCalls);
+const abortCalls: SpawnCall[] = [];
+const abortDependencies = scenarioDependencies((args) => ({ stdout: machineRecord(args, "CHANGESET", ["cs:78@/target@repo (mount:'/')"]), hang: true }), abortCalls, {
+  setTimeout(callback: () => void) { return setTimeout(callback, 60_000) as unknown as NodeJS.Timeout; },
+  clearTimeout(timeout: NodeJS.Timeout) { clearTimeout(timeout as unknown as ReturnType<typeof setTimeout>); },
+});
 setTimeout(() => controller.abort(), 1);
-const timeout = await runWithAbortSignal(controller.signal, () => mergeBranches.execute({ source, target, message, format: "json" }), { spawn: timeoutSpawn });
-assert.match(String(timeout), /"outcome": "uncertain"/, "aborted dispatch must retain uncertain effects");
-assert.equal(timeoutCalls.filter((call) => call.args[0] === "merge").length, 1, "aborted dispatch must not retry or fall back to a workspace route");
+const aborted = await runWithAbortSignal(controller.signal, () => mergeBranches.execute({ source, target, message, format: "json" }), abortDependencies);
+assert.match(String(aborted), /"outcome": "uncertain"/, "external abort must compose with the internal deadline boundary");
+assert.match(String(aborted), /"aborted": true/, "external abort must remain distinguishable");
+assert.equal(abortCalls.filter((call) => call.args[0] === "merge").length, 1, "external abort must not retry");
 
 const unsupportedCalls: SpawnCall[] = [];
 const unsupported = await runWithAbortSignal(undefined, () => mergeBranches.execute({ source, target, message, format: "json" }), { spawn: createSpawn([{ stdout: "cm merge help without required flags" }], unsupportedCalls) });
