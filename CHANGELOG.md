@@ -7,9 +7,16 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.6.0] - 2026-09-14
+
 ### Added
 
 - Add `plastic_mergeBranches` for one bounded, workspace-free server-side merge between explicitly same-repository/server qualified branches. The command-only preflight never contacts Plastic; completed results require one emitted root-mount target changeset and retain unverified merge-link/xlink effects and uncertain no-op/conflict effects.
+
+### Changed
+
+- Pin the test runner as local devDependency `tsx@4.23.5` and make all package test, live-test, and eval scripts use that local executable instead of an opportunistic `npx` download.
+- Update README's pinned GitHub installation examples to `v0.6.0`.
 
 ### Fixed
 
