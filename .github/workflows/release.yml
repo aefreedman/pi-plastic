@@ -59,11 +59,35 @@ jobs:
           name="$(node -p "require('./package.json').name")"
           version="$(node -p "require('./package.json').version")"
           expected_head="$(git rev-parse HEAD)"
-          published_head="$(npm view "${name}@${version}" gitHead 2>/dev/null || true)"
-          if [[ -n "${published_head}" ]]; then
-            test "${published_head}" = "${expected_head}"
+          metadata_file="$(mktemp)"
+          error_file="$(mktemp)"
+          publish_required=false
+          if npm view "${name}@${version}" version gitHead --json >"${metadata_file}" 2>"${error_file}"; then
+            if ! observed_version="$(node -e "const d=JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')); if (!d || Array.isArray(d) || typeof d.version !== 'string' || typeof d.gitHead !== 'string') process.exit(1); process.stdout.write(d.version)" "${metadata_file}")"; then
+              echo "::error::npm returned malformed metadata for ${name}@${version}."
+              cat "${metadata_file}"
+              rm -f "${metadata_file}" "${error_file}"
+              exit 1
+            fi
+            observed_git_head="$(node -e "const d=JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')); process.stdout.write(d.gitHead)" "${metadata_file}")"
+            if [[ "${observed_version}" != "${version}" || "${observed_git_head}" != "${expected_head}" ]]; then
+              echo "::error::Existing npm identity does not match ${name}@${version}: version=${observed_version}, gitHead=${observed_git_head}, expectedGitHead=${expected_head}."
+              rm -f "${metadata_file}" "${error_file}"
+              exit 1
+            fi
+            echo "publish_required=false" >> "${GITHUB_OUTPUT}"
             echo "${name}@${version} is already published from this commit; skipping."
+          elif grep -Eq '^(npm (ERR!|error) )?code E404$' "${error_file}"; then
+            publish_required=true
+            echo "publish_required=true" >> "${GITHUB_OUTPUT}"
           else
+            echo "::error::Unable to verify whether ${name}@${version} exists on npm."
+            cat "${error_file}"
+            rm -f "${metadata_file}" "${error_file}"
+            exit 1
+          fi
+          rm -f "${metadata_file}" "${error_file}"
+          if [[ "${publish_required}" = true ]]; then
             npm publish --access public
           fi
       - name: Verify npm release identity
