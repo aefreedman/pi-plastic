@@ -36,7 +36,7 @@ export const __bashCmMergeGuardInternals = {
 
 export default function bashCmMergeGuard(pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
-    if (!isBashToolCall(event as { toolName?: string })) return;
+    if (!isBashToolCall(event)) return;
 
     const command = typeof event.input.command === "string" ? event.input.command : "";
     if (!command || !commandRunsUnsafeCmMerge(command)) return;

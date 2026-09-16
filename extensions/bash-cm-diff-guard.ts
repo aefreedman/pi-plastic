@@ -42,7 +42,7 @@ export const __bashCmDiffGuardInternals = {
 
 export default function bashCmDiffGuard(pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
-    if (!isBashToolCall(event as { toolName?: string })) return;
+    if (!isBashToolCall(event)) return;
 
     const command = typeof event.input.command === "string" ? event.input.command : "";
     if (!command || !commandRunsCmDiff(command)) return;

@@ -7,6 +7,21 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.7.0] - 2026-09-16
+
+### Fixed
+
+- Infer tool arguments from the schemas in `src/tool-definition.ts`, retaining required fields, optional fields, arrays, and literal enums instead of implicit `any` parameters.
+- Use TypeBox schema guards and array-based unions in the adapter, and narrow Bash tool events directly in both safety guards.
+- Add a pinned strict typecheck before the test suite, covering production sources, extensions, and compile-only argument-inference regressions.
+
+### Changed
+
+- Present Plastic tools and capability search with compact action headers, operation targets, and structured result summaries in Pi's existing tool boxes.
+- Keep previews, blocked checkins, cancelled switches, uncertain server effects, unavailable comparisons, and output omissions visible; retain full returned evidence and colored diff hunks on expansion.
+- Use Pi's wrapping components and configured expansion hint instead of manual character truncation and a fixed shortcut. Preserve original JSON numeric text and mask common credential assignments in display output.
+- Add an offline tool preview and behavioral renderer tests covering outcomes, exact evidence, redaction, keybindings, registration, and narrow terminals.
+
 ## [0.6.1] - 2026-09-14
 
 ### Fixed

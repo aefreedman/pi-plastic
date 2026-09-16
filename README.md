@@ -2,6 +2,14 @@
 
 Pi tools, footer status, and skill guidance for Plastic SCM / Unity Version Control workflows.
 
+## Tool presentation
+
+Plastic tools use compact action headers inside Pi's standard tool boxes. Headers show the workspace name and the branch, file, revision pair, or query being acted on; command previews are labeled explicitly. Collapsed results summarize structured status counts, diff availability, patch output, and server-merge outcomes. Blocked checkins, unresolved effects, omitted results, and unavailable comparisons remain visible without expansion. Plain CLI output stays neutral rather than implying a verified mutation.
+
+Expand a result using your configured tool-expansion shortcut to see the workspace, request, colored diff hunks, and complete original returned evidence. The display preserves JSON identifiers and numeric text, masks common credential assignments, and removes terminal control sequences. Rendering does not change tool execution or model-facing output; it is not a general source-code secret scanner.
+
+Run `npm run preview:tools` from a repository checkout for offline examples. The preview uses plain colors and a test expansion binding; Pi supplies the live theme, box, and configured shortcut.
+
 ## Plastic branch footer status
 
 When Pi starts inside a Plastic workspace, this package adds a themed `Plastic <branch>` status to Pi's built-in footer. It discovers the nearest enclosing `.plastic/plastic.workspace` and reads either the selector's `smartbranch` or `br` form as the credential-free branch source. A bounded `cm status` call is used only when the selector has no valid branch. Selector changes and successful same-workspace `plastic_*` tools refresh the status; sibling workspaces are ignored.
@@ -64,7 +72,7 @@ For controlled comparisons, set `PI_PLASTIC_TOOL_LOADING_MODE` before starting P
 ```bash
 PI_PLASTIC_TOOL_LOADING_MODE=balanced    # default production candidate
 PI_PLASTIC_TOOL_LOADING_MODE=loader-only # maximum initial schema reduction
-PI_PLASTIC_TOOL_LOADING_MODE=all-active  # all 29 currently exposed tools; loader omitted
+PI_PLASTIC_TOOL_LOADING_MODE=all-active  # all 30 currently exposed tools; loader omitted
 ```
 
 Pi 0.82 and newer use canonical `sourceInfo` provenance to identify this package's effective tools before deferring, restoring, or activating them. If canonical provenance or ownership of the effective loader cannot be proven, `pi-plastic` fails safe: it preserves the complete current active set exactly, does not defer, remove, or activate any `plastic_*` name, and an effective package loader can only report known tools that are already active rather than activating inactive names. On sourceInfo-capable Pi instances, providers without native deferred definitions still receive the complete current active set after a loader call. Reload or restart Pi after source edits; source files are not watched automatically.
@@ -111,13 +119,13 @@ pi install npm:@aefree/pi-plastic
 Install a pinned GitHub release over HTTPS:
 
 ```bash
-pi install git:github.com/aefreedman/pi-plastic@v0.6.1
+pi install git:github.com/aefreedman/pi-plastic@v0.7.0
 ```
 
 Equivalent SSH install:
 
 ```bash
-pi install git:git@github.com/aefreedman/pi-plastic@v0.6.1
+pi install git:git@github.com/aefreedman/pi-plastic@v0.7.0
 ```
 
 To intentionally track the moving default branch instead of a release tag:
@@ -156,7 +164,9 @@ Project-local installation protects only Pi processes that load those project se
 npm test
 ```
 
-The default suite is credential-free and covers tool validation, path-resolution regressions, extension registration, OpenAI strict-schema compatibility classification, and bash guard behavior.
+`npm test` first runs `npm run typecheck` with pinned TypeScript and Node 22 types. The strict, no-emit check covers `index.ts`, `src/`, every extension, and compile-only schema-inference contracts under `tests/types/`. Runtime tests and eval harnesses execute through `tsx`.
+
+The default suite is credential-free and covers tool validation, schema conversion, path-resolution regressions, extension registration, rendering, OpenAI strict-schema compatibility classification, and bash guard behavior.
 
 Run the opt-in read-only live smoke test against a dedicated clean sandbox workspace:
 
@@ -191,6 +201,7 @@ OpenAI Codex models may advertise grammar tools without advertising strict JSON-
 - Shared workspace discovery and branch parsing live in `src/plastic-workspace.ts`.
 - `extensions/plastic-branch-status.ts` owns the additive footer status and its session-scoped refresh lifecycle.
 - `index.ts` is the Pi tool registration layer.
+- `src/plastic-renderers.ts` owns compact calls, result summaries, and expanded evidence.
 - Output shapes are intentionally stable for prompt and workflow compatibility.
 
 ## License

@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { type TSchema, Type } from "typebox";
 import * as core from "./src/plastic-core";
+import { renderPlasticCall, renderPlasticResult, renderPlasticSearchResult } from "./src/plastic-renderers";
 import {
   getEffectivePlasticToolOwnership,
   getInitiallyInactivePlasticTools,
@@ -39,8 +40,8 @@ type ToolConfig = {
 
 const EXTENSION_SOURCE_PATH = fileURLToPath(import.meta.url);
 const EMPTY_PARAMETERS = Type.Object({});
-const enumSchema = <T extends readonly [string, ...string[]]>(values: T, description: string): TSchema =>
-  Type.Union(values.map((value) => Type.Literal(value)) as [TSchema, TSchema, ...TSchema[]], { description });
+const enumSchema = (values: readonly string[], description: string): TSchema =>
+  Type.Union(values.map((value) => Type.Literal(value)), { description });
 
 const OUTPUT_FORMAT_SCHEMA = enumSchema(["text", "json"], "Output format. Defaults to text.");
 const PENDING_CHANGES_SCHEMA = enumSchema(["shelve", "bring", "cancel"], "How to handle pending changes when switching branches.");
@@ -371,146 +372,9 @@ function toToolName(exportName: string): string {
   return `plastic_${exportName}`;
 }
 
-type TextLikeComponent = {
-  invalidate: () => void;
-  render: (width: number) => string[];
-};
-
-type RenderTheme = {
-  fg?: (color: string, text: string) => string;
-  bold?: (text: string) => string;
-};
-
-type PlasticToolResult = {
-  content?: Array<{ type?: string; text?: string }>;
-  details?: {
-    exportName?: string;
-    rawResult?: unknown;
-  };
-};
-
-const COLLAPSED_RESULT_LINES = 12;
-const ANSI_PATTERN = /\x1b\][^\x07]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]/g;
-
 function toText(result: unknown): string {
-  if (typeof result === "string") {
-    return result;
-  }
-
+  if (typeof result === "string") return result;
   return JSON.stringify(result, null, 2);
-}
-
-function visibleLength(value: string): number {
-  return value.replace(ANSI_PATTERN, "").length;
-}
-
-function truncateAnsiLine(value: string, width: number): string {
-  if (width <= 0 || !value) {
-    return "";
-  }
-
-  if (visibleLength(value) <= width) {
-    return value;
-  }
-
-  const target = Math.max(0, width - 1);
-  let visible = 0;
-  let output = "";
-  for (let index = 0; index < value.length;) {
-    const remaining = value.slice(index);
-    const ansi = remaining.match(ANSI_PATTERN);
-    if (ansi && ansi.index === 0) {
-      output += ansi[0];
-      index += ansi[0].length;
-      continue;
-    }
-
-    if (visible >= target) {
-      break;
-    }
-
-    const codePoint = value.codePointAt(index);
-    if (codePoint === undefined) {
-      break;
-    }
-
-    const char = String.fromCodePoint(codePoint);
-    output += char;
-    visible += 1;
-    index += char.length;
-  }
-
-  return `${output}…`;
-}
-
-function textComponent(text: string): TextLikeComponent {
-  return {
-    invalidate() {},
-    render(width: number) {
-      if (!text) {
-        return [];
-      }
-      return text.split(/\r?\n/).map((line) => truncateAnsiLine(line, width));
-    },
-  };
-}
-
-function themed(theme: RenderTheme, color: string, text: string): string {
-  return typeof theme.fg === "function" ? theme.fg(color, text) : text;
-}
-
-function bold(theme: RenderTheme, text: string): string {
-  return typeof theme.bold === "function" ? theme.bold(text) : text;
-}
-
-function extractTextContent(result: PlasticToolResult | undefined): string {
-  return result?.content
-    ?.filter((entry) => entry?.type === "text")
-    .map((entry) => String(entry.text ?? ""))
-    .join("\n") ?? "";
-}
-
-function trimTrailingEmptyLines(lines: string[]): string[] {
-  let end = lines.length;
-  while (end > 0 && lines[end - 1]?.trim() === "") {
-    end -= 1;
-  }
-  return lines.slice(0, end);
-}
-
-function renderPlasticCall(exportName: string, args: Record<string, unknown>, theme: RenderTheme): TextLikeComponent {
-  const target = args.workdir ?? args.branch ?? args.source ?? args.path ?? args.paths ?? args.target ?? args.shelveset ?? args.id ?? "";
-  const targetText = Array.isArray(target) ? target.join(", ") : String(target);
-  const suffix = targetText ? ` ${themed(theme, "accent", targetText)}` : "";
-  return textComponent(`${themed(theme, "toolTitle", bold(theme, toToolName(exportName)))}${suffix}`);
-}
-
-function renderPlasticResult(
-  exportName: string,
-  result: PlasticToolResult | undefined,
-  options: { expanded?: boolean; isPartial?: boolean } | undefined,
-  theme: RenderTheme,
-): TextLikeComponent {
-  if (options?.isPartial) {
-    return textComponent(themed(theme, "warning", `Running ${toToolName(exportName)}...`));
-  }
-
-  const output = extractTextContent(result);
-  const lines = trimTrailingEmptyLines(output.split(/\r?\n/).map((line) => line.replace(/\t/g, "  ")));
-  const maxLines = options?.expanded ? lines.length : COLLAPSED_RESULT_LINES;
-  const displayLines = lines.slice(0, maxLines);
-  const remaining = lines.length - displayLines.length;
-  const rendered = displayLines.map((line) => themed(theme, "toolOutput", line));
-
-  if (remaining > 0) {
-    rendered.push(themed(theme, "muted", `... (${remaining} more lines, ctrl+o to expand)`));
-  }
-
-  if (rendered.length === 0) {
-    rendered.push(themed(theme, "toolOutput", "(no output)"));
-  }
-
-  return textComponent(rendered.join("\n"));
 }
 
 function normalizeArgs(args: unknown): Record<string, unknown> {
@@ -563,7 +427,7 @@ function isCoreSchemaNode(value: unknown): value is CoreSchemaNode {
 
 function applySchemaMetadata(schema: TSchema, node: CoreSchemaNode): TSchema {
   const metadata = node.metadata ?? {};
-  const options: Record<string, unknown> = {};
+  const options: { description?: string; minimum?: number; maximum?: number } = {};
 
   if (metadata.description) options.description = metadata.description;
   if (metadata.min !== undefined) options.minimum = metadata.min;
@@ -571,15 +435,15 @@ function applySchemaMetadata(schema: TSchema, node: CoreSchemaNode): TSchema {
 
   let nextSchema: TSchema = schema;
   if (Object.keys(options).length > 0) {
-    if (schema.type === "string") nextSchema = Type.String(options);
-    else if (schema.type === "number" || schema.type === "integer") nextSchema = metadata.int ? Type.Integer(options) : Type.Number(options);
-    else if (schema.type === "boolean") nextSchema = Type.Boolean(options);
-    else if (schema.type === "array") nextSchema = Type.Array((schema as any).items ?? Type.Any(), options);
+    if (Type.IsString(schema)) nextSchema = Type.String(options);
+    else if (Type.IsNumber(schema) || Type.IsInteger(schema)) nextSchema = metadata.int ? Type.Integer(options) : Type.Number(options);
+    else if (Type.IsBoolean(schema)) nextSchema = Type.Boolean(options);
+    else if (Type.IsArray(schema)) nextSchema = Type.Array(schema.items, options);
     else nextSchema = Type.Unsafe({ ...schema, ...options });
   }
 
-  if (metadata.int && nextSchema.type === "number") {
-    nextSchema = Type.Integer({ description: options.description as string | undefined, minimum: options.minimum as number | undefined, maximum: options.maximum as number | undefined });
+  if (metadata.int && Type.IsNumber(nextSchema)) {
+    nextSchema = Type.Integer(options);
   }
 
   return metadata.optional ? Type.Optional(nextSchema) : nextSchema;
@@ -617,7 +481,7 @@ function convertCoreSchema(node: unknown): TSchema {
     case "enum": {
       const values = Array.isArray(node.values) ? node.values : [];
       if (values.every((value) => typeof value === "string")) {
-        const valueSet = values as string[];
+        const valueSet = values;
         if (arraysEqual(valueSet, ["text", "json"])) {
           schema = OUTPUT_FORMAT_SCHEMA;
         } else if (arraysEqual(valueSet, ["shelve", "bring", "cancel"])) {
@@ -633,17 +497,17 @@ function convertCoreSchema(node: unknown): TSchema {
         } else if (arraysEqual(valueSet, ["date", "modifieddate", "status"])) {
           schema = REVIEW_ORDER_BY_SCHEMA;
         } else {
-          schema = enumSchema(valueSet as [string, ...string[]], metadataDescription(node));
+          schema = enumSchema(valueSet, metadataDescription(node));
         }
       } else {
-        schema = Type.Union(values.map((value) => literalSchema(value)) as [TSchema, TSchema, ...TSchema[]]);
+        schema = Type.Union(values.map((value) => literalSchema(value)));
       }
       break;
     }
     case "union": {
       const values = Array.isArray(node.values) ? node.values : [];
       const converted = values.map((value) => convertCoreSchema(value));
-      schema = converted.length > 1 ? Type.Union(converted as [TSchema, TSchema, ...TSchema[]]) : (converted[0] ?? Type.Any());
+      schema = converted.length > 1 ? Type.Union(converted) : (converted[0] ?? Type.Any());
       break;
     }
     default:
@@ -712,11 +576,11 @@ export default function plasticTools(pi: ExtensionAPI) {
       description: coreTool.description ?? toToolName(exportName),
       parameters: buildParameters(coreTool.args),
       prepareArguments: config.prepareArguments,
-      renderCall(args, theme) {
-        return renderPlasticCall(exportName, (args ?? {}) as Record<string, unknown>, theme as RenderTheme);
+      renderCall(args, theme, context) {
+        return renderPlasticCall(exportName, args ?? {}, theme, context);
       },
-      renderResult(result, options, theme) {
-        return renderPlasticResult(exportName, result as PlasticToolResult | undefined, options, theme as RenderTheme);
+      renderResult(result, options, theme, context) {
+        return renderPlasticResult(exportName, result, options, theme, context);
       },
       async execute(_toolCallId, params, signal, _onUpdate, ctx) {
         const normalizedParams = normalizeArgs(params);
@@ -730,6 +594,7 @@ export default function plasticTools(pi: ExtensionAPI) {
           details: {
             exportName,
             rawResult: result,
+            ...(typeof normalizedParams.workdir === "string" ? { workdir: normalizedParams.workdir } : {}),
           },
         };
       },
@@ -749,6 +614,12 @@ export default function plasticTools(pi: ExtensionAPI) {
       toolNames: Type.Optional(Type.Array(Type.String({ description: "Exact public Plastic tool name." }), { maxItems: 4, description: "Optional exact tool names to enable." })),
       limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 4, description: "Maximum matching tools to enable. Defaults to the single best keyword match; exact toolNames requests may enable up to four." })),
     }),
+    renderCall(args, theme, context) {
+      return renderPlasticCall("tool_search", args ?? {}, theme, context);
+    },
+    renderResult(result, options, theme, context) {
+      return renderPlasticSearchResult(result, options, theme, context);
+    },
     async execute(_toolCallId, params) {
       if (isPlasticToolBrowseRequest(params)) {
         return {

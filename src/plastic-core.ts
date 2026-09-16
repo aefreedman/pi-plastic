@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { isUtf8 } from "node:buffer";
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { tool } from "./pi-tool-compat";
+import { tool } from "./tool-definition";
 import { promises as fs, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, win32 } from "path";
