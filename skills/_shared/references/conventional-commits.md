@@ -112,27 +112,6 @@ Closes #124
 Related to #125
 ```
 
-**Attribution:**
-```
-feat(dashboard): add analytics widget
-
-Co-Authored-By: <AI Assistant Name (e.g., Codex, Claude, Pi Coding Agent)>
-```
-
----
-
-## Attribution Footer
-
-Add a simple attribution line in the footer when needed:
-
-```
-feat(feature): implement new capability
-
-[Body explaining the change]
-
-Co-Authored-By: <AI Assistant Name (e.g., Codex, Claude, Pi Coding Agent)>
-```
-
 ---
 
 ## Examples
@@ -166,18 +145,6 @@ perf(physics): optimize collision detection
 
 Changed from O(n²) all-pairs check to spatial hashing.
 Reduces frame time by ~15ms with 100+ objects.
-```
-
-### Attribution Example
-```
-feat(multiplayer): add lobby system
-
-Implements matchmaking lobby with room creation, joining, and ready-up.
-Uses WebSocket for real-time updates.
-
-Closes #89
-
-Co-Authored-By: <AI Assistant Name (e.g., Codex, Claude, Pi Coding Agent)>
 ```
 
 ---

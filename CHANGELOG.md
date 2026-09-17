@@ -7,6 +7,13 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.7.1] - 2026-09-17
+
+### Changed
+
+- Remove co-author attribution instructions and examples from conventional commit guidance.
+- Remove the automatic co-author footer from default merge check-in messages.
+
 ## [0.7.0] - 2026-09-16
 
 ### Fixed

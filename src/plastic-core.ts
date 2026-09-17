@@ -4910,10 +4910,10 @@ export const mergeToBranch = tool({
         const strategy: MergeConflictStrategy = args.strategy ?? "auto";
         const updateTarget = args.updateTarget ?? true;
         const includePrivate = args.includePrivate ?? false;
-        const cardLine = args.cardRef?.trim() ? `${args.cardRef.trim()}\n\n` : "";
+        const cardLine = args.cardRef?.trim() ? `\n\n${args.cardRef.trim()}` : "";
         const checkinMessage = args.message?.trim()
             ? args.message.trim()
-            : `Merge ${sourceBranch} into ${targetBranch}\n\n${cardLine}Co-authored-by: Pi <pi@earendil.works>`;
+            : `Merge ${sourceBranch} into ${targetBranch}${cardLine}`;
 
         if (isSameBranchSpec(sourceBranch, targetBranch))
         {
