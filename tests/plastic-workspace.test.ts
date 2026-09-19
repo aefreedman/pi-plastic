@@ -48,6 +48,10 @@ try {
     kind: "found",
     value: { repository: "sample", branch: "/main" },
   });
+  assert.deepEqual(parsePlasticSelector('Selector for workspace sample:\nrep "sample-repository@sample-org@cloud"\n  path "/"\n    smartbranch "/main"\n'), {
+    kind: "found",
+    value: { repository: "sample-repository@sample-org@cloud", branch: "/main" },
+  }, "The rep selector spelling must retain the complete cloud repository identity");
   assert.deepEqual(parsePlasticSelector('br "/main/explicit"\nsmartbranch "/main/smart"\n'), {
     kind: "found",
     value: { branch: "/main/smart" },

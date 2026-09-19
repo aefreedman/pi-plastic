@@ -84,7 +84,7 @@ export function parsePlasticSelector(content: string): ParseOutcome<PlasticSelec
 
   for (const line of content.split(/\r?\n/)) {
     if (/^\s*(?:#|$)/.test(line)) continue;
-    if (/^\s*repository(?:\s|$)/i.test(line)) repository = parseSelectorValue(line, "repository");
+    if (/^\s*(?:repository|rep)(?:\s|$)/i.test(line)) repository = parseSelectorValue(line, "(?:repository|rep)");
     if (/^\s*smartbranch(?:\s|$)/i.test(line)) {
       sawBranchKey = true;
       smartBranch = parseSelectorValue(line, "smartbranch");

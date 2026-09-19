@@ -20,7 +20,7 @@ const main = (): void =>
 {
     const cwd = "/repo/ws";
     const machineOutput = [
-        "STATUS 123 Normandie/Repo server",
+        "STATUS 123 sample-project/Repo server",
         "CH /repo/ws/Assets/Gameplay/Movement.cs False NO_MERGES",
         "LD /repo/ws/Assets/Gameplay/FakeModifierService.cs False NO_MERGES",
         "MV /repo/ws/Assets/Gameplay/MockModifierService.cs False NO_MERGES",
@@ -215,7 +215,7 @@ const main = (): void =>
     assert(!__plasticSwitchInternals.isSameBranchSpec("/dev/task-123", "/dev/task-124"), "Expected branch comparison helper to detect different branches.");
 
     const machineOutputWithPrivate = [
-        "STATUS 123 Normandie/Repo server",
+        "STATUS 123 sample-project/Repo server",
         "PR /repo/ws/todos/059-ready.md False NO_MERGES",
         "PR /repo/ws/.env.local False NO_MERGES",
         "PR /repo/ws/src/id_rsa False NO_MERGES",

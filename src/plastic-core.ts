@@ -1876,7 +1876,7 @@ const parseRepositoryIdentity = (selector: string | undefined): RepositoryIdenti
 
 const parseRepositorySelector = (output: string): RepositoryIdentity | null =>
 {
-    const match = output.match(/^\s*repository\s+(?:"([^"]+)"|(\S+))\s*$/mi);
+    const match = output.match(/^\s*(?:repository|rep)\s+(?:"([^"]+)"|(\S+))\s*$/mi);
     return parseRepositoryIdentity(match?.[1] ?? match?.[2]);
 };
 
@@ -1974,6 +1974,12 @@ const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): Pendi
                 toPathComparisonKeyFromAbsolutePath(rootIdentity),
             ))
             {
+                // The workspace root belongs to its selector; cm rejects Xlink queries there.
+                if (toPathComparisonKeyFromAbsolutePath(await toFilesystemIdentityPath(candidate))
+                    === toPathComparisonKeyFromAbsolutePath(rootIdentity))
+                {
+                    break;
+                }
                 // A missing ancestor can be a removed Xlink mount. Status does not
                 // retain ownership, so parent-repository fallback would be unsafe.
                 if ((item.kind === "deleted" || item.kind === "moved") && !(await fs.stat(candidate).catch(() => null)))
@@ -1985,11 +1991,6 @@ const createPendingBaseIdentityResolver = (cwd: string, workdir?: string): Pendi
                 {
                     item.baseRepository = `${repository.repository}@${repository.server}`;
                     return `revid:${item.revisionId}@rep:${repository.repository}@repserver:${repository.server}`;
-                }
-                if (toPathComparisonKeyFromAbsolutePath(await toFilesystemIdentityPath(candidate))
-                    === toPathComparisonKeyFromAbsolutePath(rootIdentity))
-                {
-                    break;
                 }
                 const parent = dirname(candidate);
                 if (parent === candidate)

@@ -119,13 +119,13 @@ pi install npm:@aefree/pi-plastic
 Install a pinned GitHub release over HTTPS:
 
 ```bash
-pi install git:github.com/aefreedman/pi-plastic@v0.7.1
+pi install git:github.com/aefreedman/pi-plastic@v0.7.2
 ```
 
 Equivalent SSH install:
 
 ```bash
-pi install git:git@github.com/aefreedman/pi-plastic@v0.7.1
+pi install git:git@github.com/aefreedman/pi-plastic@v0.7.2
 ```
 
 To intentionally track the moving default branch instead of a release tag:

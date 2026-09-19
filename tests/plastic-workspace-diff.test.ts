@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
 import { __plasticDiffInternals, diffFile, diffRevisions, runWithAbortSignal, workspaceDiff } from "../src/plastic-core.ts";
 
@@ -17,7 +17,7 @@ class FakeChildProcess extends EventEmitter {
 type Call = { command: string; args: string[] };
 const statusSeparator = "\x1f";
 
-function fakeCommands(calls: Call[]) {
+function fakeCommands(calls: Call[], repositoryKeyword: "repository" | "rep" = "repository") {
   return ((command: string, args: string[]) => {
     const proc = new FakeChildProcess();
     calls.push({ command, args });
@@ -37,7 +37,7 @@ function fakeCommands(calls: Call[]) {
         return;
       }
       if (command === "cm" && args[0] === "showselector") {
-        proc.stdout.write('repository "parent-repository@parent-server"\n  smartbranch "/main"\n');
+        proc.stdout.write(`${repositoryKeyword} "parent-repository@parent-server"\n  path "/"\n    smartbranch "/main"\n`);
         proc.close(0);
         return;
       }
@@ -141,7 +141,7 @@ async function assertNoUnhandledRejection(action: () => Promise<unknown>): Promi
   }
 }
 
-function xlinkCollisionCommands(calls: Call[], root: string) {
+function xlinkCollisionCommands(calls: Call[], root: string, ownershipFailure?: "unavailable" | "malformed") {
   const statuses = [
     `CH${statusSeparator}${join(root, "parent.txt")}${statusSeparator}False${statusSeparator}77${statusSeparator}NO_MERGES`,
     `CH${statusSeparator}${join(root, "link-one", "one.txt")}${statusSeparator}False${statusSeparator}77${statusSeparator}NO_MERGES`,
@@ -173,6 +173,17 @@ function xlinkCollisionCommands(calls: Call[], root: string) {
       }
       if (command === "cm" && args[0] === "xlink") {
         const candidate = args.at(-1)!;
+        if (resolve(candidate) === resolve(dirname(root))) {
+          proc.stderr.write(`Item path not in workspace: ${dirname(candidate)}.`);
+          proc.close(1);
+          return;
+        }
+        if (candidate.endsWith("link-one") && ownershipFailure) {
+          if (ownershipFailure === "unavailable") proc.stderr.write("Repository ownership lookup unavailable.");
+          else proc.stdout.write("Unrecognized ownership response\n");
+          proc.close(ownershipFailure === "unavailable" ? 1 : 0);
+          return;
+        }
         const repository = candidate.endsWith("partial") ? "partial-repository@cloud@partial-server"
           : candidate.endsWith("link-one") ? "linked-repository@linked-server"
             : candidate.endsWith("link-two") ? "linked-repository@other-server" : null;
@@ -273,6 +284,8 @@ try {
   const movedXlinkDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/moved.cs", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
   assert.match(String(movedXlinkDiff), /XLINK MOVE CSHARP/, "Moved Xlink files must resolve the base from their source owner.");
   const xlinkWorkspaceDiff = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ allPending: true, maxFiles: 3, workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
+  assert.match(String(xlinkWorkspaceDiff), /PARENT MARKDOWN/, "Mixed batches must resolve parent-repository files without probing the workspace root as an Xlink.");
+  assert(!collisionCalls.some((call) => call.args[0] === "xlink" && resolve(call.args.at(-1)!) === resolve(root)), "The discovered workspace root must never be queried as an Xlink.");
   assert.match(String(xlinkWorkspaceDiff), /XLINK ONE CSHARP/);
   assert.match(String(xlinkWorkspaceDiff), /XLINK TWO CSHARP/);
   assert(collisionCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:77@rep:linked-repository@repserver:linked-server"), "Xlink bases must use the documented repository-qualified selector.");
@@ -285,18 +298,33 @@ try {
   );
   assert(!collisionCalls.some((call) => call.args[0] === "cat" && call.args[1].startsWith("revid:88")), "Ambiguous ownership must not materialize any revision.");
 
+  for (const failure of ["unavailable", "malformed"] as const) {
+    const failureCalls: Call[] = [];
+    await assert.rejects(
+      () => runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/one.txt", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(failureCalls, collisionRoot, failure) }),
+      failure === "unavailable" ? /ownership lookup unavailable/ : /malformed Xlink ownership/,
+      "Unknown descendant ownership must fail rather than falling back to the workspace repository.",
+    );
+    assert(!failureCalls.some((call) => call.args[0] === "cat" || call.args[0] === "showselector"), "Failed descendant ownership must not read a parent-repository base.");
+  }
+
   // Workspace discovery resolves the alias to its physical root while Plastic status
   // reports the lexical alias. Containment and ownership lookup must use one identity.
   await symlink(root, workspaceAlias, process.platform === "win32" ? "junction" : "dir");
   const aliasCollisionRoot = join(workspaceAlias, "collision");
   const aliasCalls: Call[] = [];
   const aliasXlinkDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/one.txt", workdir: aliasCollisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(aliasCalls, aliasCollisionRoot) });
+  const aliasParentDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "parent.txt", workdir: aliasCollisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(aliasCalls, aliasCollisionRoot) });
+  assert.match(String(aliasParentDiff), /PARENT MARKDOWN/, "The root boundary must also hold when lexical and physical workspace paths differ.");
+  assert(!aliasCalls.some((call) => call.args[0] === "xlink" && resolve(call.args.at(-1)!) === resolve(workspaceAlias)), "Filesystem aliases must not cause a root Xlink probe.");
   assert.match(String(aliasXlinkDiff), /XLINK ONE CSHARP/, "A real filesystem alias must resolve Xlink ownership rather than rejecting the lexical status path as outside the physical workspace.");
   assert(aliasCalls.some((call) => call.command === "cm" && call.args[0] === "xlink" && call.args.at(-1)?.startsWith(aliasCollisionRoot.replace(/\\/g, "/"))), "Xlink commands must retain the caller's lexical workspace path.");
 
-  const changedCalls: Call[] = [];
-  await runWithAbortSignal(undefined, () => diffFile.execute({ path: "changed.txt", workdir: root, format: "text" }), { spawn: fakeCommands(changedCalls) });
-  assert(changedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:41@rep:parent-repository@repserver:parent-server"), "Changed files must bind the status revision ID to the owning repository.");
+  for (const keyword of ["repository", "rep"] as const) {
+    const changedCalls: Call[] = [];
+    await runWithAbortSignal(undefined, () => diffFile.execute({ path: "changed.txt", workdir: root, format: "text" }), { spawn: fakeCommands(changedCalls, keyword) });
+    assert(changedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:41@rep:parent-repository@repserver:parent-server"), `Changed files must bind their base to the owning repository with the ${keyword} selector spelling.`);
+  }
 
   const deletedCalls: Call[] = [];
   await runWithAbortSignal(undefined, () => diffFile.execute({ path: "deleted.txt", workdir: root, format: "text" }), { spawn: fakeCommands(deletedCalls) });

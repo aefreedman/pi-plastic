@@ -7,6 +7,13 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.7.2] - 2026-09-19
+
+### Fixed
+
+- Stop pending-diff Xlink ownership discovery before querying the workspace root, allowing parent-repository base resolution while preserving linked-repository qualification and refusal on unresolved descendant ownership.
+- Accept both `rep` and `repository` selector spellings when resolving workspace repository identity for pending diffs and shared selector consumers.
+
 ## [0.7.1] - 2026-09-17
 
 ### Changed
