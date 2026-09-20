@@ -631,7 +631,7 @@ export default function plasticTools(pi: ExtensionAPI) {
       const ownership = getEffectivePlasticToolOwnership(pi.getAllTools(), EXTENSION_SOURCE_PATH);
       const unknownToolNames = getUnknownExactPlasticToolNames(params.toolNames);
       const active = pi.getActiveTools();
-      // Never infer ownership without Pi 0.82 canonical sourceInfo. In that
+      // Never infer ownership without canonical sourceInfo. In that
       // compatibility mode we may describe known tools that are already active,
       // but cannot safely activate an inactive same-named definition.
       const matches = searchPlasticTools(params, coreDescriptions).filter((match) =>

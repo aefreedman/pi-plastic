@@ -75,7 +75,7 @@ PI_PLASTIC_TOOL_LOADING_MODE=loader-only # maximum initial schema reduction
 PI_PLASTIC_TOOL_LOADING_MODE=all-active  # all 30 currently exposed tools; loader omitted
 ```
 
-Pi 0.82 and newer use canonical `sourceInfo` provenance to identify this package's effective tools before deferring, restoring, or activating them. If canonical provenance or ownership of the effective loader cannot be proven, `pi-plastic` fails safe: it preserves the complete current active set exactly, does not defer, remove, or activate any `plastic_*` name, and an effective package loader can only report known tools that are already active rather than activating inactive names. On sourceInfo-capable Pi instances, providers without native deferred definitions still receive the complete current active set after a loader call. Reload or restart Pi after source edits; source files are not watched automatically.
+Pi uses canonical `sourceInfo` provenance to identify this package's effective tools before deferring, restoring, or activating them. If canonical provenance or ownership of the effective loader cannot be proven, `pi-plastic` fails safe: it preserves the complete current active set exactly, does not defer, remove, or activate any `plastic_*` name, and an effective package loader can only report known tools that are already active rather than activating inactive names. On sourceInfo-capable Pi instances, providers without native deferred definitions still receive the complete current active set after a loader call. Reload or restart Pi after source edits; source files are not watched automatically.
 
 ## Safety behavior
 
@@ -151,7 +151,7 @@ Project-local installation protects only Pi processes that load those project se
 ## Requirements
 
 - Node.js 22.19.0 or newer
-- Pi 0.82.0 or newer; the current development and eval baseline is Pi 0.83
+- Pi 0.86.1 or newer; the current development and eval baseline is Pi 0.86.1
 - Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`, or `PI_PLASTIC_CM_EXECUTABLE` set to its full executable path
 - A GNU/POSIX-compatible text `diff` available on `PATH`, or `PI_PLASTIC_DIFF_EXECUTABLE` set to its full executable path (including paths containing spaces), for text-only diff tools. Pi invokes that resolved executable as-is and does not discover Git Bash paths automatically. On macOS, bare `diff` is PATH-dependent: it may be GNU Diffutils (often installed as `diff` ahead of system paths) or Apple’s BSD `/usr/bin/diff`; the package does not substitute one for the other. Configure the intended text executable explicitly when that distinction matters.
 - Patch generation has a separate executable policy: `toolPath` is the one-call highest-priority override, followed by `PI_PLASTIC_PATCH_EXECUTABLE`. On Windows, set one to a verified patch-capable non-GUI executable such as Git's `diff.exe`; the package deliberately does not reuse `PI_PLASTIC_DIFF_EXECUTABLE`/GnuWin32 as a patch default. macOS validation with Plastic 11 found that Apple BSD `/usr/bin/diff` supports text-only diffs but rejects the `--binary` argument supplied by `cm patch`; configure a verified GNU Diffutils-compatible executable explicitly for `plastic_patch`. The non-Windows fallback to `PI_PLASTIC_DIFF_EXECUTABLE` or bare `diff` remains only for environments whose resolved executable satisfies that patch contract. In an interactive Pi session, an invalid configured patch override or missing Windows patch setting produces one package capability warning per Pi runtime; the warning omits configured paths, and `plastic_patch` retains its tool-time validation.
@@ -178,7 +178,7 @@ The live test requires `/main`, no pending changes, and no merge in progress. It
 
 ### Dynamic tool-loading eval
 
-The package-local behavioral eval uses fresh Pi 0.83 JSON subprocesses against an explicitly attested dedicated Plastic sandbox and is not a skill eval. It compares all-active, balanced, and loader-only mode behavior, checks exact smallest-sufficient loader activations, blocks destructive calls unless they are supported `preflight: true` previews, captures tool calls and sanitized provider-schema measurements, and deletes raw provider payload captures by default.
+The package-local behavioral eval uses fresh Pi 0.86.1 JSON subprocesses against an explicitly attested dedicated Plastic sandbox and is not a skill eval. It compares all-active, balanced, and loader-only mode behavior, checks exact smallest-sufficient loader activations, blocks destructive calls unless they are supported `preflight: true` previews, captures tool calls and sanitized provider-schema measurements, and deletes raw provider payload captures by default.
 
 ```bash
 npm run eval:tool-loading -- --dry-run
@@ -189,7 +189,7 @@ See [`evals/tool-loading/README.md`](evals/tool-loading/README.md) for approved 
 
 ## Constrained sampling compatibility
 
-Pi 0.82 introduced provider-side constrained sampling for tools. `pi-plastic` does not currently opt in: every public Plastic schema includes optional fields (at minimum `workdir`), while OpenAI strict function schemas require closed objects and all declared properties to be required. Pi forwards the registered schema without converting those optional fields.
+Pi supports provider-side constrained sampling for tools. `pi-plastic` does not currently opt in: every public Plastic schema includes optional fields (at minimum `workdir`), while OpenAI strict function schemas require closed objects and all declared properties to be required. Pi forwards the registered schema without converting those optional fields.
 
 Enabling `strict: "prefer"` now would therefore either produce invalid strict OpenAI requests or require a breaking redesign of the ordinary tool arguments. The test suite audits all registered tools and prevents accidental opt-in until a schema is genuinely strict-compatible. Existing TypeBox validation and Plastic runtime safety checks remain authoritative.
 

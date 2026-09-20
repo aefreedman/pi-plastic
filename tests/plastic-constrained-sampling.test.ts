@@ -56,7 +56,7 @@ const main = async (): Promise<void> => {
     }
   }
 
-  // Pi 0.82 forwards a strict tool's schema without normalizing it. Every current
+  // Pi forwards a strict tool's schema without normalizing it. Every current
   // Plastic schema has optional fields (at minimum workdir), and TypeBox objects
   // currently allow unspecified additional properties. Enabling strict sampling
   // would therefore make direct OpenAI requests fail or require a breaking public

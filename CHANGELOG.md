@@ -7,6 +7,10 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Changed
+
+- Update the Pi development dependencies and dynamic tool-loading eval contract to the 0.86.1 baseline while retaining explicit schema registration and sandbox authorization gates.
+
 ## [0.7.2] - 2026-09-19
 
 ### Fixed

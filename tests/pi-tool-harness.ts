@@ -57,8 +57,8 @@ export class PiToolHarness {
   } = {}) {
     this.activeTools = [...(options.activeTools ?? [])];
     this.branchEntries = [...(options.branchEntries ?? [])];
-    // Default to Pi 0.82 behavior; individual compatibility tests explicitly
-    // opt out to model older runtimes without canonical sourceInfo.
+    // Model canonical sourceInfo by default; collision tests explicitly opt out
+    // to verify the package's fail-safe ownership behavior.
     this.sourceInfoAvailable = options.sourceInfoAvailable ?? true;
     this.extensionSourceInfo = options.extensionSourceInfo ?? DEFAULT_EXTENSION_SOURCE;
     for (const tool of options.foreignTools ?? []) this.registry.set(tool.name, { ...tool });

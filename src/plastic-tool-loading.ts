@@ -103,7 +103,7 @@ function hasSourcePath(tool: PlasticToolInfo, expectedSourcePath: string): boole
 }
 
 /**
- * Pi 0.82 exposes effective tool provenance. Compare effective definitions to
+ * Pi exposes effective tool provenance. Compare effective definitions to
  * this module's own import path, so even a foreign first-registration-wins
  * collision on the public loader name cannot become an ownership anchor.
  * Without that proof, callers preserve the active set unchanged.
