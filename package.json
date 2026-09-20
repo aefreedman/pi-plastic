@@ -79,10 +79,5 @@
     "typebox": {
       "optional": true
     }
-  },
-  "main": "index.js",
-  "directories": {
-    "test": "tests"
-  },
-  "author": ""
+  }
 }
