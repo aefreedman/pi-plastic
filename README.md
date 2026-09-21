@@ -151,7 +151,7 @@ Project-local installation protects only Pi processes that load those project se
 ## Requirements
 
 - Node.js 22.19.0 or newer
-- Pi 0.86.1 or newer; the current development and eval baseline is Pi 0.86.1
+- Pi 0.87.0 or newer; the current development and eval baseline is Pi 0.87.0
 - Plastic SCM / Unity Version Control CLI (`cm`) available on `PATH`, or `PI_PLASTIC_CM_EXECUTABLE` set to its full executable path
 - A GNU/POSIX-compatible text `diff` available on `PATH`, or `PI_PLASTIC_DIFF_EXECUTABLE` set to its full executable path (including paths containing spaces), for text-only diff tools. Pi invokes that resolved executable as-is and does not discover Git Bash paths automatically. On macOS, bare `diff` is PATH-dependent: it may be GNU Diffutils (often installed as `diff` ahead of system paths) or Apple’s BSD `/usr/bin/diff`; the package does not substitute one for the other. Configure the intended text executable explicitly when that distinction matters.
 - Patch generation has a separate executable policy: `toolPath` is the one-call highest-priority override, followed by `PI_PLASTIC_PATCH_EXECUTABLE`. On Windows, set one to a verified patch-capable non-GUI executable such as Git's `diff.exe`; the package deliberately does not reuse `PI_PLASTIC_DIFF_EXECUTABLE`/GnuWin32 as a patch default. macOS validation with Plastic 11 found that Apple BSD `/usr/bin/diff` supports text-only diffs but rejects the `--binary` argument supplied by `cm patch`; configure a verified GNU Diffutils-compatible executable explicitly for `plastic_patch`. The non-Windows fallback to `PI_PLASTIC_DIFF_EXECUTABLE` or bare `diff` remains only for environments whose resolved executable satisfies that patch contract. In an interactive Pi session, an invalid configured patch override or missing Windows patch setting produces one package capability warning per Pi runtime; the warning omits configured paths, and `plastic_patch` retains its tool-time validation.
@@ -178,7 +178,7 @@ The live test requires `/main`, no pending changes, and no merge in progress. It
 
 ### Dynamic tool-loading eval
 
-The package-local behavioral eval uses fresh Pi 0.86.1 JSON subprocesses against an explicitly attested dedicated Plastic sandbox and is not a skill eval. It compares all-active, balanced, and loader-only mode behavior, checks exact smallest-sufficient loader activations, blocks destructive calls unless they are supported `preflight: true` previews, captures tool calls and sanitized provider-schema measurements, and deletes raw provider payload captures by default.
+The package-local behavioral eval uses fresh Pi 0.87.0 JSON subprocesses against an explicitly attested dedicated Plastic sandbox and is not a skill eval. It compares all-active, balanced, and loader-only mode behavior, checks exact smallest-sufficient loader activations, blocks destructive calls unless they are supported `preflight: true` previews, captures tool calls and sanitized provider-schema measurements, and deletes raw provider payload captures by default.
 
 ```bash
 npm run eval:tool-loading -- --dry-run

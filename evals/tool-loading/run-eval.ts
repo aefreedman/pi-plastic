@@ -83,7 +83,7 @@ function parseOptions(argv: string[]): Options {
 }
 
 function validate(config: EvalConfig, cases: EvalCase[], baseline: JsonObject, options: Options): void {
-  if (config.piVersionPrefix !== "0.86.1") fail("config piVersionPrefix must select Pi 0.86.1 exactly");
+  if (config.piVersionPrefix !== "0.87.0") fail("config piVersionPrefix must select Pi 0.87.0 exactly");
   if (config.sandboxCwdEnv !== "PI_PLASTIC_EVAL_SANDBOX") fail("config sandboxCwdEnv must use the dedicated eval environment variable");
   if (config.sandboxMarkerFile !== ".pi-plastic-eval-sandbox" || config.sandboxMarkerContent !== "pi-plastic-eval-sandbox\n") fail("config sandbox marker attestation is invalid");
   if (config.sandboxAuthorizationEnv !== "PI_PLASTIC_EVAL_ALLOW" || config.sandboxAuthorizationValue !== "dedicated-sandbox") fail("config sandbox authorization attestation is invalid");

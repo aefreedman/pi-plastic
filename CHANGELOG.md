@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows semantic versioning for public package releases.
 
+## [0.7.5] - 2026-09-21
+
+### Fixed
+
+- Align the package-owned tool-loading eval baseline with Pi 0.87.0 so trusted release validation can run.
+
 ## [0.7.4] - 2026-09-21
 
 ### Changed
