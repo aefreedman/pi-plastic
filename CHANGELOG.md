@@ -7,10 +7,17 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
-- Refresh development tooling for the Node 22 floor; retain existing TypeScript module modes and ES2022 target.
-- Close eval guard gaps for registered writes and persistent local artifacts; preserve supported read-only/preflight calls.
+## [0.7.6] - 2026-09-29
 
+### Changed
+
+- Refresh development tooling for the Node 22 floor; retain existing TypeScript module modes and ES2022 target.
 - Align development and deterministic validation with Pi 0.99.1.
+- Update current Pi requirements, eval baseline guidance, and pinned GitHub installation examples.
+
+### Fixed
+
+- Close eval guard gaps for registered writes and persistent local artifacts; preserve supported read-only/preflight calls.
 
 ## [0.7.5] - 2026-09-21
 
