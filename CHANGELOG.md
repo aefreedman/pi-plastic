@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows semantic versioning for public package releases.
 
+## Unreleased
+
+- Align development and deterministic validation with Pi 0.99.1.
+
 ## [0.7.5] - 2026-09-21
 
 ### Fixed
