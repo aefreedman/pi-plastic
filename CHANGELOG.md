@@ -7,6 +7,10 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Fixed
+
+- Remove the post-publish registry visibility gate while preserving fail-closed identity reconciliation before publishing.
+
 ## [0.7.6] - 2026-09-29
 
 ### Changed

@@ -6,9 +6,9 @@ import assert from "node:assert/strict";
 
 const workflow = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
 const gateMatch = workflow.match(
-  /- name: Publish to npm with trusted publishing\n        shell: bash\n        run: \|\n([\s\S]*?)\n      - name: Verify npm release identity/,
+  /- name: Publish to npm with trusted publishing\n        shell: bash\n        run: \|\n([\s\S]*?)\s*$/,
 );
-assert.ok(gateMatch, "release workflow must contain the npm publication gate");
+assert.ok(gateMatch, "release workflow must end with the npm publication gate, not a registry visibility gate");
 const gate = gateMatch[1].replace(/^ {10}/gm, "");
 const expectedHead = "__EXPECTED_HEAD__";
 const bashPath = process.platform === "win32" && existsSync("C:\\Program Files\\Git\\bin\\bash.exe")
