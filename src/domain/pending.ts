@@ -180,8 +180,13 @@ export const parseMachineReadablePendingItems = (output: string, cwd: string): P
     return pendingItems;
 };
 
+// Windows cannot have literal '?' filenames; local cm machine output uses it
+// for characters lost before capture. POSIX '?' filenames remain supported.
+export const hasStatusPathDecodingLoss = (path: string, platform: NodeJS.Platform = process.platform): boolean =>
+    path.includes("\uFFFD") || (platform === "win32" && path.includes("?"));
+
 // Diagnostics deliberately leave the legacy selection parser unchanged for mutation/diff consumers.
-export const diagnoseMachineReadablePendingItems = (output: string, cwd: string) =>
+export const diagnoseMachineReadablePendingItems = (output: string, cwd: string, platform: NodeJS.Platform = process.platform) =>
 {
     const diagnostics = { valid: 0, blank: 0, header: 0, unsupported: 0, malformed: 0, ambiguousLegacyMove: 0 };
     const pendingItems: PendingItem[] = [];
@@ -208,8 +213,8 @@ export const diagnoseMachineReadablePendingItems = (output: string, cwd: string)
                 diagnostics.malformed++;
                 for (const item of items) delete item.revisionId;
             }
-            // Current CLI capture cannot distinguish decoding loss from a literal replacement character.
-            if (items.some(item => item.workspacePath.includes("\uFFFD") || item.sourceWorkspacePath?.includes("\uFFFD"))) diagnostics.malformed++;
+            // Capture cannot distinguish decoding loss from a literal replacement character.
+            if (items.some(item => hasStatusPathDecodingLoss(item.workspacePath, platform) || (item.sourceWorkspacePath !== undefined && hasStatusPathDecodingLoss(item.sourceWorkspacePath, platform)))) diagnostics.malformed++;
             continue;
         }
         if (/^MV\b/.test(line) && !line.includes(STATUS_FIELD_SEPARATOR)) diagnostics.ambiguousLegacyMove++;

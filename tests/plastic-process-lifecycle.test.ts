@@ -2,7 +2,9 @@ import { EventEmitter } from "node:events";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { PassThrough } from "node:stream";
+import { PassThrough, Readable } from "node:stream";
+import strictAssert from "node:assert/strict";
+import { readStream } from "../src/execution/process";
 import { __plasticDiffInternals, __plasticProcessInternals, runWithAbortSignal } from "../src/plastic-core.ts";
 
 const assert = (condition: boolean, message: string): void =>
@@ -232,8 +234,73 @@ const testConcurrentAndNestedScopes = async (): Promise<void> =>
     assert(first.listenerCount("close") === 0 && second.listenerCount("close") === 0, "Both concurrent scopes must clean up listeners.");
 };
 
+const testUtf8StreamDecoding = async (): Promise<void> =>
+{
+    const text = "ASCII ü é 日本 😀 end";
+    const bytes = Buffer.from(text);
+    // Every possible two-chunk boundary, including within 2/3/4-byte sequences.
+    for (let split = 0; split <= bytes.length; split++)
+    {
+        const result = await readStream(Readable.from([bytes.subarray(0, split), bytes.subarray(split)]));
+        strictAssert.deepEqual(result, { output: text, truncated: false, totalChars: text.length });
+    }
+    const chunks = Array.from(bytes, byte => Buffer.from([byte]));
+    for (const limit of [undefined, 0, 7, 14, text.length, text.length + 1])
+    {
+        strictAssert.deepEqual(await readStream(Readable.from(chunks), limit), {
+            output: limit === undefined ? text : text.slice(0, limit),
+            truncated: limit !== undefined && text.length > limit,
+            totalChars: text.length,
+        });
+    }
+    for (const malformed of [Buffer.from([0xff]), Buffer.from([0xc3, 0x28]), Buffer.from([0xf0, 0x9f, 0x98])])
+    {
+        const expected = malformed.toString("utf8");
+        strictAssert.deepEqual(await readStream(Readable.from(Array.from(malformed, byte => Buffer.from([byte])))), {
+            output: expected, truncated: false, totalChars: expected.length,
+        });
+        strictAssert.deepEqual(await readStream(Readable.from([malformed]), 0), {
+            output: "", truncated: true, totalChars: expected.length,
+        });
+    }
+    strictAssert.deepEqual(await readStream(Readable.from([])), { output: "", truncated: false, totalChars: 0 });
+    strictAssert.deepEqual(await readStream(null), { output: "", truncated: false, totalChars: 0 });
+    strictAssert.deepEqual(await readStream(Readable.from(["ü", "日本", "😀"])), { output: "ü日本😀", truncated: false, totalChars: 5 });
+    strictAssert.deepEqual(await readStream(Readable.from([Buffer.from([0xc3]), "plain", Buffer.from("ü")])), { output: "\uFFFDplainü", truncated: false, totalChars: 7 });
+    const broken = Readable.from((async function* () { yield Buffer.from([0xc3]); throw new Error("stream failed"); })());
+    await strictAssert.rejects(readStream(broken), /stream failed/);
+};
+
+const testUtf8ProcessLifecycle = async (): Promise<void> =>
+{
+    const proc = new FakeChildProcess();
+    const controller = new AbortController();
+    const run = __plasticProcessInternals.spawnAndCollect("fake", [], process.cwd(), undefined, controller.signal, {
+        spawn: fakeSpawn(proc), outputLimitChars: 2,
+    });
+    proc.stdout.write(Buffer.from([0xc3]));
+    proc.stderr.write(Buffer.from([0xf0, 0x9f]));
+    await new Promise<void>(resolve => setImmediate(resolve));
+    controller.abort();
+    proc.stdout.write(Buffer.from([0xbc, 0x21, 0x21]));
+    proc.stderr.write(Buffer.from([0x98])); // incomplete sequence flushed at close
+    proc.close();
+    const result = await run;
+    strictAssert.equal(result.stdout, "ü!");
+    strictAssert.equal(result.stdoutTotalChars, 3);
+    strictAssert.equal(result.stdoutTruncated, true);
+    strictAssert.equal(result.stderr, "\uFFFD");
+    strictAssert.equal(result.stderrTotalChars, 1);
+    strictAssert.equal(result.stderrTruncated, false);
+    strictAssert.equal(result.aborted, true);
+    strictAssert.equal(proc.listenerCount("close"), 0);
+    strictAssert.equal(proc.listenerCount("error"), 0);
+};
+
 const main = async (): Promise<void> =>
 {
+    await testUtf8StreamDecoding();
+    await testUtf8ProcessLifecycle();
     await testExecutableResolutionAndDiagnostics();
     await testAbortEscalatesUntilTerminalSettlement();
     await testPortableDiffReceivesActiveAbortSignal();

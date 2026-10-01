@@ -4,7 +4,7 @@ import { PassThrough } from "node:stream";
 import { Check } from "typebox/value";
 import type { SpawnAndCollectDependencies } from "../src/execution/process";
 import { runWithAbortSignal } from "../src/execution/context";
-import { diagnoseMachineReadablePendingItems, parseMachineReadablePendingItems } from "../src/domain/pending";
+import { diagnoseMachineReadablePendingItems, hasStatusPathDecodingLoss, parseMachineReadablePendingItems } from "../src/domain/pending";
 import { projectStatusOutput, validateStatusOutput, statusOutputSchema } from "../src/pi/status-output";
 import { loadRegisteredTools } from "./pi-tool-harness";
 
@@ -41,6 +41,24 @@ assert.deepEqual(json.structuredContent, text.structuredContent);
 assert.equal(calls.filter(call => call[0] === "status").length, 1);
 assert.match(json.details.rawResult, /rawOutput/);
 assert.equal(JSON.stringify(json.structuredContent).includes("rawOutput"), false);
+// Registered adapter must preserve identities split across subprocess byte chunks.
+const unicodeRecord = record("space ü 日本 😀.txt", "PR").replace(`${sep}0${sep}`, `${sep}-1${sep}`);
+const unicodeBytes = Buffer.from(unicodeRecord);
+const splitSpawn = (() => {
+  const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), stdin: new PassThrough(), kill: () => true });
+  void (async () => {
+    for (const byte of unicodeBytes) {
+      child.stdout.write(Buffer.from([byte]));
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+    child.stdout.end(); child.stderr.end(); child.emit("close", 0, null);
+  })();
+  return child;
+}) as any;
+const splitResult = await runWithAbortSignal(undefined, () => status.execute("fixture", { machineReadable: true }, undefined, undefined, { cwd: "/fixture" }), { spawn: splitSpawn });
+assert.equal(splitResult.structuredContent.completeness.read, "complete");
+assert.equal(splitResult.structuredContent.data.items[0].path, "space ü 日本 😀.txt");
+assert.equal(splitResult.structuredContent.data.items[0].revisionId, undefined);
 const full = await invoke(output);
 assert.equal(full.structuredContent.data.items[1].sourcePath, "old.txt");
 for (const raw of ["", `STATUS${sep}16${sep}fixture-repo${sep}fixture-server\n`]) {
@@ -86,6 +104,25 @@ for (const raw of [record("lossy \uFFFD.txt"), ["MV", "100%", "lossy \uFFFD.txt"
   assert.equal(lossy.structuredContent.data.itemCount.excluded, 1);
   assert.equal(lossy.structuredContent.data.items.length, 0);
   assert.deepEqual(diagnoseMachineReadablePendingItems(raw, "/fixture").pendingItems, parseMachineReadablePendingItems(raw, "/fixture"));
+}
+// Platform-specific pre-decoding loss: do not outlaw valid POSIX '?' names.
+for (const platform of ["win32", "linux", "darwin"] as const) {
+  assert.equal(hasStatusPathDecodingLoss("lost?.txt", platform), platform === "win32");
+  assert.equal(hasStatusPathDecodingLoss("lost\uFFFD.txt", platform), true);
+  assert.equal(hasStatusPathDecodingLoss("valid ü 日本 😀.txt", platform), false);
+  for (const raw of [record("lost?.txt"), ["MV", "100%", "lost?.txt", "destination.txt", "False", "41"].join(sep)]) {
+    const diagnosed = diagnoseMachineReadablePendingItems(raw, "/fixture", platform);
+    assert.equal(diagnosed.diagnostics.malformed, platform === "win32" ? 1 : 0);
+    assert.equal(diagnosed.pendingItems.length, 1);
+    assert.deepEqual(diagnosed.pendingItems, parseMachineReadablePendingItems(raw, "/fixture"));
+  }
+}
+for (const raw of [record("lost?.txt"), ["MV", "100%", "lost?.txt", "destination.txt", "False", "41"].join(sep)]) {
+  const result = await invoke(raw);
+  assert.equal(result.structuredContent.completeness.read, process.platform === "win32" ? "incomplete" : "complete");
+  assert.equal(result.structuredContent.data.itemCount.parsed, 1);
+  assert.equal(result.structuredContent.data.itemCount.excluded, process.platform === "win32" ? 1 : 0);
+  assert.equal(result.structuredContent.data.items.length, process.platform === "win32" ? 0 : 1);
 }
 const excluded = projectStatusOutput(machine(record("x".repeat(4097))));
 assert(excluded.ok && excluded.data.mode === "machine");

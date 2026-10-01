@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { StringDecoder } from "node:string_decoder";
 
 export type SpawnResult = {
     stdout: string;
@@ -76,15 +77,22 @@ export const readStream = async (stream: NodeJS.ReadableStream | null | undefine
 
     let output = "";
     let totalChars = 0;
-    for await (const chunk of stream)
+    const decoder = new StringDecoder("utf8");
+    const append = (text: string): void =>
     {
-        const text = chunk.toString();
         totalChars += text.length;
         if (maxChars === undefined || output.length < maxChars)
         {
             output += maxChars === undefined ? text : text.slice(0, Math.max(0, maxChars - output.length));
         }
+    };
+    for await (const chunk of stream)
+    {
+        // Byte boundaries are not character boundaries. Already-decoded streams
+        // retain their strings; flush pending bytes before switching to text.
+        append(typeof chunk === "string" ? decoder.end() + chunk : decoder.write(chunk));
     }
+    append(decoder.end());
     return { output, truncated: maxChars !== undefined && totalChars > maxChars, totalChars };
 };
 

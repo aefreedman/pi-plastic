@@ -17,12 +17,14 @@ const common = {
     provenance: object({ source: Type.Literal("plastic"), producer: Type.Literal("@aefree/pi-plastic"), contentTrust: Type.Literal("external") }),
     completeness,
 };
+// Reject pre-decoding Windows substitution as well as UTF-8 replacement loss.
+const statusPathPattern = process.platform === "win32" ? "^[^\\uFFFD?]*$" : "^[^\\uFFFD]*$";
 const item = object({
     statusCode: Type.String({ minLength: 1, maxLength: 64 }),
     kind: Type.Union([Type.Literal("added"), Type.Literal("changed"), Type.Literal("moved"), Type.Literal("deleted"), Type.Literal("private"), Type.Literal("other")]),
-    path: Type.String({ minLength: 1, maxLength: 4096, pattern: "^[^\\uFFFD]*$" }), isDirectory: Type.Boolean(),
+    path: Type.String({ minLength: 1, maxLength: 4096, pattern: statusPathPattern }), isDirectory: Type.Boolean(),
     revisionId: Type.Optional(Type.String({ minLength: 1, maxLength: 128, pattern: "^[0-9]+$" })),
-    sourcePath: Type.Optional(Type.String({ minLength: 1, maxLength: 4096, pattern: "^[^\\uFFFD]*$" })),
+    sourcePath: Type.Optional(Type.String({ minLength: 1, maxLength: 4096, pattern: statusPathPattern })),
 });
 export const statusOutputSchema = Type.Union([
     object({ ...common, ok: Type.Literal(true), data: object({

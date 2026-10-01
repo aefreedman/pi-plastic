@@ -20,6 +20,8 @@ and this project follows semantic versioning for public package releases.
 
 ### Fixed
 
+- Preserve split UTF-8 subprocess sequences across capture chunks and flush incomplete sequences at stream end while retaining character limits and lifecycle behavior.
+- Exclude Windows status path/source identities containing pre-decoding `?` substitutions and report incomplete reads, without changing POSIX question-mark filenames or legacy checkin/diff selection. Non-UTF-8 Windows cm machine output remains unsupported; no encoding fallback is added.
 - Remove the post-publish registry visibility gate while preserving fail-closed identity reconciliation before publishing.
 
 ## [0.7.6] - 2026-09-29
