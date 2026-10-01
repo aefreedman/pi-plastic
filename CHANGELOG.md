@@ -10,6 +10,7 @@ and this project follows semantic versioning for public package releases.
 ### Changed
 
 - Align development dependencies and the eval runtime baseline with Pi 0.99.2.
+- Extract shared execution and domain owners while preserving tool behavior and existing core export seams.
 
 ### Fixed
 

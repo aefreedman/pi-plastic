@@ -44,10 +44,12 @@ const main = (): void => {
   const bashMergeGuardPath = new URL("../extensions/bash-cm-merge-guard.ts", import.meta.url);
 
   const plasticText = readText(plasticPath);
-  failures += checkRequired(plasticText, "pi-plastic/src/plastic-core.ts", [
+  failures += checkRequired(readText(new URL("../src/execution/cm.ts", import.meta.url)), "pi-plastic/src/execution/cm.ts", [
     "const BLOCKED_CM_DIFF_MESSAGE",
     "ensureCmCommandAllowed(args);",
     'command === "diff"',
+  ]);
+  failures += checkRequired(plasticText, "pi-plastic/src/plastic-core.ts", [
     "export const merge = tool({",
     "export const mergeToBranch = tool({",
   "resolveBranchParentName",

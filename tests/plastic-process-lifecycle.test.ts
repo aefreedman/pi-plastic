@@ -188,12 +188,45 @@ const testTerminalListenersExistBeforeStdinWrite = async (): Promise<void> =>
     assert(proc.listenerCount("error") === 0 && proc.listenerCount("close") === 0, "Expected terminal listeners to be removed after rejection.");
 };
 
+const testConcurrentAndNestedScopes = async (): Promise<void> =>
+{
+    const first = new FakeChildProcess();
+    const second = new FakeChildProcess();
+    const firstController = new AbortController();
+    const secondController = new AbortController();
+    const calls: string[] = [];
+    const scopedSpawn = (name: string, child: FakeChildProcess): typeof import("node:child_process").spawn =>
+        ((command, args) =>
+        {
+            calls.push(`${name}:${command}:${args.join(" ")}`);
+            return child as unknown as ReturnType<typeof import("node:child_process").spawn>;
+        }) as typeof import("node:child_process").spawn;
+    const firstRun = runWithAbortSignal(firstController.signal,
+        () => runWithAbortSignal(undefined, () => __plasticProcessInternals.runCmRaw(["status"], "/first")),
+        { spawn: scopedSpawn("first", first) });
+    const secondRun = runWithAbortSignal(secondController.signal,
+        () => runWithAbortSignal(undefined, () => __plasticProcessInternals.runCmRaw(["showselector"], "/second")),
+        { spawn: scopedSpawn("second", second) });
+    assert(calls.length === 2 && calls[0].startsWith("first:") && calls[1].startsWith("second:"), "Concurrent nested scopes must inherit only their own injected spawn.");
+    firstController.abort();
+    assert(first.signals.join(",") === "SIGTERM" && second.signals.length === 0, "Nested abort inheritance must not leak into another concurrent scope.");
+    first.stdout.write("first-output");
+    second.stdout.write("second-output");
+    first.close();
+    second.close();
+    const results = await Promise.allSettled([firstRun, secondRun]);
+    assert(results[0].status === "rejected" && String(results[0].reason).includes("first-output"), "First nested scope must retain abort diagnostics and captured output.");
+    assert(results[1].status === "fulfilled" && results[1].value === "second-output", "Second scope must retain its independent output.");
+    assert(first.listenerCount("close") === 0 && second.listenerCount("close") === 0, "Both concurrent scopes must clean up listeners.");
+};
+
 const main = async (): Promise<void> =>
 {
     await testExecutableResolutionAndDiagnostics();
     await testAbortEscalatesUntilTerminalSettlement();
     await testPortableDiffReceivesActiveAbortSignal();
     await testTerminalListenersExistBeforeStdinWrite();
+    await testConcurrentAndNestedScopes();
     console.log("PASS: plastic process lifecycle tests passed");
 };
 
