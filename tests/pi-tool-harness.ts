@@ -16,6 +16,7 @@ export type RegisteredTool = {
   promptGuidelines?: string[];
   sourceInfo?: ToolSourceInfo;
   parameters?: unknown;
+  outputSchema?: unknown;
   constrainedSampling?: false | {
     type: "json_schema";
     strict: "prefer" | "require";

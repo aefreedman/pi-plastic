@@ -7,11 +7,16 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Added
+
+- Status-only versioned structured output schema with machine/standard observations, parsed totals, independent read/capture/projection evidence, bounded identity projection, sanitized native errors and compact UTF-8 overflow rejection.
+- Deterministic status adapter/diagnostic tests and a standalone real Pi 0.99.2 file-loaded host test for finalization, codemode and nested consumers without network/provider charges.
+
 ### Changed
 
 - Align development dependencies and the eval runtime baseline with Pi 0.99.2.
 - Modularize execution, domain, operations, text diff, presentation and Pi adapters behind the existing explicit core export facade and canonical-root entry wiring; preserve tool behavior, loading, rendering and exposure.
-- Add a typed internal status observation seam without changing output formats, and deterministic runtime import-layer/cycle, shared-owner and registry-parity regression checks.
+- Add a typed internal status observation seam and shared single-observation presentation, preserving core string results and renderers; add deterministic runtime import-layer/cycle, shared-owner and registry-parity regression checks.
 
 ### Fixed
 

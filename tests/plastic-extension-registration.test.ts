@@ -4,9 +4,13 @@ import { loadRegisteredTools } from "./pi-tool-harness.ts";
 import { PLASTIC_TOOL_REGISTRY, getRegisteredPlasticExportNames, toToolName } from "../src/pi/tool-registry.ts";
 import { PLASTIC_TOOL_NAMES } from "../src/plastic-tool-loading.ts";
 import { getActiveAbortSignal } from "../src/execution/context.ts";
+import { statusOutputSchema } from "../src/pi/status-output.ts";
 
 async function main(): Promise<void> {
   const tools = await loadRegisteredTools();
+  for (const tool of tools.values()) {
+    assert.deepEqual(tool.outputSchema, tool.name === "plastic_status" ? statusOutputSchema : undefined, "Only status owns a structured output schema");
+  }
   const shape = [...tools.values()].map(({ name, label, description, parameters, prepareArguments, promptSnippet, promptGuidelines, constrainedSampling }) => ({
     name, label, description, parameters, defaults: prepareArguments?.({}), promptSnippet, promptGuidelines, constrainedSampling,
   }));

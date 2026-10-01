@@ -75,3 +75,13 @@ function narrowStatusObservation(observation: StatusObservation): void {
     observation.pendingItems.map(item => item.workspacePath);
   }
 }
+
+// Public status schema must retain discriminants and exact fields, not never/any or an index signature.
+import type { StatusOutput } from "../../src/pi/status-output";
+type StatusFailure = Extract<StatusOutput, { ok: false }>;
+type StatusErrorCodes = Expect<Equal<StatusFailure["error"]["code"], "command_failed" | "aborted" | "capture_incomplete" | "invalid_producer_data" | "output_overflow">>;
+type StatusSuccess = Extract<StatusOutput, { ok: true }>;
+type StatusModes = Expect<Equal<StatusSuccess["data"]["mode"], "machine" | "standard">>;
+type MachineData = Extract<StatusSuccess["data"], { mode: "machine" }>;
+type ParseKeys = Expect<Equal<keyof MachineData["parse"], "valid" | "blank" | "header" | "unsupported" | "malformed" | "ambiguousLegacyMove">>;
+type ItemKinds = Expect<Equal<MachineData["items"][number]["kind"], "added" | "changed" | "moved" | "deleted" | "private" | "other">>;

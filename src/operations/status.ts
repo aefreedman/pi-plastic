@@ -1,8 +1,8 @@
 import { tool } from "../tool-definition";
 import { workdirArg } from "./arguments";
-import { MACHINE_READABLE_STATUS_MAX_ITEMS, MACHINE_READABLE_STATUS_DEFAULT_MAX_ITEMS, STATUS_FIELD_SEPARATOR, parseMachineReadablePendingItems, toMachineReadableStatusItems, toMachineReadableStatusSummary, summarizeShortStatus } from "../domain/pending";
+import { MACHINE_READABLE_STATUS_MAX_ITEMS, MACHINE_READABLE_STATUS_DEFAULT_MAX_ITEMS, STATUS_FIELD_SEPARATOR, diagnoseMachineReadablePendingItems, toMachineReadableStatusItems, toMachineReadableStatusSummary, summarizeShortStatus } from "../domain/pending";
 import { outputFormatArg, toStructuredResult, formatStatusText } from "../presentation/results";
-import { runCmRaw, runCm } from "../execution/cm";
+import { runStatusCommand } from "../execution/status-command";
 import { analyzeMergeStatusOutput } from "../domain/merge-output";
 
 export type StatusObservationOptions = {
@@ -24,14 +24,17 @@ export const assembleStatusObservation = async (args: StatusObservationOptions) 
         // revision IDs let agents safely identify the base of moved/deleted items.
         if (!cmdArgs.includes("--includeRevId")) cmdArgs.push("--includeRevId");
         cmdArgs.push("--machinereadable", `--fieldseparator=${STATUS_FIELD_SEPARATOR}`);
-        const output = await runCmRaw(cmdArgs, args.workdir);
+        const { output, capture } = await runStatusCommand(cmdArgs, args.workdir, true);
         const cwd = args.workdir ?? process.cwd();
-        return { kind: "machine" as const, output, cwd, pendingItems: parseMachineReadablePendingItems(output, cwd) };
+        return { kind: "machine" as const, output, capture, cwd, ...diagnoseMachineReadablePendingItems(output, cwd), requestedShort: args.short ?? false };
     }
-    const output = await runCm(cmdArgs, args.workdir);
-    const shortOutput = await runCmRaw(["status", "--short"], args.workdir);
+    const primary = await runStatusCommand(cmdArgs, args.workdir);
+    const secondary = await runStatusCommand(["status", "--short"], args.workdir, true);
+    const output = primary.output;
+    const shortOutput = secondary.output;
     return {
         kind: "standard" as const,
+        capture: secondary.capture,
         output,
         shortOutput,
         summary: summarizeShortStatus(shortOutput),
@@ -41,21 +44,9 @@ export const assembleStatusObservation = async (args: StatusObservationOptions) 
 };
 export type StatusObservation = Awaited<ReturnType<typeof assembleStatusObservation>>;
 
-export const status = tool({
-    description: "Show Plastic SCM workspace status (cm status).",
-    args: {
-        workdir: workdirArg,
-        includeRevId: tool.schema.boolean().optional().describe("Include revision IDs in the status output when supported."),
-        machineReadable: tool.schema.boolean().optional().describe("Return parsed, machine-readable pending status records when supported."),
-        maxItems: tool.schema.number().int().min(1).max(MACHINE_READABLE_STATUS_MAX_ITEMS).optional().describe(`Maximum parsed items in machine-readable JSON (default ${MACHINE_READABLE_STATUS_DEFAULT_MAX_ITEMS}, maximum ${MACHINE_READABLE_STATUS_MAX_ITEMS}).`),
-        includeRaw: tool.schema.boolean().optional().describe("Include unbounded raw machine-readable Plastic output in JSON diagnostics. Applies only when machineReadable=true."),
-        short: tool.schema.boolean().optional().describe("Use short status output."),
-        format: outputFormatArg,
-    },
-    async execute(args)
-    {
+export const presentStatusObservation = async (observation: StatusObservation, args: { format?: "text" | "json"; maxItems?: number; includeRaw?: boolean; workdir?: string }) =>
+{
         const format = args.format ?? "text";
-        const observation = await assembleStatusObservation(args);
         if (observation.kind === "machine")
         {
             const { output: machineOutput, pendingItems, cwd } = observation;
@@ -86,5 +77,21 @@ export const status = tool({
             { rawOutput: output, shortOutput, summary, mergeState, usedShortFlag },
             args.workdir,
         );
+};
+
+export const status = tool({
+    description: "Show Plastic SCM workspace status (cm status).",
+    args: {
+        workdir: workdirArg,
+        includeRevId: tool.schema.boolean().optional().describe("Include revision IDs in the status output when supported."),
+        machineReadable: tool.schema.boolean().optional().describe("Return parsed, machine-readable pending status records when supported."),
+        maxItems: tool.schema.number().int().min(1).max(MACHINE_READABLE_STATUS_MAX_ITEMS).optional().describe(`Maximum parsed items in machine-readable JSON (default ${MACHINE_READABLE_STATUS_DEFAULT_MAX_ITEMS}, maximum ${MACHINE_READABLE_STATUS_MAX_ITEMS}).`),
+        includeRaw: tool.schema.boolean().optional().describe("Include unbounded raw machine-readable Plastic output in JSON diagnostics. Applies only when machineReadable=true."),
+        short: tool.schema.boolean().optional().describe("Use short status output."),
+        format: outputFormatArg,
+    },
+    async execute(args)
+    {
+        return presentStatusObservation(await assembleStatusObservation(args), args);
     },
 });

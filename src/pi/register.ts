@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { executeStatusOutput, statusOutputSchema } from "./status-output";
 import { runWithAbortSignal } from "../execution/context";
 import { renderPlasticCall, renderPlasticResult, renderPlasticSearchResult } from "../plastic-renderers";
 import {
@@ -39,6 +40,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
       label: toToolName(exportName),
       description: coreTool.description ?? toToolName(exportName),
       parameters: buildParameters(coreTool.args),
+      ...(exportName === "status" ? { outputSchema: statusOutputSchema } : {}),
       prepareArguments: config.prepareArguments,
       renderCall(args, theme, context) {
         return renderPlasticCall(exportName, args ?? {}, theme, context);
@@ -51,6 +53,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
         if (exportName !== "mergeBranches" && normalizedParams.workdir === undefined && ctx?.cwd) {
           normalizedParams.workdir = ctx.cwd;
         }
+        if (exportName === "status") return runWithAbortSignal(signal, () => executeStatusOutput(normalizedParams));
         const result = await runWithAbortSignal(signal, async () => coreTool.execute(normalizedParams));
         const text = toText(result);
         return {

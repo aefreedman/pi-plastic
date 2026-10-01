@@ -180,6 +180,45 @@ export const parseMachineReadablePendingItems = (output: string, cwd: string): P
     return pendingItems;
 };
 
+// Diagnostics deliberately leave the legacy selection parser unchanged for mutation/diff consumers.
+export const diagnoseMachineReadablePendingItems = (output: string, cwd: string) =>
+{
+    const diagnostics = { valid: 0, blank: 0, header: 0, unsupported: 0, malformed: 0, ambiguousLegacyMove: 0 };
+    const pendingItems: PendingItem[] = [];
+    for (const rawLine of output.split(/\r?\n/))
+    {
+        const line = rawLine.trim();
+        if (!line) { diagnostics.blank++; continue; }
+        const fields = line.split(STATUS_FIELD_SEPARATOR);
+        if (fields[0] === "STATUS" && fields.length === 4 && /^\d+$/.test(fields[1]) && fields[2] && fields[3]) { diagnostics.header++; continue; }
+        if (/^STATUS \d+ \S+ \S+$/.test(line)) { diagnostics.header++; continue; }
+        if (fields[0] === "STATUS" || line.startsWith("STATUS ")) { diagnostics.malformed++; continue; }
+        const items = parseMachineReadablePendingItems(line, cwd);
+        pendingItems.push(...items);
+        if (items.length) {
+            diagnostics.valid++;
+            // Selection remains permissive, but unfamiliar codes must never imply a complete read.
+            if (!/^(AD|CH|CO|RP|MV|LD|RD|DE|RM|PR)(\+(AD|CH|CO|RP|MV|LD|RD|DE|RM|PR))*$/.test(items[0].statusCode)) diagnostics.unsupported++;
+            // Legacy selection accepts a numeric prefix (e.g. 41 from 41.5).
+            // Status must validate the whole revision token before exposing a reusable identity.
+            const revisionField = fields.length > 1
+                ? fields[items[0].kind === "moved" ? 5 : 3]
+                : line.match(/^([A-Z+]+)\s+(.+)\s+(True|False)(?:\s+(.*))?$/)?.[4]?.trim().split(/\s+/)[0];
+            if (revisionField !== undefined && revisionField !== "" && revisionField !== "-1" && !/^\d+$/.test(revisionField)) {
+                diagnostics.malformed++;
+                for (const item of items) delete item.revisionId;
+            }
+            // Current CLI capture cannot distinguish decoding loss from a literal replacement character.
+            if (items.some(item => item.workspacePath.includes("\uFFFD") || item.sourceWorkspacePath?.includes("\uFFFD"))) diagnostics.malformed++;
+            continue;
+        }
+        if (/^MV\b/.test(line) && !line.includes(STATUS_FIELD_SEPARATOR)) diagnostics.ambiguousLegacyMove++;
+        else if (line.includes(STATUS_FIELD_SEPARATOR) || /^[A-Z+]+\s/.test(line)) diagnostics.malformed++;
+        else diagnostics.unsupported++;
+    }
+    return { pendingItems, diagnostics };
+};
+
 export const getMachineReadablePendingItems = async (workdir?: string): Promise<PendingItem[]> =>
 {
     const cwd = workdir ?? process.cwd();
