@@ -1,0 +1,1420 @@
+[
+  {
+    "name": "plastic_status",
+    "label": "plastic_status",
+    "description": "Show Plastic SCM workspace status (cm status).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        },
+        "includeRevId": {
+          "type": "boolean",
+          "description": "Include revision IDs in the status output when supported."
+        },
+        "machineReadable": {
+          "type": "boolean",
+          "description": "Return parsed, machine-readable pending status records when supported."
+        },
+        "maxItems": {
+          "type": "integer",
+          "description": "Maximum parsed items in machine-readable JSON (default 100, maximum 500).",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "includeRaw": {
+          "type": "boolean",
+          "description": "Include unbounded raw machine-readable Plastic output in JSON diagnostics. Applies only when machineReadable=true."
+        },
+        "short": {
+          "type": "boolean",
+          "description": "Use short status output."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_update",
+    "label": "plastic_update",
+    "description": "Update workspace safely without launching interactive merge (cm update --dontmerge --noinput).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_add",
+    "label": "plastic_add",
+    "description": "Add items to Plastic SCM (cm add).",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "paths"
+      ],
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Paths to add.",
+          "minimum": 1
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_checkin",
+    "label": "plastic_checkin",
+    "description": "Check in pending changes with a required comment (cm checkin -c=...).",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Changeset comment.",
+          "minimum": 1
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional paths to check in."
+        },
+        "applyChanged": {
+          "type": "boolean",
+          "description": "Include changed items not checked out."
+        },
+        "includePrivate": {
+          "type": "boolean",
+          "description": "Include private items."
+        },
+        "includeAll": {
+          "type": "boolean",
+          "description": "Include changed, moved, and deleted items."
+        },
+        "updateAfter": {
+          "type": "boolean",
+          "description": "Deprecated in unattended mode. Blocked because checkin --update can trigger interactive update-merge."
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Preview command and included paths without executing checkin."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_undo",
+    "label": "plastic_undo",
+    "description": "Undo changes for specified items (cm undo).",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "paths"
+      ],
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Paths to undo.",
+          "minimum": 1
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_resolveDeleteChangeConflict",
+    "label": "plastic_resolveDeleteChangeConflict",
+    "description": "Resolve a Plastic SCM delete/change conflict by accepting the source-side deletion with cm remove.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "paths"
+      ],
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Controlled workspace paths to resolve by accepting the source-side deletion.",
+          "minimum": 1
+        },
+        "keepOnDisk": {
+          "type": "boolean",
+          "description": "Keep removed items on disk as private files via --nodisk. Defaults to true."
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Preview the resolution command without executing it."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_diff",
+    "label": "plastic_diff",
+    "description": "Disabled alias for cm diff; use text-only alternatives.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "source"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Source changeset/label/shelveset/branch spec (cs:, lb:, sh:, br:, or a numeric changeset).",
+          "minimum": 1
+        },
+        "destination": {
+          "type": "string",
+          "description": "Optional destination changeset/label/shelveset/branch spec."
+        },
+        "added": {
+          "type": "boolean",
+          "description": "Show only added items."
+        },
+        "changed": {
+          "type": "boolean",
+          "description": "Show only changed items."
+        },
+        "moved": {
+          "type": "boolean",
+          "description": "Show only moved items."
+        },
+        "deleted": {
+          "type": "boolean",
+          "description": "Show only deleted items."
+        },
+        "repositoryPaths": {
+          "type": "boolean",
+          "description": "Print repository paths instead of workspace paths."
+        },
+        "format": {
+          "type": "string",
+          "description": "Format string for CLI output."
+        },
+        "dateFormat": {
+          "type": "string",
+          "description": "Date format for output dates."
+        },
+        "comparisonMethod": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "ignoreeol"
+            },
+            {
+              "type": "string",
+              "const": "ignorewhitespaces"
+            },
+            {
+              "type": "string",
+              "const": "ignoreeolandwhitespaces"
+            },
+            {
+              "type": "string",
+              "const": "recognizeall"
+            }
+          ],
+          "description": "Comparison method used for diff calculations."
+        },
+        "clean": {
+          "type": "boolean",
+          "description": "Exclude changes produced by merges."
+        },
+        "integration": {
+          "type": "boolean",
+          "description": "Show pending integration differences."
+        },
+        "fullPaths": {
+          "type": "boolean",
+          "description": "Force full workspace paths when possible."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_patch",
+    "label": "plastic_patch",
+    "description": "Generate a Plastic SCM review patch with a patch-specific non-GUI diff backend; branch selectors are qualified to the current workspace repository and requested outputs publish atomically without overwrite (cm patch).",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "source"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Source changeset or branch spec. Unqualified br:/ selectors are qualified only from the exact current workspace repository.",
+          "minimum": 1
+        },
+        "destination": {
+          "type": "string",
+          "description": "Optional second changeset or branch spec for two-spec patch generation."
+        },
+        "output": {
+          "type": "string",
+          "description": "Optional new output file path. The package stages then atomically publishes it and refuses any existing path. If omitted, patch content is returned."
+        },
+        "toolPath": {
+          "type": "string",
+          "description": "Optional patch-capable non-GUI diff executable for this call (highest priority). Otherwise use PI_PLASTIC_PATCH_EXECUTABLE; non-Windows falls back to PI_PLASTIC_DIFF_EXECUTABLE/diff, which must support the local Plastic patch argument contract."
+        },
+        "clean": {
+          "type": "boolean",
+          "description": "Exclude content that arrived via merges and include only direct checkins."
+        },
+        "integration": {
+          "type": "boolean",
+          "description": "Show branch changes pending integration into the parent branch."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_diffRevisions",
+    "label": "plastic_diffRevisions",
+    "description": "Show a bounded text-only diff between two file-qualified Plastic revisions using portable diff -u; binary content is reported explicitly.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "leftRevision",
+        "rightRevision"
+      ],
+      "properties": {
+        "leftRevision": {
+          "type": "string",
+          "description": "Left file-qualified Plastic revision spec for cm cat.",
+          "minimum": 1
+        },
+        "rightRevision": {
+          "type": "string",
+          "description": "Right file-qualified Plastic revision spec for cm cat.",
+          "minimum": 1
+        },
+        "maxChars": {
+          "type": "integer",
+          "description": "Maximum diff-body characters returned (default 8000, maximum 20000).",
+          "minimum": 500,
+          "maximum": 20000
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_diffFile",
+    "label": "plastic_diffFile",
+    "description": "Show a bounded text-only diff between a workspace file and its Plastic base (or a supported revision). Omit revision for the common workspace-base comparison.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Workspace file path to diff.",
+          "minimum": 1
+        },
+        "revision": {
+          "type": "string",
+          "description": "Optional revision: changeset number/cs:<number>, br:/<branch>, lb:<label>, file-qualified '<path>#<selector>', or global revid:/rev:. Omit for the workspace base."
+        },
+        "maxChars": {
+          "type": "integer",
+          "description": "Maximum diff-body characters returned (default 8000, maximum 20000).",
+          "minimum": 500,
+          "maximum": 20000
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_workspaceDiff",
+    "label": "plastic_workspaceDiff",
+    "description": "Review explicitly selected pending workspace file diffs, or opt into a small bounded whole-workspace review with allPending=true. Use plastic_status when only changed paths are needed.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minimum": 1,
+            "maximum": 1024
+          },
+          "description": "Pending workspace paths to review (maximum 20, 1024 characters each). Selecting paths includes matching private files.",
+          "maximum": 20
+        },
+        "allPending": {
+          "type": "boolean",
+          "description": "Explicitly review pending non-private files when paths are omitted. Defaults to false; required for an unscoped workspace diff."
+        },
+        "includePrivate": {
+          "type": "boolean",
+          "description": "Include private pending files with allPending=true. Selected private paths do not require this flag."
+        },
+        "maxFiles": {
+          "type": "integer",
+          "description": "Maximum files to compare for allPending review (default 3, maximum 20); selected paths are all considered unless this is set.",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "maxChars": {
+          "type": "integer",
+          "description": "Maximum diff-body characters returned per file (default 3000, maximum 8000).",
+          "minimum": 500,
+          "maximum": 8000
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_branchCreate",
+    "label": "plastic_branchCreate",
+    "description": "Create a hierarchical Plastic SCM branch, guarding rare top-level branch creation (cm branch create).",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "branch"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "description": "Relative new-branch name or full hierarchical branch path. A relative name uses parent, or the current branch when parent is omitted.",
+          "minimum": 1
+        },
+        "parent": {
+          "type": "string",
+          "description": "Parent branch for a relative branch name. May differ from the workspace branch; Plastic uses the parent's latest changeset by default."
+        },
+        "changeset": {
+          "type": "string",
+          "description": "Changeset used as the starting point instead of the parent branch's latest changeset."
+        },
+        "label": {
+          "type": "string",
+          "description": "Label used as the starting point."
+        },
+        "comment": {
+          "type": "string",
+          "description": "Optional branch comment."
+        },
+        "commentsFile": {
+          "type": "string",
+          "description": "File path containing the branch comment."
+        },
+        "allowRootBranch": {
+          "type": "boolean",
+          "description": "Allow intentional top-level branch creation such as /<new-branch>. Defaults to false."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_switchBranch",
+    "label": "plastic_switchBranch",
+    "description": "Switch the Plastic SCM workspace to a branch (cm switch), handling pending changes when needed.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "branch"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "description": "Branch name or spec selected from the current repository convention.",
+          "minimum": 1
+        },
+        "pendingChanges": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "shelve"
+            },
+            {
+              "type": "string",
+              "const": "bring"
+            },
+            {
+              "type": "string",
+              "const": "cancel"
+            }
+          ],
+          "description": "How to handle pending changes when switching branches. Defaults to cancel. In unattended mode, bring is blocked only when tracked pending changes exist."
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Preview switch strategy without executing switch."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_merge",
+    "label": "plastic_merge",
+    "description": "Merge safely with explicit non-interactive conflict strategy (cm merge --merge --nointeractiveresolution).",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "source"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Source branch/changeset/label/shelveset spec to merge from.",
+          "minimum": 1
+        },
+        "strategy": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "auto"
+            },
+            {
+              "type": "string",
+              "const": "source"
+            },
+            {
+              "type": "string",
+              "const": "destination"
+            }
+          ],
+          "description": "Conflict resolution strategy. auto tries non-destructive auto-resolution and aborts if manual conflict remains. source/destination are explicit overrides."
+        },
+        "cherrypicking": {
+          "type": "boolean",
+          "description": "Enable cherry-picking mode."
+        },
+        "forced": {
+          "type": "boolean",
+          "description": "Skip connected-branch checks when supported by the merge mode."
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Preview command without executing merge."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_mergeBranches",
+    "label": "plastic_mergeBranches",
+    "description": "Perform one bounded workspace-free server-side merge between explicitly qualified branches; merge-link and xlink effects remain unverified.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "source",
+        "target",
+        "message"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Fully qualified source branch: br:/<branch>@<repository>@<server>.",
+          "minimum": 1
+        },
+        "target": {
+          "type": "string",
+          "description": "Fully qualified target branch in the same repository/server as source.",
+          "minimum": 1
+        },
+        "message": {
+          "type": "string",
+          "description": "Non-empty changeset comment; no editor fallback is allowed.",
+          "minimum": 1
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Render the exact command only; does not contact Plastic or analyze remote conflicts."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_mergeToBranch",
+    "label": "plastic_mergeToBranch",
+    "description": "Merge a source branch into a target branch using safe Plastic update, switch, merge, and checkin steps.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Source branch to merge. Defaults to the currently loaded branch."
+        },
+        "target": {
+          "type": "string",
+          "description": "Target branch to merge into. Defaults to the source branch's Plastic parent branch."
+        },
+        "cardRef": {
+          "type": "string",
+          "description": "Optional tracker card reference to include in the merge checkin message, for example $4re."
+        },
+        "message": {
+          "type": "string",
+          "description": "Optional checkin message. Defaults to Merge <source> into <target>."
+        },
+        "strategy": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "auto"
+            },
+            {
+              "type": "string",
+              "const": "source"
+            },
+            {
+              "type": "string",
+              "const": "destination"
+            }
+          ],
+          "description": "Merge conflict strategy. Defaults to auto."
+        },
+        "updateTarget": {
+          "type": "boolean",
+          "description": "Run plastic_update on the target branch before merging. Defaults to true."
+        },
+        "includePrivate": {
+          "type": "boolean",
+          "description": "Include private items in the merge checkin. Defaults to false."
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Preview the planned closeout merge steps without executing them."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_finalizeMerge",
+    "label": "plastic_finalizeMerge",
+    "description": "Finalize Plastic merge metadata after manual conflict resolution using an explicit non-interactive source/destination policy.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "source"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Original source branch/changeset/label/shelveset spec being merged.",
+          "minimum": 1
+        },
+        "strategy": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "source"
+            },
+            {
+              "type": "string",
+              "const": "destination"
+            }
+          ],
+          "description": "Explicit finalization policy. destination preserves destination/manual workspace resolution in typical post-resolution flows; source accepts source where Plastic still needs a policy."
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Preview finalization command without executing it."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_currentBranch",
+    "label": "plastic_currentBranch",
+    "description": "Get the current Plastic SCM branch from workspace status output.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_branchList",
+    "label": "plastic_branchList",
+    "description": "List Plastic SCM branches using cm find branch with optional filters.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "nameLike": {
+          "type": "string",
+          "description": "Filter by branch name pattern (supports % wildcard)."
+        },
+        "parent": {
+          "type": "string",
+          "description": "Filter by parent branch spec."
+        },
+        "owner": {
+          "type": "string",
+          "description": "Filter by branch owner."
+        },
+        "includeHidden": {
+          "type": "boolean",
+          "description": "Include hidden branches in the query result."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of branches to return.",
+          "minimum": 1
+        },
+        "orderBy": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "date"
+            },
+            {
+              "type": "string",
+              "const": "branchname"
+            }
+          ],
+          "description": "Sort field for branch queries."
+        },
+        "descending": {
+          "type": "boolean",
+          "description": "Sort descending when true."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_branchExists",
+    "label": "plastic_branchExists",
+    "description": "Check whether a branch exists using cm find branch.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "branch"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "description": "Branch name to check.",
+          "minimum": 1
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_branchDelete",
+    "label": "plastic_branchDelete",
+    "description": "Delete a Plastic SCM branch (cm branch delete).",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "branch"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "description": "Branch spec to delete.",
+          "minimum": 1
+        },
+        "deleteChangesets": {
+          "type": "boolean",
+          "description": "Delete changesets inside the branch when required."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_shelvesetCreate",
+    "label": "plastic_shelvesetCreate",
+    "description": "Create a shelveset (cm shelveset create).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "comment": {
+          "type": "string",
+          "description": "Shelveset comment."
+        },
+        "commentsFile": {
+          "type": "string",
+          "description": "File path containing shelveset comment."
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional item paths to shelve."
+        },
+        "all": {
+          "type": "boolean",
+          "description": "Include changed, moved, and deleted items."
+        },
+        "dependencies": {
+          "type": "boolean",
+          "description": "Include local change dependencies."
+        },
+        "summaryFormat": {
+          "type": "boolean",
+          "description": "Print only created shelveset spec for automation."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_shelvesetApply",
+    "label": "plastic_shelvesetApply",
+    "description": "Apply a shelveset (cm shelveset apply).",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "shelveset"
+      ],
+      "properties": {
+        "shelveset": {
+          "type": "string",
+          "description": "Shelveset spec to apply (for example, sh:3).",
+          "minimum": 1
+        },
+        "changePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional shelve server paths to apply."
+        },
+        "preview": {
+          "type": "boolean",
+          "description": "Preview changes without applying them."
+        },
+        "dontCheckout": {
+          "type": "boolean",
+          "description": "Keep applied changes as local modifications without checkout."
+        },
+        "comparisonMethod": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "ignoreeol"
+            },
+            {
+              "type": "string",
+              "const": "ignorewhitespaces"
+            },
+            {
+              "type": "string",
+              "const": "ignoreeolandwhitespaces"
+            },
+            {
+              "type": "string",
+              "const": "recognizeall"
+            }
+          ],
+          "description": "Comparison method used when applying changes."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_shelvesetDelete",
+    "label": "plastic_shelvesetDelete",
+    "description": "Delete a shelveset (cm shelveset delete).",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "shelveset"
+      ],
+      "properties": {
+        "shelveset": {
+          "type": "string",
+          "description": "Shelveset spec to delete (for example, sh:3).",
+          "minimum": 1
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_shelvesetList",
+    "label": "plastic_shelvesetList",
+    "description": "List shelvesets using cm find shelve.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "description": "Filter by shelveset owner."
+        },
+        "commentLike": {
+          "type": "string",
+          "description": "Filter by shelveset comment pattern (supports % wildcard)."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of shelvesets to return.",
+          "minimum": 1
+        },
+        "dateFrom": {
+          "type": "string",
+          "description": "Filter shelvesets created on or after this date/date constant."
+        },
+        "format": {
+          "type": "string",
+          "description": "Format string for query output."
+        },
+        "dateFormat": {
+          "type": "string",
+          "description": "Date format for query output."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_codeReviewCreate",
+    "label": "plastic_codeReviewCreate",
+    "description": "Create a code review (cm codereview).",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "target",
+        "title"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "description": "Review target spec (branch, changeset, or shelveset spec).",
+          "minimum": 1
+        },
+        "title": {
+          "type": "string",
+          "description": "Code review title.",
+          "minimum": 1
+        },
+        "status": {
+          "type": "string",
+          "description": "Initial review status."
+        },
+        "assignee": {
+          "type": "string",
+          "description": "Initial review assignee."
+        },
+        "repository": {
+          "type": "string",
+          "description": "Repository specification when no workspace is used."
+        },
+        "format": {
+          "type": "string",
+          "description": "Format string for creation output."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_codeReviewUpdate",
+    "label": "plastic_codeReviewUpdate",
+    "description": "Update an existing code review (cm codereview -e).",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Code review id or GUID.",
+          "minimum": 1
+        },
+        "status": {
+          "type": "string",
+          "description": "Updated review status."
+        },
+        "assignee": {
+          "type": "string",
+          "description": "Updated review assignee."
+        },
+        "repository": {
+          "type": "string",
+          "description": "Repository specification when no workspace is used."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_codeReviewDelete",
+    "label": "plastic_codeReviewDelete",
+    "description": "Delete one or more code reviews (cm codereview -d).",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "ids"
+      ],
+      "properties": {
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Code review IDs or GUIDs to delete.",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string",
+          "description": "Repository specification when no workspace is used."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_codeReviewFind",
+    "label": "plastic_codeReviewFind",
+    "description": "Find code reviews with filters using cm find review.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Filter by review status."
+        },
+        "assignee": {
+          "type": "string",
+          "description": "Filter by review assignee."
+        },
+        "owner": {
+          "type": "string",
+          "description": "Filter by review owner."
+        },
+        "target": {
+          "type": "string",
+          "description": "Filter by review target branch/changeset spec."
+        },
+        "targetType": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "branch"
+            },
+            {
+              "type": "string",
+              "const": "changeset"
+            }
+          ],
+          "description": "Filter by review target type."
+        },
+        "titleLike": {
+          "type": "string",
+          "description": "Filter by title pattern (supports % wildcard)."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of reviews to return.",
+          "minimum": 1
+        },
+        "orderBy": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "date"
+            },
+            {
+              "type": "string",
+              "const": "modifieddate"
+            },
+            {
+              "type": "string",
+              "const": "status"
+            }
+          ],
+          "description": "Sort field for review queries."
+        },
+        "descending": {
+          "type": "boolean",
+          "description": "Sort descending when true."
+        },
+        "format": {
+          "type": "string",
+          "description": "Format string for query output."
+        },
+        "dateFormat": {
+          "type": "string",
+          "description": "Date format for query output."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_workspaceList",
+    "label": "plastic_workspaceList",
+    "description": "List Plastic SCM workspaces (cm workspace list).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "description": "Format string for workspace list output."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {}
+  },
+  {
+    "name": "plastic_tool_search",
+    "label": "Plastic Tool Search",
+    "description": "Search and enable Plastic SCM / Unity Version Control tools for workspace status and sync, changes and checkins, text-only diffs and patches, branches and merges, shelvesets, code reviews, and workspaces.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Capability or workflow to search for."
+        },
+        "toolNames": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "Exact public Plastic tool name."
+          },
+          "maxItems": 4,
+          "description": "Optional exact tool names to enable."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4,
+          "description": "Maximum matching tools to enable. Defaults to the single best keyword match; exact toolNames requests may enable up to four."
+        }
+      }
+    },
+    "promptSnippet": "Use plastic_tool_search to find and enable Plastic SCM capabilities that are not active.",
+    "promptGuidelines": [
+      "Use plastic_tool_search before a Plastic SCM action when an appropriate plastic_* tool is not active. Inspect exact mutation targets. Do not preflight routinely: use preflight for ambiguous or broad scope, moved/deleted path rewriting, compound operations, or an explicit preview request."
+    ]
+  }
+]

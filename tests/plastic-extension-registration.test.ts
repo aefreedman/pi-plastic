@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { loadRegisteredTools } from "./pi-tool-harness.ts";
 
-function main(): void {
+async function main(): Promise<void> {
+  const tools = await loadRegisteredTools();
+  const shape = [...tools.values()].map(({ name, label, description, parameters, prepareArguments, promptSnippet, promptGuidelines, constrainedSampling }) => ({
+    name, label, description, parameters, defaults: prepareArguments?.({}), promptSnippet, promptGuidelines, constrainedSampling,
+  }));
+  const expectedShape = JSON.parse(readFileSync(new URL("./fixtures/plastic-registration-shape.json", import.meta.url), "utf8"));
+  assert.deepEqual(JSON.parse(JSON.stringify(shape)), expectedShape, "Registered order, descriptions, schemas and argument defaults must preserve the characterized tool surface");
+  assert(!tools.has("plastic_workspaceCreate"), "workspaceCreate must remain unregistered");
   const indexText = readFileSync(new URL("../index.ts", import.meta.url), "utf8");
   const packageManifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   const branchStatusText = readFileSync(new URL("../extensions/plastic-branch-status.ts", import.meta.url), "utf8");
@@ -33,4 +41,4 @@ function main(): void {
   console.log("PASS: plastic extension registration test succeeded");
 }
 
-main();
+void main();
