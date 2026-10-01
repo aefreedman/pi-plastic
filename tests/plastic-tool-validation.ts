@@ -65,12 +65,10 @@ const main = (): void => {
     "selectPrivatePathsForAutoAdd",
     "filterPendingItemsByScope",
     "isNoChangesWorkspaceCheckinError",
-    "SENSITIVE_PRIVATE_PATH_PATTERNS",
     "auto-add-private-retry-success",
     "__plasticSwitchInternals",
     "normalizeBranchSpecForComparison",
     "assertWorkspaceOnBranch",
-    "Plastic changesets remain on the branch where they were created",
     "isSwitchBringBlockedForUnattended",
     "canSwitchDirectWithPrivateOnlyPending",
     "direct-switch-private-only",
@@ -79,12 +77,18 @@ const main = (): void => {
     "--nointeractiveresolution",
     "--mergetype=try",
     "--automaticresolution=all-",
-    "FILE_CONFLICT",
     "isMergeInProgressCheckinError",
     "buildMergeInProgressCheckinMessage",
     "updateAfter is disabled for unattended safety",
     '["update", "--dontmerge", "--noinput"]',
   ]);
+  for (const [owner, snippets] of [
+    ["pending", ["SENSITIVE_PRIVATE_PATH_PATTERNS"]],
+    ["branches", ["Plastic changesets remain on the branch where they were created"]],
+    ["merge-output", ["FILE_CONFLICT"]],
+  ] as const) {
+    failures += checkRequired(readText(new URL(`../src/domain/${owner}.ts`, import.meta.url)), `pi-plastic/src/domain/${owner}.ts`, [...snippets]);
+  }
   failures += checkForbidden(plasticText, "pi-plastic/src/plastic-core.ts", [
     /runCm\(\["diff"/,
     /runCmRaw\(\["diff"/,
