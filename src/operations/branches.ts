@@ -1,9 +1,10 @@
-import { getBranchLeafName, resolveBranchCreationTarget, normalizeBranchSpecForComparison, resolveCurrentBranchName, cmWhereLike, cmWhereEquals, isSameBranchSpec } from "../domain/branches";
+import { assembleCurrentBranchObservation, assembleBranchExistsObservation, presentCurrentBranchObservation, presentBranchExistsObservation } from "./branch-reads";
+import { getBranchLeafName, resolveBranchCreationTarget, normalizeBranchSpecForComparison, resolveCurrentBranchName, cmWhereLike, cmWhereEquals } from "../domain/branches";
 import { parsePlasticStatusBranch } from "../plastic-workspace";
 import { tool } from "../tool-definition";
 import { workdirArg } from "./arguments";
-import { runCm, runCmRaw, normalizeFindOutputLines } from "../execution/cm";
-import { outputFormatArg, toStructuredResult } from "../presentation/results";
+import { runCm } from "../execution/cm";
+import { outputFormatArg } from "../presentation/results";
 
 export const __plasticBranchInternals = {
     getBranchLeafName,
@@ -89,17 +90,7 @@ export const currentBranch = tool({
     },
     async execute(args)
     {
-        const format = args.format ?? "text";
-        const branch = await resolveCurrentBranchName(args.workdir);
-        return toStructuredResult(
-            "current-branch",
-            format,
-            branch,
-            {
-                branch,
-            },
-            args.workdir,
-        );
+        return presentCurrentBranchObservation(await assembleCurrentBranchObservation(args), args);
     },
 });
 
@@ -172,19 +163,7 @@ export const branchExists = tool({
     },
     async execute(args)
     {
-        // Plastic's `name` query field contains only the leaf segment even though
-        // `{name}` renders the full branch path. Query by leaf, then compare the
-        // returned full paths so identical leaf names under other parents do not
-        // produce a false positive.
-        const output = await runCmRaw([
-            "find",
-            "branch",
-            `where ${cmWhereEquals("name", getBranchLeafName(args.branch))}`,
-            "--format={name}",
-            "--nototal",
-        ], args.workdir);
-        const exists = normalizeFindOutputLines(output).some((branch) => isSameBranchSpec(branch, args.branch));
-        return exists ? "true" : "false";
+        return presentBranchExistsObservation(await assembleBranchExistsObservation(args));
     },
 });
 

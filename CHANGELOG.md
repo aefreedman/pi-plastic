@@ -9,6 +9,8 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Versioned structured output for `plastic_currentBranch` and `plastic_branchExists`, with exact scoped branch identities, actual boolean existence, single-observation presentation, sanitized native failures, 4096-character identity and 16384-byte compact DTO bounds.
+- Deterministic branch-read contract/transport tests and real Pi host finalizer/codemode/nested-consumer coverage; qualified existence requests explicitly remain workspace-repository path comparisons, not requested-repository verification.
 - Status-only versioned structured output schema with machine/standard observations, parsed totals, independent read/capture/projection evidence, bounded identity projection, sanitized native errors and compact UTF-8 overflow rejection.
 - Deterministic status adapter/diagnostic tests and a standalone real Pi 0.99.2 file-loaded host test for finalization, codemode and nested consumers without network/provider charges.
 
@@ -20,6 +22,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Fixed
 
+- Fail branch reads closed on malformed/ambiguous/lossy identities, partial query rows, successful stderr uncertainty and failed/aborted/truncated captures; preserve mutation resolver behavior and do not retry failed resolution commands.
 - Preserve split UTF-8 subprocess sequences across capture chunks and flush incomplete sequences at stream end while retaining character limits and lifecycle behavior.
 - Exclude Windows status path/source identities containing pre-decoding `?` substitutions and report incomplete reads, without changing POSIX question-mark filenames or legacy checkin/diff selection. Non-UTF-8 Windows cm machine output remains unsupported; no encoding fallback is added.
 - Remove the post-publish registry visibility gate while preserving fail-closed identity reconciliation before publishing.

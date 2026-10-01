@@ -1,3 +1,4 @@
+import { executeBranchOutput, currentBranchOutputSchema, branchExistsOutputSchema } from "./branch-output";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { executeStatusOutput, statusOutputSchema } from "./status-output";
@@ -40,7 +41,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
       label: toToolName(exportName),
       description: coreTool.description ?? toToolName(exportName),
       parameters: buildParameters(coreTool.args),
-      ...(exportName === "status" ? { outputSchema: statusOutputSchema } : {}),
+      ...(exportName === "status" ? { outputSchema: statusOutputSchema } : exportName === "currentBranch" ? { outputSchema: currentBranchOutputSchema } : exportName === "branchExists" ? { outputSchema: branchExistsOutputSchema } : {}),
       prepareArguments: config.prepareArguments,
       renderCall(args, theme, context) {
         return renderPlasticCall(exportName, args ?? {}, theme, context);
@@ -54,6 +55,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
           normalizedParams.workdir = ctx.cwd;
         }
         if (exportName === "status") return runWithAbortSignal(signal, () => executeStatusOutput(normalizedParams));
+        if (exportName === "currentBranch" || exportName === "branchExists") return runWithAbortSignal(signal, () => executeBranchOutput(exportName, normalizedParams));
         const result = await runWithAbortSignal(signal, async () => coreTool.execute(normalizedParams));
         const text = toText(result);
         return {

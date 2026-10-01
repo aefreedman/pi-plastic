@@ -5,11 +5,12 @@ import { PLASTIC_TOOL_REGISTRY, getRegisteredPlasticExportNames, toToolName } fr
 import { PLASTIC_TOOL_NAMES } from "../src/plastic-tool-loading.ts";
 import { getActiveAbortSignal } from "../src/execution/context.ts";
 import { statusOutputSchema } from "../src/pi/status-output.ts";
+import { currentBranchOutputSchema, branchExistsOutputSchema } from "../src/pi/branch-output.ts";
 
 async function main(): Promise<void> {
   const tools = await loadRegisteredTools();
   for (const tool of tools.values()) {
-    assert.deepEqual(tool.outputSchema, tool.name === "plastic_status" ? statusOutputSchema : undefined, "Only status owns a structured output schema");
+    assert.deepEqual(tool.outputSchema, tool.name === "plastic_status" ? statusOutputSchema : tool.name === "plastic_currentBranch" ? currentBranchOutputSchema : tool.name === "plastic_branchExists" ? branchExistsOutputSchema : undefined, "Exactly status and the two branch-read tools own structured output schemas");
   }
   const shape = [...tools.values()].map(({ name, label, description, parameters, prepareArguments, promptSnippet, promptGuidelines, constrainedSampling }) => ({
     name, label, description, parameters, defaults: prepareArguments?.({}), promptSnippet, promptGuidelines, constrainedSampling,
