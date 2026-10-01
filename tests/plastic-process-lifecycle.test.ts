@@ -195,6 +195,8 @@ const testConcurrentAndNestedScopes = async (): Promise<void> =>
     const firstController = new AbortController();
     const secondController = new AbortController();
     const calls: string[] = [];
+    let releaseScopes: (() => void) | undefined;
+    const ready = new Promise<void>((resolvePromise) => { releaseScopes = resolvePromise; });
     const scopedSpawn = (name: string, child: FakeChildProcess): typeof import("node:child_process").spawn =>
         ((command, args) =>
         {
@@ -202,11 +204,21 @@ const testConcurrentAndNestedScopes = async (): Promise<void> =>
             return child as unknown as ReturnType<typeof import("node:child_process").spawn>;
         }) as typeof import("node:child_process").spawn;
     const firstRun = runWithAbortSignal(firstController.signal,
-        () => runWithAbortSignal(undefined, () => __plasticProcessInternals.runCmRaw(["status"], "/first")),
+        async () => {
+            await ready;
+            return runWithAbortSignal(undefined, () => __plasticProcessInternals.runCmRaw(["status"], "/first"));
+        },
         { spawn: scopedSpawn("first", first) });
     const secondRun = runWithAbortSignal(secondController.signal,
-        () => runWithAbortSignal(undefined, () => __plasticProcessInternals.runCmRaw(["showselector"], "/second")),
+        async () => {
+            await ready;
+            return runWithAbortSignal(undefined, () => __plasticProcessInternals.runCmRaw(["showselector"], "/second"));
+        },
         { spawn: scopedSpawn("second", second) });
+    // Resume only after both outer scopes exist: a process-global injection
+    // would route both resumed commands through the second scope's seam.
+    releaseScopes?.();
+    await Promise.resolve();
     assert(calls.length === 2 && calls[0].startsWith("first:") && calls[1].startsWith("second:"), "Concurrent nested scopes must inherit only their own injected spawn.");
     firstController.abort();
     assert(first.signals.join(",") === "SIGTERM" && second.signals.length === 0, "Nested abort inheritance must not leak into another concurrent scope.");
