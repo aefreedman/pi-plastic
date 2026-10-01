@@ -1,5 +1,20 @@
 import { tool } from "../tool-definition";
+import { analyzeMergeStatusOutput } from "../domain/merge-output";
 import { getCmVersion } from "../execution/cli-version";
+
+export const formatStatusText = (output: string, mergeState: ReturnType<typeof analyzeMergeStatusOutput>): string =>
+{
+    return mergeState.hasMergeInProgress || mergeState.hasPendingMergeLinks
+    ? [
+        output,
+        "",
+        "## Merge State",
+        `- Pending merge links: ${mergeState.pendingMergeLinks.length}`,
+        `- Merge-in-progress hints: ${mergeState.mergeInProgressHints.length}`,
+        ...(mergeState.hasMergeInProgress ? ["- Checkin may be blocked until merge metadata is finalized. If files are resolved, run plastic_finalizeMerge(...)."] : []),
+    ].join("\n")
+    : output;
+};
 
 export const TOOL_VERSION = "v2.0.0";
 

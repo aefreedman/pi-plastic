@@ -11,6 +11,7 @@ and this project follows semantic versioning for public package releases.
 
 - Align development dependencies and the eval runtime baseline with Pi 0.99.2.
 - Extract shared execution and domain owners while preserving tool behavior and existing core export seams.
+- Extract focused operation, text-diff and presentation owners; retain an explicit core export facade and add a typed internal status observation seam without changing output formats.
 
 ### Fixed
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { runWithAbortSignal, status } from "../src/plastic-core.ts";
+import { assembleStatusObservation, type StatusObservation } from "../src/operations/status.ts";
 
 class FakeChildProcess extends EventEmitter {
   readonly stdout = new PassThrough();
@@ -41,6 +42,18 @@ const jsonPayload = (result: unknown): Record<string, unknown> => {
 };
 
 const root = "/repo/workspace";
+const observationCalls: Call[] = [];
+const observation: StatusObservation = await runWithAbortSignal(undefined, () => assembleStatusObservation({ machineReadable: true, workdir: root }), { spawn: fakeCommands(observationCalls) });
+assert.equal(observation.kind, "machine");
+if (observation.kind !== "machine") throw new Error("Expected machine observations");
+assert.equal(observation.output, machineOutput);
+assert.equal(observation.pendingItems.length, 5, "Observation seam retains all records before response bounds");
+assert.equal(observation.pendingItems[3].revisionId, "44");
+assert.deepEqual(observationCalls.map((call) => call.args[0]), ["status"], "Observation assembly must not look up CLI metadata");
+const standardCalls: Call[] = [];
+const standardObservation = await runWithAbortSignal(undefined, () => assembleStatusObservation({ short: true, includeRevId: true, workdir: root }), { spawn: fakeCommands(standardCalls) });
+assert.equal(standardObservation.kind, "standard");
+assert.deepEqual(standardCalls.map((call) => call.args), [["status", "--short", "--includeRevId"], ["status", "--short"]], "Standard assembly preserves status/short order without version lookup");
 const calls: Call[] = [];
 const defaultJson = await runWithAbortSignal(undefined, () => status.execute({ machineReadable: true, format: "json", workdir: root }), { spawn: fakeCommands(calls) });
 const defaultData = jsonPayload(defaultJson).data as Record<string, unknown>;

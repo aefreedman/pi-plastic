@@ -47,15 +47,17 @@ const main = (): void => {
     "ensureCmCommandAllowed(args);",
     'command === "diff"',
   ]);
-  failures += checkRequired(readText(new URL("../src/plastic-core.ts", import.meta.url)), "pi-plastic/src/plastic-core.ts", [
+  failures += checkRequired(readText(new URL("../src/operations/merge.ts", import.meta.url)), "pi-plastic/src/operations/merge.ts", [
     "export const merge = tool({",
-    "export const mergeToBranch = tool({",
-    "resolveBranchParentName",
     "export const finalizeMerge = tool({",
     "--nointeractiveresolution",
     "--mergetype=try",
     "--automaticresolution=all-"
 ]);
+  failures += checkRequired(readText(new URL("../src/operations/closeout.ts", import.meta.url)), "pi-plastic/src/operations/closeout.ts", [
+    "export const mergeToBranch = tool({",
+    "resolveBranchParentName",
+  ]);
   failures += checkRequired(readText(new URL("../src/operations/patch.ts", import.meta.url)), "pi-plastic/src/operations/patch.ts", [
     "export const patch = tool({",
     "__plasticPatchInternals",
@@ -97,7 +99,7 @@ const main = (): void => {
   ] as const) {
     failures += checkRequired(readText(new URL(`../src/domain/${owner}.ts`, import.meta.url)), `pi-plastic/src/domain/${owner}.ts`, [...snippets]);
   }
-  for (const owner of ["plastic-core", "operations/diff", "operations/patch", "operations/workspace"]) {
+  for (const owner of ["operations/merge", "operations/server-merge", "operations/closeout", "operations/checkin", "operations/switch", "operations/diff", "operations/patch", "operations/workspace"]) {
     failures += checkForbidden(readText(new URL(`../src/${owner}.ts`, import.meta.url)), `pi-plastic/src/${owner}.ts`, [
       /runCm\(\["diff"/,
       /runCmRaw\(\["diff"/,

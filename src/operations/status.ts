@@ -1,7 +1,7 @@
 import { tool } from "../tool-definition";
 import { workdirArg } from "./arguments";
 import { MACHINE_READABLE_STATUS_MAX_ITEMS, MACHINE_READABLE_STATUS_DEFAULT_MAX_ITEMS, STATUS_FIELD_SEPARATOR, parseMachineReadablePendingItems, toMachineReadableStatusItems, toMachineReadableStatusSummary, summarizeShortStatus } from "../domain/pending";
-import { outputFormatArg, toStructuredResult } from "../presentation/results";
+import { outputFormatArg, toStructuredResult, formatStatusText } from "../presentation/results";
 import { runCmRaw, runCm } from "../execution/cm";
 import { analyzeMergeStatusOutput } from "../domain/merge-output";
 
@@ -80,16 +80,7 @@ export const status = tool({
             );
         }
         const { output, shortOutput, summary, mergeState, usedShortFlag } = observation;
-        const textOutput = mergeState.hasMergeInProgress || mergeState.hasPendingMergeLinks
-            ? [
-                output,
-                "",
-                "## Merge State",
-                `- Pending merge links: ${mergeState.pendingMergeLinks.length}`,
-                `- Merge-in-progress hints: ${mergeState.mergeInProgressHints.length}`,
-                ...(mergeState.hasMergeInProgress ? ["- Checkin may be blocked until merge metadata is finalized. If files are resolved, run plastic_finalizeMerge(...)."] : []),
-            ].join("\n")
-            : output;
+        const textOutput = formatStatusText(output, mergeState);
         return toStructuredResult(
             "status", format, textOutput,
             { rawOutput: output, shortOutput, summary, mergeState, usedShortFlag },
