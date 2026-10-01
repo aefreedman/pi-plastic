@@ -7,6 +7,7 @@ import { Type } from "typebox";
 import { createAgentSessionServices, createAgentSessionFromServices, createCodemodeExtension, ModelRuntime, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { currentBranchOutputSchema, branchExistsOutputSchema } from "../src/pi/branch-output";
 import { statusOutputSchema } from "../src/pi/status-output";
+import { xmlStatus, xmlRecord } from "./fixtures/status-xml";
 
 // File-loaded package, real finalizer and codemode; node itself is the fake cm executable.
 // Node treats fixture/status and fixture/version as scripts, so this works without shell wrappers.
@@ -69,9 +70,9 @@ await writeFile(modifierPath, `export default function(pi) {
     settingsManager: SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } }),
     resourceLoaderOptions: { additionalExtensionPaths: [modifierPath, extensionPath], extensionFactories: [createCodemodeExtension({ mode: "on", models: false }), pi => {
       pi.registerTool({ name: "fixture_throw", label: "Throw", description: "Fixture", parameters: Type.Object({}), async execute() { throw Error("fixture thrown"); } });
-      pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), branch: Type.Optional(Type.String()) }), async execute(_id, params, _signal, _update, ctx) {
+      pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Literal("xml")) }), async execute(_id, params, _signal, _update, ctx) {
         const controller = new AbortController(); if (params.abort) controller.abort();
-        state.nested = await ctx.executeTool(params.child ?? "plastic_status", params.child === "plastic_branchExists" ? { branch: params.branch } : { machineReadable: true }, { signal: controller.signal });
+        state.nested = await ctx.executeTool(params.child ?? "plastic_status", params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
         return { content: [{ type: "text", text: "nested result inspected outside transcript" }], details: { childIsError: state.nested.isError } };
       } });
     }], noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true, systemPrompt: "Run only the local scripted action." },
@@ -126,6 +127,29 @@ await writeFile(modifierPath, `export default function(pi) {
   if (state.nested.result.structuredContent) assert.equal(state.nested.result.structuredContent.ok, false);
   const replaced = await run("content-only", "codemode", { code: `text(await tools.plastic_status({machineReadable:true}));` });
   assert.equal(replaced.children[0].result.structuredContent, undefined); assert.match(text(replaced.parent), /foreign replacement/);
+  const xml = xmlStatus(xmlRecord());
+  const xmlDirect = await run("xml-direct", "plastic_status", { source: "xml" }, xml);
+  const xmlDto = xmlDirect.children[0].result.structuredContent;
+  assert.equal(xmlDto.schemaVersion, 2); assert.equal(xmlDto.data.items[0].path, "/synthetic/日本-é-😀.txt"); assert.equal(xmlDirect.calls.length, 1);
+  for (const format of ["text", "json"]) {
+    const xmlCode = await run("xml-code-" + format, "codemode", script({ source: "xml", format }), xml);
+    assert.deepEqual(xmlCode.children[0].result.structuredContent, xmlDto);
+    assert.equal(xmlCode.parent.details.calls[0].status, "ok"); assert.equal(xmlCode.calls.length, 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(xmlCode.children[0])), xmlCode.children[0]);
+  }
+  await run("xml-nested", "fixture_nested", { source: "xml" }, xml);
+  assert.deepEqual(state.nested.result.structuredContent, xmlDto); assert.equal(state.nested.isError, false);
+  for (const [scenario, args, output, codeCalls] of [
+    ["xml-malformed", { source: "xml" }, "foreign", 1],
+    ["xml-short", { source: "xml", short: true }, xml, 0],
+    ["xml-revision", { source: "xml", includeRevId: true }, xml, 0],
+  ] as const) {
+    const error = await run(scenario, "codemode", script(args), output);
+    assert.equal(error.children[0].isError, true); assert.equal(error.children[0].result.structuredContent.schemaVersion, 2);
+    assert.equal(error.parent.details.calls[0].status, "error"); assert.equal(error.calls.length, codeCalls);
+  }
+  const xmlAborted = await run("xml-abort", "fixture_nested", { source: "xml", abort: true }, xml);
+  assert.equal(state.nested.isError, true); assert.equal(xmlAborted.calls.length, 0);
   for (const [name, schema, args, output] of [
     ["plastic_currentBranch", currentBranchOutputSchema, {}, "/main/space ü 日本 😀@repo@server (cs:0 - head)\n"],
     ["plastic_branchExists", branchExistsOutputSchema, { branch: "/main/space ü 日本 😀" }, "/main/space ü 日本 😀\n"],

@@ -9,6 +9,9 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Opt-in status `source="xml"`: strict bounded UTF-8 XML capture and parsing, absolute Unicode identities, verified ordinary/added/deleted/local-deleted/moved/private text-file and directory records, XML-specific v2 DTOs and one-snapshot synthesized presentation. Existing machine/standard v1 routes and mutation/branch consumers remain unchanged.
+- XML transport fails closed on malformed/unsupported records, DTD/entities, encoding disagreement, capture bounds, stderr, cancellation and command failure. Base revisions are explicitly unavailable; XML short/revision requests are rejected before execution. Literal U+FFFD is rejected by the strict parser-warning policy, not diagnosed as CLI decoding loss.
+- Status XML parser, transport, DTO, source-selection and real Pi host regression coverage; maintained MIT-licensed `@xmldom/xmldom` pinned to 0.9.12.
 - Versioned structured output for `plastic_currentBranch` and `plastic_branchExists`, with exact scoped branch identities, actual boolean existence, single-observation presentation, sanitized native failures, 4096-character identity and 16384-byte compact DTO bounds.
 - Deterministic branch-read contract/transport tests and real Pi host finalizer/codemode/nested-consumer coverage; qualified existence requests explicitly remain workspace-repository path comparisons, not requested-repository verification.
 - Status-only versioned structured output schema with machine/standard observations, parsed totals, independent read/capture/projection evidence, bounded identity projection, sanitized native errors and compact UTF-8 overflow rejection.

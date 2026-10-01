@@ -62,14 +62,14 @@ type FacadeCheckinOwner = Expect<Equal<typeof checkin, typeof ownedCheckin>>;
 type RegistryBranch = Expect<Equal<typeof PLASTIC_TOOL_REGISTRY.branchCreate, typeof branchCreate>>;
 type RegistryCheckin = Expect<Equal<typeof PLASTIC_TOOL_REGISTRY.checkin, typeof checkin>>;
 type RegistryMerge = Expect<Equal<typeof PLASTIC_TOOL_REGISTRY.merge, typeof merge>>;
-type ObservationKinds = Expect<Equal<StatusObservation["kind"], "machine" | "standard">>;
+type ObservationKinds = Expect<Equal<StatusObservation["kind"], "machine" | "standard" | "xml">>;
 
 function narrowStatusObservation(observation: StatusObservation): void {
   if (observation.kind === "machine") {
     observation.pendingItems.map(item => item.workspacePath);
     // @ts-expect-error Machine observations do not contain standard status output.
     const shortOutput: string = observation.shortOutput;
-  } else {
+  } else if (observation.kind === "standard") {
     const output: string = observation.shortOutput;
     // @ts-expect-error Standard observations do not contain parsed pending records.
     observation.pendingItems.map(item => item.workspacePath);
@@ -81,7 +81,7 @@ import type { StatusOutput } from "../../src/pi/status-output";
 type StatusFailure = Extract<StatusOutput, { ok: false }>;
 type StatusErrorCodes = Expect<Equal<StatusFailure["error"]["code"], "command_failed" | "aborted" | "capture_incomplete" | "invalid_producer_data" | "output_overflow">>;
 type StatusSuccess = Extract<StatusOutput, { ok: true }>;
-type StatusModes = Expect<Equal<StatusSuccess["data"]["mode"], "machine" | "standard">>;
+type StatusModes = Expect<Equal<StatusSuccess["data"]["mode"], "machine" | "standard" | "xml">>;
 type MachineData = Extract<StatusSuccess["data"], { mode: "machine" }>;
 type ParseKeys = Expect<Equal<keyof MachineData["parse"], "valid" | "blank" | "header" | "unsupported" | "malformed" | "ambiguousLegacyMove">>;
 type ItemKinds = Expect<Equal<MachineData["items"][number]["kind"], "added" | "changed" | "moved" | "deleted" | "private" | "other">>;

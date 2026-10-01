@@ -18,6 +18,23 @@
           "type": "boolean",
           "description": "Return parsed, machine-readable pending status records when supported."
         },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "machine"
+            },
+            {
+              "type": "string",
+              "const": "xml"
+            }
+          ],
+          "description": "Explicit status source; omitted preserves machineReadable. XML is UTF-8, workspace-scoped, absolute paths, no short/base revisions, with synthesized presentation."
+        },
         "maxItems": {
           "type": "integer",
           "description": "Maximum parsed items in machine-readable JSON (default 100, maximum 500).",
@@ -26,7 +43,7 @@
         },
         "includeRaw": {
           "type": "boolean",
-          "description": "Include unbounded raw machine-readable Plastic output in JSON diagnostics. Applies only when machineReadable=true."
+          "description": "Include raw machine output in JSON diagnostics, or bounded XML with a private metadata warning. Never included in the compact native DTO."
         },
         "short": {
           "type": "boolean",
