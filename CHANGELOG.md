@@ -9,6 +9,9 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Workspace-list closed native/fields/error structured output with explicit ASCII-original-name/path configuration prerequisite and formatter-loss caveat, one supported template observation, bounded projection and observed-record accounting. Exact repeated records remain in order with full-response duplicate diagnostics; conflicting identities fail closed. Native custom templates and legacy text/JSON behavior remain intact.
+- Workspace-list strict raw capture, schema/core/transport/limits regression tests and deterministic real Pi host consumers; read-only live acceptance against independently known ASCII originals without runtime registry access.
+
 - Versioned structured `plastic_branchList` output with additive explicit UTF-8 `source="names"`, exact bounded unqualified identities, query-scoped counts and one-observation text/JSON presentation. Native/default table and legacy query behavior remain intact with explicitly unavailable normalized rows/counts.
 - Branch-list strict bounded raw capture, fatal UTF-8/identity/duplicate validation, default 100/max 500 projection, 4096-code-unit identity/query and 131072-byte compact DTO limits; names rejects unsupported hidden inclusion before execution, with no alternate-source fallback or repository-total inference.
 - Deterministic branch-list transport/schema/core tests, compile-time narrowing, real Pi host consumers and opt-in read-only registered-adapter Unicode acceptance against externally supplied owned synthetic fixtures.
@@ -23,7 +26,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Changed
 
-- Align development dependencies and the eval runtime baseline with Pi 0.99.2.
+- Align existing Pi development pins and eval runtime baseline with latest stable Pi 1.0.0; no package release/version bump.
 - Modularize execution, domain, operations, text diff, presentation and Pi adapters behind the existing explicit core export facade and canonical-root entry wiring; preserve tool behavior, loading, rendering and exposure.
 - Add a typed internal status observation seam and shared single-observation presentation, preserving core string results and renderers; add deterministic runtime import-layer/cycle, shared-owner and registry-parity regression checks.
 

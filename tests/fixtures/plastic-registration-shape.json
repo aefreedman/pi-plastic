@@ -1411,7 +1411,26 @@
       "properties": {
         "format": {
           "type": "string",
-          "description": "Format string for workspace list output."
+          "description": "Native CLI template (up to 4096 code units), not a presentation enum. Conflicts with fields source unless empty."
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "native"
+            },
+            {
+              "type": "string",
+              "const": "fields"
+            }
+          ],
+          "description": "Defaults to native. Fields requires independently known ASCII-only original workspace names and paths; formatter may silently best-fit non-ASCII to ASCII."
+        },
+        "maxItems": {
+          "type": "integer",
+          "description": "Fields projection limit, default 100; not a CLI query limit.",
+          "minimum": 1,
+          "maximum": 500
         },
         "output": {
           "anyOf": [

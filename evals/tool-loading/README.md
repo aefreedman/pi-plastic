@@ -1,6 +1,6 @@
 # Dynamic tool-loading behavioral eval
 
-This package-local eval compares `all-active`, `balanced`, and `loader-only` Plastic tool-loading modes through fresh Pi 0.99.2 JSON subprocesses. It is intentionally **not** a skill eval: skills, prompt templates, built-in tools, discovered extensions, context files, and sessions are disabled.
+This package-local eval compares `all-active`, `balanced`, and `loader-only` Plastic tool-loading modes through fresh Pi 1.0.0 JSON subprocesses. It is intentionally **not** a skill eval: skills, prompt templates, built-in tools, discovered extensions, context files, and sessions are disabled.
 
 ## What it measures
 

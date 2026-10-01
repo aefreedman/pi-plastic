@@ -1,3 +1,4 @@
+import { workspaceListOutputSchema } from "../src/pi/workspace-list-output";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -39,13 +40,14 @@ globalThis.fetch = (() => { throw Error("No network transport is allowed in this
 try {
 await writeFile(join(fixture, "status"), commandFixture, { flag: "wx" });
 await writeFile(join(fixture, "find"), commandFixture, { flag: "wx" });
+await writeFile(join(fixture, "workspace"), commandFixture, { flag: "wx" });
 await writeFile(join(fixture, "scenario.json"), "{}", { flag: "wx" });
 await writeFile(join(fixture, "calls.jsonl"), "", { flag: "wx" });
 await writeFile(join(fixture, "version"), `require("node:fs").appendFileSync("calls.jsonl", "version\\n"); console.log("fixture-version");`, { flag: "wx" });
 await writeFile(modifierPath, `export default function(pi) {
-  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
+  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
   pi.on("tool_result", e => {
-    if (!["plastic_status", "plastic_branchList"].includes(e.toolName)) return;
+    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList"].includes(e.toolName)) return;
     if (globalThis.__plasticHostFixture.scenario === "content-only") return { content: [{ type: "text", text: "foreign replacement" }] };
   });
 }`, { flag: "wx" });
@@ -71,16 +73,16 @@ await writeFile(modifierPath, `export default function(pi) {
     settingsManager: SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } }),
     resourceLoaderOptions: { additionalExtensionPaths: [modifierPath, extensionPath], extensionFactories: [createCodemodeExtension({ mode: "on", models: false }), pi => {
       pi.registerTool({ name: "fixture_throw", label: "Throw", description: "Fixture", parameters: Type.Object({}), async execute() { throw Error("fixture thrown"); } });
-      pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Union([Type.Literal("xml"), Type.Literal("names"), Type.Literal("native")])) }), async execute(_id, params, _signal, _update, ctx) {
+      pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Union([Type.Literal("xml"), Type.Literal("names"), Type.Literal("fields"), Type.Literal("native")])) }), async execute(_id, params, _signal, _update, ctx) {
         const controller = new AbortController(); if (params.abort) controller.abort();
-        state.nested = await ctx.executeTool(params.child ?? "plastic_status", params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
+        state.nested = await ctx.executeTool(params.child ?? "plastic_status", params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
         return { content: [{ type: "text", text: "nested result inspected outside transcript" }], details: { childIsError: state.nested.isError } };
       } });
     }], noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true, systemPrompt: "Run only the local scripted action." },
   });
   assert.deepEqual(services.diagnostics.filter(d => d.type === "error"), []);
   assert.deepEqual(services.resourceLoader.getExtensions().errors, []);
-  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "codemode", "fixture_throw", "fixture_nested"] }));
+  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "codemode", "fixture_throw", "fixture_nested"] }));
   await session.bindExtensions({});
   assert.deepEqual(session.getToolDefinition("plastic_status").outputSchema, statusOutputSchema);
   assert.equal(resolve(session.getAllTools().find((tool: any) => tool.name === "plastic_status").sourceInfo.path), resolve(extensionPath));
@@ -92,7 +94,7 @@ await writeFile(modifierPath, `export default function(pi) {
     const start = records.length;
     await session.prompt(scenario);
     const parent = session.messages.filter((m: any) => m.role === "toolResult").at(-1);
-    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
+    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
   };
   const script = (args: object) => ({ code: `const dto = await tools.plastic_status(${JSON.stringify(args)}); if (typeof dto !== "object") throw Error("unexpected fallback"); text(dto);` });
   const text = (result: any) => result.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
@@ -221,6 +223,23 @@ await writeFile(modifierPath, `export default function(pi) {
   assert.equal(listBlocked.children[0].isError, true); assert.equal(listBlocked.children[0].result.structuredContent, undefined); assert.equal(listBlocked.calls.length, 0);
   const listReplaced = await run("content-only", "codemode", { code: 'text(await tools.plastic_branchList({source:"names"}));' }, namesOutput);
   assert.equal(listReplaced.children[0].result.structuredContent, undefined); assert.match(text(listReplaced.parent), /foreign replacement/);
+  assert.deepEqual(session.getToolDefinition("plastic_workspaceList").outputSchema,workspaceListOutputSchema);
+  assert.equal(resolve(session.getAllTools().find((tool:any)=>tool.name==="plastic_workspaceList").sourceInfo.path),resolve(extensionPath));
+  const workspaceOutput="Fictional Workspace\tFICTIONAL\tC:\\Fictional\\workspace\t00000000-0000-0000-0000-000000000001\r\n";
+  const workspaceDirect=await run("workspace-direct","plastic_workspaceList",{source:"fields"},workspaceOutput);
+  const workspaceDto=workspaceDirect.children[0].result.structuredContent;
+  assert(workspaceDto.ok);assert.equal(workspaceDto.data.rows[0].name,"Fictional Workspace");assert.equal(workspaceDirect.calls.length,1);
+  for(const output of ["text","json"]){const r=await run("workspace-code-"+output,"codemode",{code:`text(await tools.plastic_workspaceList({source:"fields",output:${JSON.stringify(output)}}));`},workspaceOutput);assert.deepEqual(r.children[0].result.structuredContent,workspaceDto);assert.equal(r.calls.length,1);assert.deepEqual(JSON.parse(JSON.stringify(r.children[0])),r.children[0]);}
+  const workspaceSubset=await run("workspace-subset","codemode",{code:'const dto=await tools.plastic_workspaceList({source:"fields",maxItems:1}); text(dto.ok&&dto.data.mode==="fields"?dto.data.rows.map(r=>r.name):[]);'},workspaceOutput);
+  assert.match(text(workspaceSubset.parent),/Fictional Workspace/);assert.doesNotMatch(text(workspaceSubset.parent),/schemaVersion|guid/);
+  await run("workspace-nested","fixture_nested",{child:"plastic_workspaceList",source:"fields"},workspaceOutput);assert.deepEqual(state.nested.result.structuredContent,workspaceDto);
+  for(const [scenario,args,output,fail,count] of [["workspace-error",{source:"fields"},"",true,1],["workspace-native-error",{source:"native"},"",true,1],["workspace-malformed",{source:"fields"},"junk",false,1],["workspace-conflict",{source:"fields",format:"{path}"},workspaceOutput,false,0]] as const){const r=await run(scenario,"codemode",{code:`text(await tools.plastic_workspaceList(${JSON.stringify(args)}));`},output,fail);assert(r.children[0].isError);assert.equal(r.parent.details.calls[0].status,"error");assert.equal(r.calls.length,count);assert.doesNotMatch(JSON.stringify(r),/private fixture error/);}
+  const workspaceRepeat=await run("workspace-repeat","plastic_workspaceList",{source:"fields",maxItems:1},workspaceOutput+workspaceOutput);assert.equal(workspaceRepeat.children[0].result.structuredContent.data.counts.observed,2);assert.equal(workspaceRepeat.children[0].result.structuredContent.data.diagnostics.duplicateRecords,1);
+  const workspaceConflict=await run("workspace-conflict-aftercap","plastic_workspaceList",{source:"fields",maxItems:1},workspaceOutput+workspaceOutput.replace("FICTIONAL","OTHER"));assert(workspaceConflict.children[0].isError);
+  const workspaceNative=await run("workspace-native","plastic_workspaceList",{}, "native table\n");assert.equal(workspaceNative.children[0].result.structuredContent.data.rows,null);
+  const workspaceAbort=await run("workspace-abort","fixture_nested",{child:"plastic_workspaceList",source:"fields",abort:true},workspaceOutput);assert(state.nested.isError);assert.equal(workspaceAbort.calls.length,0);
+  const workspaceBlocked=await run("blocked","codemode",{code:'try { await tools.plastic_workspaceList({source:"fields"}); throw Error("must reject"); } catch(e){ text(String(e)); }'},workspaceOutput);assert.equal(workspaceBlocked.calls.length,0);assert.equal(workspaceBlocked.children[0].result.structuredContent,undefined);
+  const workspaceReplaced=await run("content-only","codemode",{code:'text(await tools.plastic_workspaceList({source:"fields"}));'},workspaceOutput);assert.equal(workspaceReplaced.children[0].result.structuredContent,undefined);assert.match(text(workspaceReplaced.parent),/foreign replacement/);
   console.log(`PASS: real Pi host, ${turns} local scripted turns; finalizer/codemode/nested consumers, SDK JSON events, native errors, selective context and foreign-hook fallback; zero network`);
 } finally {
   session?.dispose(); globalThis.fetch = originalFetch; delete (globalThis as any).__plasticHostFixture;

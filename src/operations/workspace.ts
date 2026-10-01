@@ -1,6 +1,7 @@
 import { tool } from "../tool-definition";
+import { assembleWorkspaceListObservation, presentWorkspaceListObservation } from "./workspace-list";
 import { workdirArg } from "./arguments";
-import { runCm, runCmRaw, normalizeFindOutputLines } from "../execution/cm";
+import { runCm, runCmRaw } from "../execution/cm";
 import { outputFormatArg, toStructuredResult, formatPreflightText } from "../presentation/results";
 import { summarizeShortStatus } from "../domain/pending";
 
@@ -149,31 +150,15 @@ export const workspaceCreate = tool({
 export const workspaceList = tool({
     description: "List Plastic SCM workspaces (cm workspace list).",
     args: {
-        format: tool.schema.string().optional().describe("Format string for workspace list output."),
+        format: tool.schema.string().optional().describe("Native CLI template (up to 4096 code units), not a presentation enum. Conflicts with fields source unless empty."),
+        source: tool.schema.enum(["native", "fields"]).optional().describe("Defaults to native. Fields requires independently known ASCII-only original workspace names and paths; formatter may silently best-fit non-ASCII to ASCII."),
+        maxItems: tool.schema.number().int().min(1).max(500).optional().describe("Fields projection limit, default 100; not a CLI query limit."),
         output: outputFormatArg,
         workdir: workdirArg,
     },
     async execute(args)
     {
-        const outputFormat = args.output ?? "text";
-        const cmdArgs: string[] = ["workspace", "list"];
-
-        if (args.format)
-        {
-            cmdArgs.push(`--format=${args.format}`);
-        }
-
-        const output = await runCm(cmdArgs, args.workdir);
-        return toStructuredResult(
-            "workspace-list",
-            outputFormat,
-            output,
-            {
-                command: ["cm", ...cmdArgs],
-                rawOutput: output,
-                resultCount: normalizeFindOutputLines(output).length,
-            },
-            args.workdir,
-        );
+        const observation = await assembleWorkspaceListObservation(args);
+        return presentWorkspaceListObservation(observation, args);
     },
 });
