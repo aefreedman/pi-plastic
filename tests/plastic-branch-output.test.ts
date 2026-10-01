@@ -84,10 +84,10 @@ for (const output of [
   assert.equal(result.structuredContent.data, undefined);
   assert.deepEqual(calls, [["status"], ["status", "--compact"]], output);
 }
-const spacedHeader = await invoke("currentBranch", [{ output: `${identity}@Cloud Repositories/plastic-tool-sandbox@on-the-march@unity (cs:16 - head)\n` }]);
+const spacedHeader = await invoke("currentBranch", [{ output: `${identity}@Cloud Repositories/example-repository@example-server@unity (cs:16 - head)\n` }]);
 assert.equal(spacedHeader.structuredContent.data.branch, identity);
 assert.equal(calls.length, 1);
-const spacedCompact = await invoke("currentBranch", [{ output: "no branch" }, { output: `cs:16@rep:Cloud Repositories/plastic-tool-sandbox@repserver:on-the-march@unity\nBranch ${identity}@Cloud Repositories/plastic-tool-sandbox@2475285230717@cloud\n` }]);
+const spacedCompact = await invoke("currentBranch", [{ output: "no branch" }, { output: `cs:16@rep:Cloud Repositories/example-repository@repserver:example-server@unity\nBranch ${identity}@Cloud Repositories/example-repository@1111111111111@cloud\n` }]);
 assert.equal(spacedCompact.structuredContent.data.branch, identity);
 assert.equal(spacedCompact.structuredContent.data.basis, "compact_status");
 assert.equal(calls.length, 2);
