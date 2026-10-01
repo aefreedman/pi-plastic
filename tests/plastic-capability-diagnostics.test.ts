@@ -19,9 +19,9 @@ async function main(): Promise<void> {
   assert.equal(checks, 1, "A package runtime must check and warn at most once.");
   assert.deepEqual(notifications, [{ message: "Pi Plastic capability warning: configured patch backend unavailable.", level: "warning" }]);
 
-  const indexText = readFileSync(new URL("../index.ts", import.meta.url), "utf8");
-  assert.match(indexText, /pi\.on\("session_start", async/, "Capability diagnostics must be evaluated at session startup.");
-  assert.match(indexText, /await notifyPatchCapabilityWarning\(ctx as CapabilityDiagnosticContext\)/, "Session startup must use the UI-only capability notifier.");
+  const registrationText = readFileSync(new URL("../src/pi/register.ts", import.meta.url), "utf8");
+  assert.match(registrationText, /pi\.on\("session_start", async/, "Capability diagnostics must be evaluated at session startup.");
+  assert.match(registrationText, /await notifyPatchCapabilityWarning\(ctx as CapabilityDiagnosticContext\)/, "Session startup must use the UI-only capability notifier.");
 
   console.log("PASS: plastic capability diagnostic tests succeeded");
 }

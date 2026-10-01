@@ -66,6 +66,19 @@ async function main(): Promise<void> {
     assert.deepEqual(result.details.added, ["plastic_branchList"], "relative-path provenance should still allow deferred activation");
   });
 
+  await withMode("loader-only", async () => {
+    const active = ["read", "plastic_status"];
+    const helperSource: ToolSourceInfo = {
+      path: fileURLToPath(new URL("../src/pi/register.ts", import.meta.url)),
+      source: "extension", scope: "project", origin: "package",
+    };
+    const harness = await loadHarness(active, [], { extensionSourceInfo: helperSource });
+    assert.deepEqual(harness.getActiveTools(), active, "Helper-module provenance must not replace canonical root ownership");
+    assert.equal(harness.setActiveToolsCalls.length, 0, "Only the manifest root may authorize loading lifecycle changes");
+    const result = await harness.registry.get(PLASTIC_TOOL_SEARCH_NAME)!.execute("helper", { toolNames: ["plastic_branchList"] });
+    assert.deepEqual(result.details.added, [], "Helper-module provenance must not authorize deferred activation");
+  });
+
   assert.deepEqual(searchPlasticTools({ toolNames: ["plastic_branchDelete"] }).map((match) => match.name), ["plastic_branchDelete"], "exact public names should select one known tool");
   assert(searchPlasticTools({ query: "shelveset" }).every((match) => match.name.includes("shelveset")), "keyword search should find the requested capability");
   assert.equal(searchPlasticTools({ query: "branch", limit: 99 }).length, 4, "search results should have a hard upper bound");
