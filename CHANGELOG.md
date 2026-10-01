@@ -9,6 +9,10 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Versioned structured `plastic_branchList` output with additive explicit UTF-8 `source="names"`, exact bounded unqualified identities, query-scoped counts and one-observation text/JSON presentation. Native/default table and legacy query behavior remain intact with explicitly unavailable normalized rows/counts.
+- Branch-list strict bounded raw capture, fatal UTF-8/identity/duplicate validation, default 100/max 500 projection, 4096-code-unit identity/query and 131072-byte compact DTO limits; names rejects unsupported hidden inclusion before execution, with no alternate-source fallback or repository-total inference.
+- Deterministic branch-list transport/schema/core tests, compile-time narrowing, real Pi host consumers and opt-in read-only registered-adapter Unicode acceptance against externally supplied owned synthetic fixtures.
+
 - Opt-in status `source="xml"`: strict bounded UTF-8 XML capture and parsing, absolute Unicode identities, verified ordinary/added/deleted/local-deleted/moved/private text-file and directory records, XML-specific v2 DTOs and one-snapshot synthesized presentation. Existing machine/standard v1 routes and mutation/branch consumers remain unchanged.
 - XML transport fails closed on malformed/unsupported records, DTD/entities, encoding disagreement, capture bounds, stderr, cancellation and command failure. Base revisions are explicitly unavailable; XML short/revision requests are rejected before execution. Literal U+FFFD is rejected by the strict parser-warning policy, not diagnosed as CLI decoding loss.
 - Status XML parser, transport, DTO, source-selection and real Pi host regression coverage; maintained MIT-licensed `@xmldom/xmldom` pinned to 0.9.12.

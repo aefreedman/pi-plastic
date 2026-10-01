@@ -904,26 +904,59 @@
     "parameters": {
       "type": "object",
       "properties": {
+        "source": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "native"
+            },
+            {
+              "type": "string",
+              "const": "names"
+            }
+          ],
+          "description": "Observation source. Defaults to native table; names selects strict UTF-8 reusable branch rows."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "maxItems": {
+          "type": "integer",
+          "description": "Canonical projection rows (default 100); independent of the CLI query limit. Native rows are unavailable.",
+          "minimum": 1,
+          "maximum": 500
+        },
         "nameLike": {
           "type": "string",
-          "description": "Filter by branch name pattern (supports % wildcard)."
+          "description": "Filter by branch leaf-name pattern (supports % wildcard); bounded to 4096 code units."
         },
         "parent": {
           "type": "string",
-          "description": "Filter by parent branch spec."
+          "description": "Requested parent branch filter, bounded to 4096 code units; repository qualifiers are not verified."
         },
         "owner": {
           "type": "string",
-          "description": "Filter by branch owner."
+          "description": "Filter by branch owner; bounded to 4096 code units."
         },
         "includeHidden": {
           "type": "boolean",
-          "description": "Include hidden branches in the query result."
+          "description": "Legacy hidden query policy. True is unsupported for names and rejected before execution."
         },
         "limit": {
           "type": "integer",
-          "description": "Maximum number of branches to return.",
-          "minimum": 1
+          "description": "CLI query row limit; not a repository total or projection limit.",
+          "minimum": 1,
+          "maximum": 9007199254740991
         },
         "orderBy": {
           "anyOf": [

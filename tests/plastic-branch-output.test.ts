@@ -8,7 +8,7 @@ import { currentBranch, branchExists } from "../src/operations/branches";
 import { currentBranchOutputSchema, branchExistsOutputSchema, validateBranchOutput, projectBranchOutput, type BranchOutput } from "../src/pi/branch-output";
 import { loadRegisteredTools } from "./pi-tool-harness";
 const tools = await loadRegisteredTools();
-assert.deepEqual([...tools.values()].filter(tool => tool.outputSchema).map(tool => tool.name), ["plastic_status", "plastic_currentBranch", "plastic_branchExists"]);
+assert.deepEqual([...tools.values()].filter(tool => tool.outputSchema).map(tool => tool.name), ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists"]);
 assert.deepEqual(tools.get("plastic_currentBranch")!.outputSchema, currentBranchOutputSchema);
 assert.deepEqual(tools.get("plastic_branchExists")!.outputSchema, branchExistsOutputSchema);
 assert.equal(tools.get("plastic_branchExists")!.parameters.properties.format, undefined);
@@ -156,3 +156,6 @@ assert.equal(await runWithAbortSignal(undefined, () => branchExists.execute({ br
 const narrow = (dto: BranchOutput): string | boolean => !dto.ok ? dto.error.code : dto.action === "current-branch" ? dto.data.branch : dto.data.exists;
 assert.equal(narrow(direct.structuredContent), identity);
 console.log("PASS: branch-read contracts, scoped comparisons, strict identities, resolver routes, bounded capture, shared abort and string compatibility");
+
+// Branch-list is the only new schema-bearing adapter in this tranche.
+await import("./plastic-branch-list-output.test");

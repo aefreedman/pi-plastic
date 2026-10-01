@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Type } from "typebox";
 import { createAgentSessionServices, createAgentSessionFromServices, createCodemodeExtension, ModelRuntime, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { branchListOutputSchema } from "../src/pi/branch-list-output";
 import { currentBranchOutputSchema, branchExistsOutputSchema } from "../src/pi/branch-output";
 import { statusOutputSchema } from "../src/pi/status-output";
 import { xmlStatus, xmlRecord } from "./fixtures/status-xml";
@@ -42,9 +43,9 @@ await writeFile(join(fixture, "scenario.json"), "{}", { flag: "wx" });
 await writeFile(join(fixture, "calls.jsonl"), "", { flag: "wx" });
 await writeFile(join(fixture, "version"), `require("node:fs").appendFileSync("calls.jsonl", "version\\n"); console.log("fixture-version");`, { flag: "wx" });
 await writeFile(modifierPath, `export default function(pi) {
-  pi.on("tool_call", e => { if (e.toolName === "plastic_status" && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
+  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
   pi.on("tool_result", e => {
-    if (e.toolName !== "plastic_status") return;
+    if (!["plastic_status", "plastic_branchList"].includes(e.toolName)) return;
     if (globalThis.__plasticHostFixture.scenario === "content-only") return { content: [{ type: "text", text: "foreign replacement" }] };
   });
 }`, { flag: "wx" });
@@ -70,16 +71,16 @@ await writeFile(modifierPath, `export default function(pi) {
     settingsManager: SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } }),
     resourceLoaderOptions: { additionalExtensionPaths: [modifierPath, extensionPath], extensionFactories: [createCodemodeExtension({ mode: "on", models: false }), pi => {
       pi.registerTool({ name: "fixture_throw", label: "Throw", description: "Fixture", parameters: Type.Object({}), async execute() { throw Error("fixture thrown"); } });
-      pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Literal("xml")) }), async execute(_id, params, _signal, _update, ctx) {
+      pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Union([Type.Literal("xml"), Type.Literal("names"), Type.Literal("native")])) }), async execute(_id, params, _signal, _update, ctx) {
         const controller = new AbortController(); if (params.abort) controller.abort();
-        state.nested = await ctx.executeTool(params.child ?? "plastic_status", params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
+        state.nested = await ctx.executeTool(params.child ?? "plastic_status", params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
         return { content: [{ type: "text", text: "nested result inspected outside transcript" }], details: { childIsError: state.nested.isError } };
       } });
     }], noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true, systemPrompt: "Run only the local scripted action." },
   });
   assert.deepEqual(services.diagnostics.filter(d => d.type === "error"), []);
   assert.deepEqual(services.resourceLoader.getExtensions().errors, []);
-  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchExists", "codemode", "fixture_throw", "fixture_nested"] }));
+  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "codemode", "fixture_throw", "fixture_nested"] }));
   await session.bindExtensions({});
   assert.deepEqual(session.getToolDefinition("plastic_status").outputSchema, statusOutputSchema);
   assert.equal(resolve(session.getAllTools().find((tool: any) => tool.name === "plastic_status").sourceInfo.path), resolve(extensionPath));
@@ -91,7 +92,7 @@ await writeFile(modifierPath, `export default function(pi) {
     const start = records.length;
     await session.prompt(scenario);
     const parent = session.messages.filter((m: any) => m.role === "toolResult").at(-1);
-    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchExists"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
+    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
   };
   const script = (args: object) => ({ code: `const dto = await tools.plastic_status(${JSON.stringify(args)}); if (typeof dto !== "object") throw Error("unexpected fallback"); text(dto);` });
   const text = (result: any) => result.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
@@ -175,6 +176,51 @@ await writeFile(modifierPath, `export default function(pi) {
   const verifiedFalse = await run("branch-false", "codemode", { code: `const dto = await tools.plastic_branchExists({branch:"/main/missing"}); text(dto.ok ? dto.data.exists : "error");` }, "");
   assert.equal(verifiedFalse.children[0].result.structuredContent.data.exists, false);
   assert.match(text(verifiedFalse.parent), /false/);
+  // Fourth schema: one explicit canonical observation, independent presentation.
+  assert.deepEqual(session.getToolDefinition("plastic_branchList").outputSchema, branchListOutputSchema);
+  assert.equal(resolve(session.getAllTools().find((tool: any) => tool.name === "plastic_branchList").sourceInfo.path), resolve(extensionPath));
+  const namesOutput = "/main/space ü café 日本 😀\n/main/second\n";
+  const listDirect = await run("list-direct", "plastic_branchList", { source: "names" }, namesOutput);
+  const listDto = listDirect.children[0].result.structuredContent;
+  assert.equal(listDto.ok, true); assert.equal(listDirect.calls.length, 1);
+  assert.deepEqual(listDto.data.rows.map((row: any) => row.branch), ["/main/space ü café 日本 😀", "/main/second"]);
+  assert.equal(listDirect.parent.structuredContent, undefined);
+  for (const format of ["text", "json"]) {
+    const coded = await run("list-code-" + format, "codemode", { code: `const dto = await tools.plastic_branchList({source:"names",format:${JSON.stringify(format)}}); text(dto);` }, namesOutput);
+    assert.deepEqual(coded.children[0].result.structuredContent, listDto);
+    assert.equal(coded.parent.details.calls[0].status, "ok"); assert.equal(coded.calls.length, 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(coded.children[0])), coded.children[0]);
+  }
+  const listSubset = await run("list-subset", "codemode", { code: 'const dto = await tools.plastic_branchList({source:"names",maxItems:1}); text(dto.ok ? dto.data.rows.map(r => r.branch) : dto.error.code);' }, namesOutput);
+  assert.match(text(listSubset.parent), /space ü/); assert.doesNotMatch(text(listSubset.parent), /schemaVersion|\/main\/second/);
+  assert.deepEqual(listSubset.children[0].result.structuredContent.data.counts, { observed: 2, returned: 1, omitted: 1, excluded: 0 });
+  await run("list-nested", "fixture_nested", { child: "plastic_branchList", source: "names" }, namesOutput);
+  assert.deepEqual(state.nested.result.structuredContent, listDto); assert.equal(state.nested.isError, false);
+  for (const [scenario, args, output, fail, expectedCalls, expectedCode] of [
+    ["list-command-error", { source: "names" }, "", true, 1, "command_failed"],
+    ["list-native-error", { source: "native" }, "", true, 1, "command_failed"],
+    ["list-malformed", { source: "names" }, "foreign", false, 1, "invalid_identity"],
+    ["list-duplicate", { source: "names", maxItems: 1 }, "/main/a\n/main/a\n", false, 1, "malformed_output"],
+    ["list-hidden", { source: "names", includeHidden: true }, namesOutput, false, 0, "unsupported_query"],
+  ] as const) {
+    const result = await run(scenario, "codemode", { code: `text(await tools.plastic_branchList(${JSON.stringify(args)}));` }, output, fail);
+    assert.equal(result.children[0].isError, true); assert.equal(result.children[0].result.structuredContent.error.code, expectedCode);
+    assert.equal(result.parent.details.calls[0].status, "error"); assert.equal(result.calls.length, expectedCalls);
+    assert.doesNotMatch(JSON.stringify(result), /private fixture error/);
+  }
+  const listNative = await run("list-native", "plastic_branchList", {}, "synthetic native table\n");
+  assert.equal(listNative.children[0].result.structuredContent.data.rows, null);
+  assert.equal(listNative.children[0].result.structuredContent.data.counts, null);
+  assert.equal(listNative.children[0].result.details.rawResult, "synthetic native table");
+  const listEmpty = await run("list-empty", "plastic_branchList", { source: "names" }, "");
+  assert.deepEqual(listEmpty.children[0].result.structuredContent.data.rows, []);
+  const listAbort = await run("list-abort", "fixture_nested", { child: "plastic_branchList", source: "names", abort: true }, namesOutput);
+  assert.equal(state.nested.isError, true); assert.equal(listAbort.calls.length, 0);
+  if (state.nested.result.structuredContent) assert.equal(state.nested.result.structuredContent.error.code, "aborted");
+  const listBlocked = await run("blocked", "codemode", { code: 'try { await tools.plastic_branchList({source:"names"}); throw Error("must reject"); } catch(e) { text(String(e)); }' }, namesOutput);
+  assert.equal(listBlocked.children[0].isError, true); assert.equal(listBlocked.children[0].result.structuredContent, undefined); assert.equal(listBlocked.calls.length, 0);
+  const listReplaced = await run("content-only", "codemode", { code: 'text(await tools.plastic_branchList({source:"names"}));' }, namesOutput);
+  assert.equal(listReplaced.children[0].result.structuredContent, undefined); assert.match(text(listReplaced.parent), /foreign replacement/);
   console.log(`PASS: real Pi host, ${turns} local scripted turns; finalizer/codemode/nested consumers, SDK JSON events, native errors, selective context and foreign-hook fallback; zero network`);
 } finally {
   session?.dispose(); globalThis.fetch = originalFetch; delete (globalThis as any).__plasticHostFixture;

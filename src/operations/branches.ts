@@ -1,5 +1,6 @@
+import { assembleBranchListObservation, presentBranchListObservation, branchListPayload } from "./branch-list";
 import { assembleCurrentBranchObservation, assembleBranchExistsObservation, presentCurrentBranchObservation, presentBranchExistsObservation } from "./branch-reads";
-import { getBranchLeafName, resolveBranchCreationTarget, normalizeBranchSpecForComparison, resolveCurrentBranchName, cmWhereLike, cmWhereEquals } from "../domain/branches";
+import { getBranchLeafName, resolveBranchCreationTarget, normalizeBranchSpecForComparison, resolveCurrentBranchName } from "../domain/branches";
 import { parsePlasticStatusBranch } from "../plastic-workspace";
 import { tool } from "../tool-definition";
 import { workdirArg } from "./arguments";
@@ -97,61 +98,28 @@ export const currentBranch = tool({
 export const branchList = tool({
     description: "List Plastic SCM branches using cm find branch with optional filters.",
     args: {
-        nameLike: tool.schema.string().optional().describe("Filter by branch name pattern (supports % wildcard)."),
-        parent: tool.schema.string().optional().describe("Filter by parent branch spec."),
-        owner: tool.schema.string().optional().describe("Filter by branch owner."),
-        includeHidden: tool.schema.boolean().optional().describe("Include hidden branches in the query result."),
-        limit: tool.schema.number().int().min(1).optional().describe("Maximum number of branches to return."),
+        source: tool.schema.enum(["native", "names"]).optional().describe("Observation source. Defaults to native table; names selects strict UTF-8 reusable branch rows."),
+        format: outputFormatArg,
+        maxItems: tool.schema.number().int().min(1).max(500).optional().describe("Canonical projection rows (default 100); independent of the CLI query limit. Native rows are unavailable."),
+        nameLike: tool.schema.string().optional().describe("Filter by branch leaf-name pattern (supports % wildcard); bounded to 4096 code units."),
+        parent: tool.schema.string().optional().describe("Requested parent branch filter, bounded to 4096 code units; repository qualifiers are not verified."),
+        owner: tool.schema.string().optional().describe("Filter by branch owner; bounded to 4096 code units."),
+        includeHidden: tool.schema.boolean().optional().describe("Legacy hidden query policy. True is unsupported for names and rejected before execution."),
+        limit: tool.schema.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional().describe("CLI query row limit; not a repository total or projection limit."),
         orderBy: tool.schema.enum(["date", "branchname"]).optional().describe("Sort field for branch queries."),
         descending: tool.schema.boolean().optional().describe("Sort descending when true."),
         workdir: workdirArg,
     },
     async execute(args)
     {
-        const whereClauses: string[] = [];
-
-        if (args.nameLike)
-        {
-            whereClauses.push(cmWhereLike("name", args.nameLike));
+        const observation = await assembleBranchListObservation(args);
+        // Enforce compact projection bounds for canonical and JSON core calls;
+        // default native text remains the legacy table/string route.
+        if (args.source === "names" || args.format === "json") {
+            const dto = branchListPayload(observation);
+            if (args.format === "json") return JSON.stringify(dto);
         }
-
-        if (args.parent)
-        {
-            whereClauses.push(cmWhereEquals("parent", args.parent));
-        }
-
-        if (args.owner)
-        {
-            whereClauses.push(cmWhereEquals("owner", args.owner));
-        }
-
-        if (args.includeHidden !== true)
-        {
-            whereClauses.push("hidden = 'false'");
-        }
-        else
-        {
-            whereClauses.push("(hidden = 'true' or hidden = 'false')");
-        }
-
-        const cmdArgs: string[] = ["find", "branch"];
-        if (whereClauses.length > 0)
-        {
-            cmdArgs.push(`where ${whereClauses.join(" and ")}`);
-        }
-
-        if (args.orderBy)
-        {
-            cmdArgs.push(`order by ${args.orderBy}${args.descending ? " desc" : " asc"}`);
-        }
-
-        if (args.limit)
-        {
-            cmdArgs.push(`limit ${args.limit}`);
-        }
-
-        cmdArgs.push("--nototal");
-        return runCm(cmdArgs, args.workdir);
+        return presentBranchListObservation(observation);
     },
 });
 
