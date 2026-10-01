@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 
 const pass = (msg: string): void => console.log(`PASS: ${msg}`);
 const fail = (msg: string): void => console.log(`FAIL: ${msg}`);
@@ -99,8 +99,12 @@ const main = (): void => {
   ] as const) {
     failures += checkRequired(readText(new URL(`../src/domain/${owner}.ts`, import.meta.url)), `pi-plastic/src/domain/${owner}.ts`, [...snippets]);
   }
-  for (const owner of ["operations/merge", "operations/server-merge", "operations/closeout", "operations/checkin", "operations/switch", "operations/diff", "operations/patch", "operations/workspace"]) {
-    failures += checkForbidden(readText(new URL(`../src/${owner}.ts`, import.meta.url)), `pi-plastic/src/${owner}.ts`, [
+  // Preserve the original whole-core forbidden-command coverage after extraction,
+  // including small query owners and shared command helpers, not just mutations.
+  const sourceOwners = readdirSync(new URL("../src/", import.meta.url), { recursive: true })
+    .filter((owner) => owner.endsWith(".ts")).map((owner) => owner.replaceAll("\\", "/")).sort();
+  for (const owner of sourceOwners) {
+    failures += checkForbidden(readText(new URL(`../src/${owner}`, import.meta.url)), `pi-plastic/src/${owner}`, [
       /runCm\(\["diff"/,
       /runCmRaw\(\["diff"/,
       /runCm\(\["update"\]/,
