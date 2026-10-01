@@ -29,4 +29,3 @@ export const getCmVersion = async (workdir?: string): Promise<string> =>
 
     return cmVersionPromise;
 };
-

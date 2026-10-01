@@ -261,4 +261,3 @@ export const resolveCurrentBranchName = async (workdir?: string): Promise<string
 
     throw new Error(`Unable to parse current branch from status output: ${trimmed}`);
 };
-

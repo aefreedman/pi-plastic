@@ -453,4 +453,3 @@ export const summarizeShortStatus = (output: string): PendingSummary =>
 
     return summary;
 };
-

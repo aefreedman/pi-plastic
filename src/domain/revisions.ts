@@ -299,4 +299,3 @@ export const createPendingBaseIdentityResolver = (cwd: string, workdir?: string)
         },
     };
 };
-

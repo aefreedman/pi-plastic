@@ -251,4 +251,3 @@ export const buildFallbackScopePaths = (absolutePaths: string[], cwd: string): s
     const fallbackAbsolutePaths = absolutePaths.map((path) => toNormalizedAbsolutePath(dirname(path), cwd));
     return dedupeAndMinimizeAbsolutePaths(fallbackAbsolutePaths).map((path) => toCommandPath(path, cwd));
 };
-

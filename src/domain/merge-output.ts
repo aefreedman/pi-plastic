@@ -321,4 +321,3 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
     }
     return { records, malformed, unknownOperations: [...unknownOperations], changesets, isAlreadyConnected, hasConflict };
 };
-
