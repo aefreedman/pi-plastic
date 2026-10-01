@@ -34,7 +34,6 @@ const checkForbidden = (contents: string, target: string, patterns: RegExp[]): n
 const main = (): void => {
   let failures = 0;
 
-  const plasticPath = new URL("../src/plastic-core.ts", import.meta.url);
   const skillPath = new URL("../skills/using-plastic/SKILL.md", import.meta.url);
   const reviewingPath = new URL("../skills/using-plastic/references/reviewing-changes.md", import.meta.url);
   const changesetPath = new URL("../skills/using-plastic/references/changeset-operations.md", import.meta.url);
@@ -43,47 +42,54 @@ const main = (): void => {
   const bashGuardPath = new URL("../extensions/bash-cm-diff-guard.ts", import.meta.url);
   const bashMergeGuardPath = new URL("../extensions/bash-cm-merge-guard.ts", import.meta.url);
 
-  const plasticText = readText(plasticPath);
   failures += checkRequired(readText(new URL("../src/execution/cm.ts", import.meta.url)), "pi-plastic/src/execution/cm.ts", [
     "const BLOCKED_CM_DIFF_MESSAGE",
     "ensureCmCommandAllowed(args);",
     'command === "diff"',
   ]);
-  failures += checkRequired(plasticText, "pi-plastic/src/plastic-core.ts", [
+  failures += checkRequired(readText(new URL("../src/plastic-core.ts", import.meta.url)), "pi-plastic/src/plastic-core.ts", [
     "export const merge = tool({",
     "export const mergeToBranch = tool({",
-  "resolveBranchParentName",
+    "resolveBranchParentName",
     "export const finalizeMerge = tool({",
+    "--nointeractiveresolution",
+    "--mergetype=try",
+    "--automaticresolution=all-"
+]);
+  failures += checkRequired(readText(new URL("../src/operations/patch.ts", import.meta.url)), "pi-plastic/src/operations/patch.ts", [
     "export const patch = tool({",
     "__plasticPatchInternals",
-    "buildPatchCommandArgs",
+    "buildPatchCommandArgs"
+]);
+  failures += checkRequired(readText(new URL("../src/operations/diff.ts", import.meta.url)), "pi-plastic/src/operations/diff.ts", [
     "export const diffRevisions = tool({",
-    "plastic_diff is disabled",
+    "plastic_diff is disabled"
+]);
+  failures += checkRequired(readText(new URL("../src/operations/checkin.ts", import.meta.url)), "pi-plastic/src/operations/checkin.ts", [
     "parseMachineReadablePendingItems",
     "summarizePendingItems",
     "selectPrivatePathsForAutoAdd",
     "filterPendingItemsByScope",
     "isNoChangesWorkspaceCheckinError",
     "auto-add-private-retry-success",
+    "resolveCheckinPaths",
+    "buildFallbackScopePaths",
+    "isMergeInProgressCheckinError",
+    "buildMergeInProgressCheckinMessage",
+    "updateAfter is disabled for unattended safety"
+]);
+  failures += checkRequired(readText(new URL("../src/operations/switch.ts", import.meta.url)), "pi-plastic/src/operations/switch.ts", [
     "__plasticSwitchInternals",
     "normalizeBranchSpecForComparison",
     "assertWorkspaceOnBranch",
     "isSwitchBringBlockedForUnattended",
     "canSwitchDirectWithPrivateOnlyPending",
-    "direct-switch-private-only",
-    "resolveCheckinPaths",
-    "buildFallbackScopePaths",
-    "--nointeractiveresolution",
-    "--mergetype=try",
-    "--automaticresolution=all-",
-    "isMergeInProgressCheckinError",
-    "buildMergeInProgressCheckinMessage",
-    "updateAfter is disabled for unattended safety",
-  ]);
+    "direct-switch-private-only"
+]);
   failures += checkRequired(readText(new URL("../src/operations/workspace.ts", import.meta.url)), "pi-plastic/src/operations/workspace.ts", [
     "export const resolveDeleteChangeConflict = tool({",
-    '["update", "--dontmerge", "--noinput"]',
-  ]);
+    "[\"update\", \"--dontmerge\", \"--noinput\"]"
+]);
   for (const [owner, snippets] of [
     ["pending", ["SENSITIVE_PRIVATE_PATH_PATTERNS"]],
     ["branches", ["Plastic changesets remain on the branch where they were created"]],
@@ -91,11 +97,13 @@ const main = (): void => {
   ] as const) {
     failures += checkRequired(readText(new URL(`../src/domain/${owner}.ts`, import.meta.url)), `pi-plastic/src/domain/${owner}.ts`, [...snippets]);
   }
-  failures += checkForbidden(plasticText, "pi-plastic/src/plastic-core.ts", [
-    /runCm\(\["diff"/,
-    /runCmRaw\(\["diff"/,
-    /runCm\(\["update"\]/,
-  ]);
+  for (const owner of ["plastic-core", "operations/diff", "operations/patch", "operations/workspace"]) {
+    failures += checkForbidden(readText(new URL(`../src/${owner}.ts`, import.meta.url)), `pi-plastic/src/${owner}.ts`, [
+      /runCm\(\["diff"/,
+      /runCmRaw\(\["diff"/,
+      /runCm\(\["update"\]/,
+    ]);
+  }
 
   const skillText = readText(skillPath);
   failures += checkRequired(skillText, "pi-plastic/skills/using-plastic/SKILL.md", [
