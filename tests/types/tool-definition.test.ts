@@ -1,5 +1,9 @@
 import { tool } from "../../src/tool-definition";
 import type { branchCreate, checkin, merge } from "../../src/plastic-core";
+import type { PLASTIC_TOOL_REGISTRY } from "../../src/pi/tool-registry";
+import type { branchCreate as ownedBranchCreate } from "../../src/operations/branches";
+import type { checkin as ownedCheckin } from "../../src/operations/checkin";
+import type { StatusObservation } from "../../src/operations/status";
 
 type Equal<Left, Right> = (<T>() => T extends Left ? 1 : 2) extends (<T>() => T extends Right ? 1 : 2) ? true : false;
 type Expect<Value extends true> = Value;
@@ -51,3 +55,23 @@ type CoreBranch = Expect<Equal<Parameters<typeof branchCreate.execute>[0]["branc
 type CoreCheckinPaths = Expect<Equal<Parameters<typeof checkin.execute>[0]["paths"], string[] | undefined>>;
 type CoreMergeStrategy = Expect<Equal<Parameters<typeof merge.execute>[0]["strategy"], "auto" | "source" | "destination" | undefined>>;
 type CoreResult = Expect<Equal<ReturnType<typeof checkin.execute>, Promise<string>>>;
+
+// Extraction and explicit registry wiring must retain the same inferred definitions.
+type FacadeBranchOwner = Expect<Equal<typeof branchCreate, typeof ownedBranchCreate>>;
+type FacadeCheckinOwner = Expect<Equal<typeof checkin, typeof ownedCheckin>>;
+type RegistryBranch = Expect<Equal<typeof PLASTIC_TOOL_REGISTRY.branchCreate, typeof branchCreate>>;
+type RegistryCheckin = Expect<Equal<typeof PLASTIC_TOOL_REGISTRY.checkin, typeof checkin>>;
+type RegistryMerge = Expect<Equal<typeof PLASTIC_TOOL_REGISTRY.merge, typeof merge>>;
+type ObservationKinds = Expect<Equal<StatusObservation["kind"], "machine" | "standard">>;
+
+function narrowStatusObservation(observation: StatusObservation): void {
+  if (observation.kind === "machine") {
+    observation.pendingItems.map(item => item.workspacePath);
+    // @ts-expect-error Machine observations do not contain standard status output.
+    const shortOutput: string = observation.shortOutput;
+  } else {
+    const output: string = observation.shortOutput;
+    // @ts-expect-error Standard observations do not contain parsed pending records.
+    observation.pendingItems.map(item => item.workspacePath);
+  }
+}

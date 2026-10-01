@@ -10,9 +10,8 @@ and this project follows semantic versioning for public package releases.
 ### Changed
 
 - Align development dependencies and the eval runtime baseline with Pi 0.99.2.
-- Extract shared execution and domain owners while preserving tool behavior and existing core export seams.
-- Extract focused operation, text-diff and presentation owners; retain an explicit core export facade and add a typed internal status observation seam without changing output formats.
-- Thin the Pi entry point into canonical-root wiring with focused argument, schema, registry, registration and capability-diagnostic owners; preserve loading, rendering and tool exposure.
+- Modularize execution, domain, operations, text diff, presentation and Pi adapters behind the existing explicit core export facade and canonical-root entry wiring; preserve tool behavior, loading, rendering and exposure.
+- Add a typed internal status observation seam without changing output formats, and deterministic runtime import-layer/cycle, shared-owner and registry-parity regression checks.
 
 ### Fixed
 
