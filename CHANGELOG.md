@@ -7,6 +7,10 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Changed
+
+- Align development dependencies and the eval runtime baseline with Pi 0.99.2.
+
 ### Fixed
 
 - Remove the post-publish registry visibility gate while preserving fail-closed identity reconciliation before publishing.
