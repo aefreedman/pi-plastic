@@ -54,7 +54,6 @@ const main = (): void => {
     "export const mergeToBranch = tool({",
   "resolveBranchParentName",
     "export const finalizeMerge = tool({",
-    "export const resolveDeleteChangeConflict = tool({",
     "export const patch = tool({",
     "__plasticPatchInternals",
     "buildPatchCommandArgs",
@@ -80,6 +79,9 @@ const main = (): void => {
     "isMergeInProgressCheckinError",
     "buildMergeInProgressCheckinMessage",
     "updateAfter is disabled for unattended safety",
+  ]);
+  failures += checkRequired(readText(new URL("../src/operations/workspace.ts", import.meta.url)), "pi-plastic/src/operations/workspace.ts", [
+    "export const resolveDeleteChangeConflict = tool({",
     '["update", "--dontmerge", "--noinput"]',
   ]);
   for (const [owner, snippets] of [

@@ -1,25 +1,35 @@
-import { analyzeMergeStatusOutput, MergeOutputSummary, MERGE_START_LINE_SEPARATOR, MERGE_END_LINE_SEPARATOR, MERGE_FIELD_SEPARATOR, normalizeErrorMessage, summarizeMergeOutput, parseServerMergeOutput } from "./domain/merge-output";
-import { isRevisionNotFoundError, resolveDiffFileRevision, normalizeDiffFileRevisionSpec, isUnscopedDiffRevisionSpec, extractBranchSelectorFromRevision, extractBranchNameFromSelector, PendingBaseIdentityResolver, createPendingBaseIdentityResolver } from "./domain/revisions";
-import { normalizeBranchSpecForComparison, isSameBranchSpec, assertWorkspaceOnBranch, getBranchLeafName, resolveBranchCreationTarget, escapeCmWhereValue, cmWhereEquals, cmWhereLike, listRecentBranchNames, resolveBranchParentName, resolveCurrentBranchName } from "./domain/branches";
-import { PendingItem, PendingItemSummary, MACHINE_READABLE_STATUS_DEFAULT_MAX_ITEMS, MACHINE_READABLE_STATUS_MAX_ITEMS, inferPendingItemKind, STATUS_FIELD_SEPARATOR, parseMachineReadablePendingItems, getMachineReadablePendingItems, toMachineReadableStatusItems, toMachineReadableStatusSummary, summarizePendingItems, formatPendingPathPreview, getSensitivePrivatePathReason, selectPrivatePathsForAutoAdd, filterPendingItemsByScope, resolveCheckinPaths, PendingSummary, summarizeShortStatus } from "./domain/pending";
-import { toNormalizedAbsolutePath, isSameFilesystemDevice, toPathComparisonKeyFromAbsolutePath, toCommandPath, buildFallbackScopePaths } from "./domain/paths";
-import { getActiveAbortSignal, commandExecutionStorage } from "./execution/context";
 export { runWithAbortSignal } from "./execution/context";
-import { spawnAndCollect, getCmExecutable, getDiffExecutable, resolveExecutable, type ExecutableEnvironment } from "./execution/process";
-import { runCm, runCmRaw, normalizeFindOutputLines, BLOCKED_CM_DIFF_MESSAGE } from "./execution/cm";
-import { getCmVersion } from "./execution/cli-version";
-import { isUtf8 } from "node:buffer";
-import { randomBytes } from "node:crypto";
+export { status } from "./operations/status";
+export { update, add, undo, resolveDeleteChangeConflict, workspaceCreate, workspaceList } from "./operations/workspace";
+export { branchCreate, currentBranch, branchList, branchExists, branchDelete, __plasticBranchInternals } from "./operations/branches";
+export { shelvesetCreate, shelvesetApply, shelvesetDelete, shelvesetList } from "./operations/shelvesets";
+export { codeReviewCreate, codeReviewUpdate, codeReviewDelete, codeReviewFind } from "./operations/reviews";
+import { PendingItemSummary, PendingSummary, inferPendingItemKind, parseMachineReadablePendingItems, summarizePendingItems, getSensitivePrivatePathReason, selectPrivatePathsForAutoAdd, filterPendingItemsByScope, resolveCheckinPaths, getMachineReadablePendingItems, PendingItem, formatPendingPathPreview, summarizeShortStatus } from "./domain/pending";
+import { isSameBranchSpec, normalizeBranchSpecForComparison, assertWorkspaceOnBranch, listRecentBranchNames, resolveCurrentBranchName, resolveBranchParentName } from "./domain/branches";
+import { spawnAndCollect, ExecutableEnvironment, resolveExecutable, getDiffExecutable, getCmExecutable } from "./execution/process";
 import { tool } from "./tool-definition";
+import { discoverPlasticWorkspace, parsePlasticSelector } from "./plastic-workspace";
 import { promises as fs, realpathSync } from "node:fs";
+import { join, dirname, basename, extname, resolve, isAbsolute } from "path";
+import { runCm, runCmRaw, BLOCKED_CM_DIFF_MESSAGE } from "./execution/cm";
+import { toPathComparisonKeyFromAbsolutePath, isSameFilesystemDevice, buildFallbackScopePaths, toNormalizedAbsolutePath, toCommandPath } from "./domain/paths";
+import { isRevisionNotFoundError, normalizeDiffFileRevisionSpec, resolveDiffFileRevision, isUnscopedDiffRevisionSpec, extractBranchSelectorFromRevision, extractBranchNameFromSelector, PendingBaseIdentityResolver, createPendingBaseIdentityResolver } from "./domain/revisions";
+import { isUtf8 } from "node:buffer";
+import { getActiveAbortSignal, commandExecutionStorage } from "./execution/context";
 import { tmpdir } from "os";
-import { basename, dirname, extname, isAbsolute, join, resolve } from "path";
-import { discoverPlasticWorkspace, parsePlasticSelector, parsePlasticStatusBranch } from "./plastic-workspace";
+import { OutputFormat, TOOL_VERSION, outputFormatArg, toStructuredResult, formatPreflightText, formatServerMergeResult } from "./presentation/results";
+import { update } from "./operations/workspace";
+import { getCmVersion } from "./execution/cli-version";
+import { MergeOutputSummary, analyzeMergeStatusOutput, normalizeErrorMessage, MERGE_START_LINE_SEPARATOR, MERGE_END_LINE_SEPARATOR, MERGE_FIELD_SEPARATOR, summarizeMergeOutput, parseServerMergeOutput } from "./domain/merge-output";
+import { workdirArg } from "./operations/arguments";
+import { randomBytes } from "node:crypto";
 
 const PLASTIC_PATCH_EXECUTABLE_ENV = "PI_PLASTIC_PATCH_EXECUTABLE";
+
 type PatchExecutableProbe = (command: string) => Promise<boolean>;
 // Plastic's server/backend determines whether a moved item is encoded as a
 // move or as delete/add records. Do not claim either without a live fixture.
+
 const PATCH_MOVE_REPRESENTATION = "backend-determined" as const;
 
 const shouldRetryCheckinWithFallbackScope = (errorMessage: string): boolean =>
@@ -240,6 +250,7 @@ type ResolvedPatchBranchSpecs = Pick<PatchCommandArgs, "source" | "destination">
 // Repository selectors are a single cm argv value, so spaces within a repository
 // name are not shell separators. Require non-empty @-separated components without
 // edge whitespace, while retaining Plastic's valid internal spaces and punctuation.
+
 const isSafePatchRepositorySelector = (repository: string | undefined): repository is string =>
 {
     if (!repository || repository !== repository.trim() || /[\u0000-\u001f\u007f-\u009f]/.test(repository))
@@ -349,6 +360,7 @@ const validatePatchStagingOutput = async (stagingOutput: string, requireContent 
 
 // Creating a hard link is atomic and fails if the requested path appeared
 // after our preflight. Unlike rename(), it can never replace an existing file.
+
 const publishPatchOutput = async (stagingOutput: string, requestedOutput: string): Promise<void> =>
 {
     await validatePatchStagingOutput(stagingOutput, true);
@@ -504,19 +516,14 @@ export const __plasticSwitchInternals = {
     canSwitchDirectWithPrivateOnlyPending,
 };
 
-export const __plasticBranchInternals = {
-    getBranchLeafName,
-    parsePlasticStatusBranch,
-    resolveBranchCreationTarget,
-};
-
-// Capture enough subprocess output for diagnostics while keeping the default
-// agent-facing response intentionally small. Callers may opt into a larger
-// focused response, but never the full capture bound.
 const DIFF_OUTPUT_MAX_CHARS = 60_000;
+
 const DIFF_RESPONSE_DEFAULT_MAX_CHARS = 8_000;
+
 const DIFF_RESPONSE_MAX_CHARS = 20_000;
+
 const DIFF_RESPONSE_MIN_CHARS = 500;
+
 const DIFF_RESPONSE_TOTAL_MAX_CHARS = 24_000;
 
 type TextDiffResult = {
@@ -530,6 +537,7 @@ type TextDiffResult = {
 
 // Do not classify serialized Unity YAML by its extension or importer metadata:
 // valid UTF-8 YAML is text, while NUL-containing or invalid UTF-8 bytes are binary.
+
 const isBinaryContent = (content: Buffer): boolean => content.includes(0) || !isUtf8(content);
 
 const stableDiffHeaders = (output: string, leftLabel: string, rightLabel: string): string =>
@@ -638,6 +646,7 @@ const isAsciiPath = (pathValue: string): boolean => /^[\x20-\x7e]*$/.test(pathVa
 
 // GnuWin32 diff cannot reliably accept Unicode operands. Keep every package
 // materialization path ASCII-only; labels are restored after the backend exits.
+
 const createAsciiTempDirectory = async (prefix: string): Promise<string> =>
 {
     const temporaryRoot = tmpdir();
@@ -776,8 +785,6 @@ export const __plasticDiffInternals = {
     isUnscopedDiffRevisionSpec,
 };
 
-const workdirArg = tool.schema.string().optional().describe("Working directory for the workspace.");
-
 const buildRevisionNotFoundGuidance = async (resolvedRevision: string, path: string, workdir?: string): Promise<string | null> =>
 {
     const branchSelector = extractBranchSelectorFromRevision(resolvedRevision);
@@ -816,51 +823,6 @@ const buildRevisionNotFoundGuidance = async (resolvedRevision: string, path: str
     {
         return `Revision '${branchSelector}' could not be resolved for '${path}'. Use a concrete file-qualified revision such as '<workspace-path>#<revision-spec>'.`;
     }
-};
-
-const TOOL_VERSION = "v2.0.0";
-type OutputFormat = "text" | "json";
-const outputFormatArg = tool.schema.enum(["text", "json"]).optional().describe("Output format. Defaults to text.");
-
-const formatPreflightText = (title: string, lines: string[]): string =>
-{
-    return [title, "", ...lines].join("\n");
-};
-
-const toStructuredResult = async (
-    action: string,
-    format: OutputFormat,
-    text: string,
-    data: Record<string, unknown>,
-    workdir?: string,
-    warnings?: string[],
-    nextSuggestedAction?: string,
-): Promise<string> =>
-{
-    if (format !== "json")
-    {
-        return text;
-    }
-
-    const payload: Record<string, unknown> = {
-        ok: true,
-        action,
-        toolVersion: TOOL_VERSION,
-        cliVersion: await getCmVersion(workdir),
-        data,
-    };
-
-    if (warnings && warnings.length > 0)
-    {
-        payload.warnings = warnings;
-    }
-
-    if (nextSuggestedAction)
-    {
-        payload.nextSuggestedAction = nextSuggestedAction;
-    }
-
-    return `## ${action}\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``;
 };
 
 const toBoundedDiffStructuredResult = async (
@@ -1005,119 +967,6 @@ const buildMergeInProgressCheckinMessage = async (originalMessage: string, workd
 
     return lines.join("\n");
 };
-
-export const status = tool({
-    description: "Show Plastic SCM workspace status (cm status).",
-    args: {
-        workdir: workdirArg,
-        includeRevId: tool.schema.boolean().optional().describe("Include revision IDs in the status output when supported."),
-        machineReadable: tool.schema.boolean().optional().describe("Return parsed, machine-readable pending status records when supported."),
-        maxItems: tool.schema.number().int().min(1).max(MACHINE_READABLE_STATUS_MAX_ITEMS).optional().describe(`Maximum parsed items in machine-readable JSON (default ${MACHINE_READABLE_STATUS_DEFAULT_MAX_ITEMS}, maximum ${MACHINE_READABLE_STATUS_MAX_ITEMS}).`),
-        includeRaw: tool.schema.boolean().optional().describe("Include unbounded raw machine-readable Plastic output in JSON diagnostics. Applies only when machineReadable=true."),
-        short: tool.schema.boolean().optional().describe("Use short status output."),
-        format: outputFormatArg,
-    },
-    async execute(args)
-    {
-        const format = args.format ?? "text";
-        const cmdArgs: string[] = ["status"];
-
-        if (args.short)
-        {
-            cmdArgs.push("--short");
-        }
-
-        if (args.includeRevId)
-        {
-            cmdArgs.push("--includeRevId");
-        }
-
-        if (args.machineReadable)
-        {
-            // Package-owned separators make paths with whitespace unambiguous, and
-            // revision IDs let agents safely identify the base of moved/deleted items.
-            if (!cmdArgs.includes("--includeRevId"))
-            {
-                cmdArgs.push("--includeRevId");
-            }
-            cmdArgs.push("--machinereadable", `--fieldseparator=${STATUS_FIELD_SEPARATOR}`);
-            const machineOutput = await runCmRaw(cmdArgs, args.workdir);
-            const cwd = args.workdir ?? process.cwd();
-            const pendingItems = parseMachineReadablePendingItems(machineOutput, cwd);
-            const maxItems = args.maxItems ?? MACHINE_READABLE_STATUS_DEFAULT_MAX_ITEMS;
-            const returnedItems = pendingItems.slice(0, maxItems);
-            return toStructuredResult(
-                "status",
-                format,
-                machineOutput,
-                {
-                    machineReadable: true,
-                    items: toMachineReadableStatusItems(returnedItems),
-                    itemCount: {
-                        total: pendingItems.length,
-                        returned: returnedItems.length,
-                        omitted: pendingItems.length - returnedItems.length,
-                    },
-                    summary: toMachineReadableStatusSummary(pendingItems, cwd),
-                    ...(args.includeRaw ? { rawOutput: machineOutput } : {}),
-                },
-                args.workdir,
-            );
-        }
-
-        const output = await runCm(cmdArgs, args.workdir);
-        const shortOutput = await runCmRaw(["status", "--short"], args.workdir);
-        const summary = summarizeShortStatus(shortOutput);
-        const mergeState = analyzeMergeStatusOutput(output);
-        const textOutput = mergeState.hasMergeInProgress || mergeState.hasPendingMergeLinks
-            ? [
-                output,
-                "",
-                "## Merge State",
-                `- Pending merge links: ${mergeState.pendingMergeLinks.length}`,
-                `- Merge-in-progress hints: ${mergeState.mergeInProgressHints.length}`,
-                ...(mergeState.hasMergeInProgress ? ["- Checkin may be blocked until merge metadata is finalized. If files are resolved, run plastic_finalizeMerge(...)."] : []),
-            ].join("\n")
-            : output;
-
-        return toStructuredResult(
-            "status",
-            format,
-            textOutput,
-            {
-                rawOutput: output,
-                shortOutput,
-                summary,
-                mergeState,
-                usedShortFlag: args.short ?? false,
-            },
-            args.workdir,
-        );
-    },
-});
-
-export const update = tool({
-    description: "Update workspace safely without launching interactive merge (cm update --dontmerge --noinput).",
-    args: {
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        return runCm(["update", "--dontmerge", "--noinput"], args.workdir);
-    },
-});
-
-export const add = tool({
-    description: "Add items to Plastic SCM (cm add).",
-    args: {
-        paths: tool.schema.array(tool.schema.string()).min(1).describe("Paths to add."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        return runCm(["add", ...args.paths], args.workdir);
-    },
-});
 
 export const checkin = tool({
     description: "Check in pending changes with a required comment (cm checkin -c=...).",
@@ -1481,93 +1330,6 @@ export const checkin = tool({
     },
 });
 
-export const undo = tool({
-    description: "Undo changes for specified items (cm undo).",
-    args: {
-        paths: tool.schema.array(tool.schema.string()).min(1).describe("Paths to undo."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        return runCm(["undo", ...args.paths], args.workdir);
-    },
-});
-
-export const resolveDeleteChangeConflict = tool({
-    description: "Resolve a Plastic SCM delete/change conflict by accepting the source-side deletion with cm remove.",
-    args: {
-        paths: tool.schema.array(tool.schema.string()).min(1).describe("Controlled workspace paths to resolve by accepting the source-side deletion."),
-        keepOnDisk: tool.schema.boolean().optional().describe("Keep removed items on disk as private files via --nodisk. Defaults to true."),
-        preflight: tool.schema.boolean().optional().describe("Preview the resolution command without executing it."),
-        format: outputFormatArg,
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        const format = args.format ?? "text";
-        const keepOnDisk = args.keepOnDisk ?? true;
-        const preflight = args.preflight ?? false;
-        const cmdArgs = ["remove", ...(keepOnDisk ? ["--nodisk"] : []), ...args.paths];
-
-        if (preflight)
-        {
-            return toStructuredResult(
-                "resolve-delete-change-conflict-preflight",
-                format,
-                formatPreflightText("## Delete/Change Conflict Resolution Preflight", [
-                    "- Would run: yes",
-                    "- Resolution: accept source-side deletion",
-                    `- Keep removed items on disk: ${keepOnDisk ? "yes (--nodisk)" : "no"}`,
-                    `- Command: cm ${cmdArgs.join(" ")}`,
-                ]),
-                {
-                    wouldRun: true,
-                    resolution: "accept-source-deletion",
-                    keepOnDisk,
-                    command: ["cm", ...cmdArgs],
-                    paths: args.paths,
-                },
-                args.workdir,
-            );
-        }
-
-        const output = await runCm(cmdArgs, args.workdir);
-        const shortStatusAfterResolution = await runCmRaw(["status", "--short"], args.workdir).catch(() => "");
-        const pendingSummaryAfterResolution = summarizeShortStatus(shortStatusAfterResolution);
-        const reportLines = [
-            "## Delete/Change Conflict Resolution Result",
-            "",
-            "- Resolution: accepted source-side deletion",
-            `- Keep removed items on disk: ${keepOnDisk ? "yes (--nodisk)" : "no"}`,
-            `- Paths resolved: ${args.paths.length}`,
-            `- Pending items after resolution: ${pendingSummaryAfterResolution.totalPending}`,
-        ];
-
-        if (output.trim().length > 0 && output.trim() !== "(no output)")
-        {
-            reportLines.push("", "Raw command output:", output.trim());
-        }
-
-        return toStructuredResult(
-            "resolve-delete-change-conflict",
-            format,
-            reportLines.join("\n"),
-            {
-                resolution: "accept-source-deletion",
-                keepOnDisk,
-                command: ["cm", ...cmdArgs],
-                paths: args.paths,
-                shortStatusAfterResolution,
-                pendingSummaryAfterResolution,
-                rawOutput: output,
-            },
-            args.workdir,
-            keepOnDisk ? ["Removed items were kept on disk as private files via --nodisk."] : undefined,
-            "Rerun plastic_merge(...) for the original source branch to continue the merge.",
-        );
-    },
-});
-
 export const diff = tool({
     description: "Disabled alias for cm diff; use text-only alternatives.",
     args: {
@@ -1888,17 +1650,27 @@ export const diffFile = tool({
 });
 
 const WORKSPACE_DIFF_DEFAULT_MAX_FILES = 3;
+
 const WORKSPACE_DIFF_MAX_FILES = 20;
+
 const WORKSPACE_DIFF_MAX_PATHS = 20;
+
 const WORKSPACE_DIFF_PATH_MAX_CHARS = 1_024;
+
 const WORKSPACE_DIFF_DISPLAY_PATH_MAX_CHARS = 256;
+
 const WORKSPACE_DIFF_ERROR_MAX_CHARS = 1_024;
+
 const WORKSPACE_DIFF_DEFAULT_MAX_CHARS = 3_000;
+
 const WORKSPACE_DIFF_PER_FILE_MAX_CHARS = 8_000;
+
 const WORKSPACE_DIFF_MIN_CHARS = 500;
 // This is a response bound, not just a diff-body bound. Reserve space for
 // framing and an omission summary so both text and JSON remain useful.
+
 const WORKSPACE_DIFF_TOTAL_MAX_CHARS = 20_000;
+
 const WORKSPACE_DIFF_CONTENT_MAX_CHARS = 16_000;
 
 const boundWorkspaceValue = (value: string, maxChars: number): string =>
@@ -2136,72 +1908,6 @@ export const workspaceDiff = tool({
             unmatchedPaths: unmatchedPreviews,
             unprocessedCandidates,
         }, warnings, outcomes, unprocessedCandidates, args.workdir);
-    },
-});
-
-export const branchCreate = tool({
-    description: "Create a hierarchical Plastic SCM branch, guarding rare top-level branch creation (cm branch create).",
-    args: {
-        branch: tool.schema.string().min(1).describe("Relative new-branch name or full hierarchical branch path. A relative name uses parent, or the current branch when parent is omitted."),
-        parent: tool.schema.string().optional().describe("Parent branch for a relative branch name. May differ from the workspace branch; Plastic uses the parent's latest changeset by default."),
-        changeset: tool.schema.string().optional().describe("Changeset used as the starting point instead of the parent branch's latest changeset."),
-        label: tool.schema.string().optional().describe("Label used as the starting point."),
-        comment: tool.schema.string().optional().describe("Optional branch comment."),
-        commentsFile: tool.schema.string().optional().describe("File path containing the branch comment."),
-        allowRootBranch: tool.schema.boolean().optional().describe("Allow intentional top-level branch creation such as /<new-branch>. Defaults to false."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        if (args.branch.trim().length === 0)
-        {
-            throw new Error("Branch must be non-empty.");
-        }
-
-        if (args.changeset && args.label)
-        {
-            throw new Error("Provide either changeset or label, not both.");
-        }
-
-        if (args.comment && args.commentsFile)
-        {
-            throw new Error("Provide either comment or commentsFile, not both.");
-        }
-
-        if (args.comment !== undefined && args.comment.trim().length === 0)
-        {
-            throw new Error("Comment must be non-empty when provided.");
-        }
-
-        const normalizedRequested = normalizeBranchSpecForComparison(args.branch);
-        const needsParent = !normalizedRequested.startsWith("/");
-        const parentBranch = needsParent
-            ? args.parent ?? await resolveCurrentBranchName(args.workdir)
-            : args.parent;
-        const targetBranch = resolveBranchCreationTarget(args.branch, parentBranch, args.allowRootBranch);
-        const cmdArgs: string[] = ["branch", "create", targetBranch];
-
-        if (args.changeset)
-        {
-            cmdArgs.push(`--changeset=${args.changeset}`);
-        }
-
-        if (args.label)
-        {
-            cmdArgs.push(`--label=${args.label}`);
-        }
-
-        if (args.comment)
-        {
-            cmdArgs.push(`-c=${args.comment}`);
-        }
-
-        if (args.commentsFile)
-        {
-            cmdArgs.push(`-commentsfile=${args.commentsFile}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
     },
 });
 
@@ -2747,9 +2453,13 @@ type QualifiedServerBranch = {
 };
 
 const SERVER_MERGE_OUTPUT_LIMIT = 16_384;
+
 const SERVER_MERGE_HELP_TIMEOUT_MS = 3_000;
+
 const SERVER_MERGE_COMMAND_TIMEOUT_MS = 30_000;
+
 const serverMergeControlPattern = /[\u0000-\u001f\u007f-\u009f]/;
+
 const serverMergeCapabilityTokens = ["--to", "--merge", "--nointeractiveresolution", "--machinereadable", "--startlineseparator", "--endlineseparator", "--fieldseparator"];
 
 const assertSafeServerMergeValue = (name: string, value: string): string =>
@@ -2797,26 +2507,6 @@ const createServerMergeSeparators = (): { start: string; end: string; field: str
         end: `__PI_PLASTIC_MERGE_END_${nonce}__`,
         field: `__PI_PLASTIC_MERGE_FIELD_${nonce}__`,
     };
-};
-
-const formatServerMergeResult = async (
-    format: OutputFormat,
-    outcome: "preflight" | "completed" | "no-op" | "conflict" | "uncertain" | "unsupported",
-    text: string,
-    data: Record<string, unknown>,
-): Promise<string> =>
-{
-    if (format === "text")
-    {
-        return text;
-    }
-    return `## merge-branches\n\n\`\`\`json\n${JSON.stringify({
-        ok: outcome === "completed" || outcome === "preflight" || outcome === "no-op",
-        action: "merge-branches",
-        outcome,
-        toolVersion: TOOL_VERSION,
-        data,
-    }, null, 2)}\n\`\`\``;
 };
 
 const getServerMergeCapability = async (): Promise<{ supported: boolean; diagnostics: string }> =>
@@ -3296,552 +2986,6 @@ export const finalizeMerge = tool({
             mergeStateAfterFinalize.hasMergeInProgress
                 ? "Resolve remaining merge-in-progress state before checkin."
                 : "If validation passes, run plastic_checkin(...) to record the merge result.",
-        );
-    },
-});
-
-export const currentBranch = tool({
-    description: "Get the current Plastic SCM branch from workspace status output.",
-    args: {
-        format: outputFormatArg,
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        const format = args.format ?? "text";
-        const branch = await resolveCurrentBranchName(args.workdir);
-        return toStructuredResult(
-            "current-branch",
-            format,
-            branch,
-            {
-                branch,
-            },
-            args.workdir,
-        );
-    },
-});
-
-export const branchList = tool({
-    description: "List Plastic SCM branches using cm find branch with optional filters.",
-    args: {
-        nameLike: tool.schema.string().optional().describe("Filter by branch name pattern (supports % wildcard)."),
-        parent: tool.schema.string().optional().describe("Filter by parent branch spec."),
-        owner: tool.schema.string().optional().describe("Filter by branch owner."),
-        includeHidden: tool.schema.boolean().optional().describe("Include hidden branches in the query result."),
-        limit: tool.schema.number().int().min(1).optional().describe("Maximum number of branches to return."),
-        orderBy: tool.schema.enum(["date", "branchname"]).optional().describe("Sort field for branch queries."),
-        descending: tool.schema.boolean().optional().describe("Sort descending when true."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        const whereClauses: string[] = [];
-
-        if (args.nameLike)
-        {
-            whereClauses.push(cmWhereLike("name", args.nameLike));
-        }
-
-        if (args.parent)
-        {
-            whereClauses.push(cmWhereEquals("parent", args.parent));
-        }
-
-        if (args.owner)
-        {
-            whereClauses.push(cmWhereEquals("owner", args.owner));
-        }
-
-        if (args.includeHidden !== true)
-        {
-            whereClauses.push("hidden = 'false'");
-        }
-        else
-        {
-            whereClauses.push("(hidden = 'true' or hidden = 'false')");
-        }
-
-        const cmdArgs: string[] = ["find", "branch"];
-        if (whereClauses.length > 0)
-        {
-            cmdArgs.push(`where ${whereClauses.join(" and ")}`);
-        }
-
-        if (args.orderBy)
-        {
-            cmdArgs.push(`order by ${args.orderBy}${args.descending ? " desc" : " asc"}`);
-        }
-
-        if (args.limit)
-        {
-            cmdArgs.push(`limit ${args.limit}`);
-        }
-
-        cmdArgs.push("--nototal");
-        return runCm(cmdArgs, args.workdir);
-    },
-});
-
-export const branchExists = tool({
-    description: "Check whether a branch exists using cm find branch.",
-    args: {
-        branch: tool.schema.string().min(1).describe("Branch name to check."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        // Plastic's `name` query field contains only the leaf segment even though
-        // `{name}` renders the full branch path. Query by leaf, then compare the
-        // returned full paths so identical leaf names under other parents do not
-        // produce a false positive.
-        const output = await runCmRaw([
-            "find",
-            "branch",
-            `where ${cmWhereEquals("name", getBranchLeafName(args.branch))}`,
-            "--format={name}",
-            "--nototal",
-        ], args.workdir);
-        const exists = normalizeFindOutputLines(output).some((branch) => isSameBranchSpec(branch, args.branch));
-        return exists ? "true" : "false";
-    },
-});
-
-export const branchDelete = tool({
-    description: "Delete a Plastic SCM branch (cm branch delete).",
-    args: {
-        branch: tool.schema.string().min(1).describe("Branch spec to delete."),
-        deleteChangesets: tool.schema.boolean().optional().describe("Delete changesets inside the branch when required."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        const cmdArgs: string[] = ["branch", "delete", args.branch];
-
-        if (args.deleteChangesets)
-        {
-            cmdArgs.push("--delete-changesets");
-        }
-
-        return runCm(cmdArgs, args.workdir);
-    },
-});
-
-export const shelvesetCreate = tool({
-    description: "Create a shelveset (cm shelveset create).",
-    args: {
-        comment: tool.schema.string().optional().describe("Shelveset comment."),
-        commentsFile: tool.schema.string().optional().describe("File path containing shelveset comment."),
-        paths: tool.schema.array(tool.schema.string()).optional().describe("Optional item paths to shelve."),
-        all: tool.schema.boolean().optional().describe("Include changed, moved, and deleted items."),
-        dependencies: tool.schema.boolean().optional().describe("Include local change dependencies."),
-        summaryFormat: tool.schema.boolean().optional().describe("Print only created shelveset spec for automation."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        if (args.comment && args.commentsFile)
-        {
-            throw new Error("Provide either comment or commentsFile, not both.");
-        }
-
-        if (args.comment !== undefined && args.comment.trim().length === 0)
-        {
-            throw new Error("Comment must be non-empty when provided.");
-        }
-
-        const cmdArgs: string[] = ["shelveset", "create"];
-
-        if (args.paths && args.paths.length > 0)
-        {
-            cmdArgs.push(...args.paths);
-        }
-
-        if (args.all)
-        {
-            cmdArgs.push("--all");
-        }
-
-        if (args.dependencies)
-        {
-            cmdArgs.push("--dependencies");
-        }
-
-        if (args.summaryFormat)
-        {
-            cmdArgs.push("--summaryformat");
-        }
-
-        if (args.comment)
-        {
-            cmdArgs.push(`-c=${args.comment}`);
-        }
-
-        if (args.commentsFile)
-        {
-            cmdArgs.push(`-commentsfile=${args.commentsFile}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
-    },
-});
-
-export const shelvesetApply = tool({
-    description: "Apply a shelveset (cm shelveset apply).",
-    args: {
-        shelveset: tool.schema.string().min(1).describe("Shelveset spec to apply (for example, sh:3)."),
-        changePaths: tool.schema.array(tool.schema.string()).optional().describe("Optional shelve server paths to apply."),
-        preview: tool.schema.boolean().optional().describe("Preview changes without applying them."),
-        dontCheckout: tool.schema.boolean().optional().describe("Keep applied changes as local modifications without checkout."),
-        comparisonMethod: tool.schema.enum([
-            "ignoreeol",
-            "ignorewhitespaces",
-            "ignoreeolandwhitespaces",
-            "recognizeall",
-        ]).optional().describe("Comparison method used when applying changes."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        const cmdArgs: string[] = ["shelveset", "apply", args.shelveset];
-
-        if (args.changePaths && args.changePaths.length > 0)
-        {
-            cmdArgs.push(...args.changePaths);
-        }
-
-        if (args.preview)
-        {
-            cmdArgs.push("--preview");
-        }
-
-        if (args.dontCheckout)
-        {
-            cmdArgs.push("--dontcheckout");
-        }
-
-        if (args.comparisonMethod)
-        {
-            cmdArgs.push(`--comparisonmethod=${args.comparisonMethod}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
-    },
-});
-
-export const shelvesetDelete = tool({
-    description: "Delete a shelveset (cm shelveset delete).",
-    args: {
-        shelveset: tool.schema.string().min(1).describe("Shelveset spec to delete (for example, sh:3)."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        return runCm(["shelveset", "delete", args.shelveset], args.workdir);
-    },
-});
-
-export const shelvesetList = tool({
-    description: "List shelvesets using cm find shelve.",
-    args: {
-        owner: tool.schema.string().optional().describe("Filter by shelveset owner."),
-        commentLike: tool.schema.string().optional().describe("Filter by shelveset comment pattern (supports % wildcard)."),
-        limit: tool.schema.number().int().min(1).optional().describe("Maximum number of shelvesets to return."),
-        dateFrom: tool.schema.string().optional().describe("Filter shelvesets created on or after this date/date constant."),
-        format: tool.schema.string().optional().describe("Format string for query output."),
-        dateFormat: tool.schema.string().optional().describe("Date format for query output."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        const whereClauses: string[] = [];
-
-        if (args.owner)
-        {
-            whereClauses.push(cmWhereEquals("owner", args.owner));
-        }
-
-        if (args.commentLike)
-        {
-            whereClauses.push(cmWhereLike("comment", args.commentLike));
-        }
-
-        if (args.dateFrom)
-        {
-            whereClauses.push(`date >= '${escapeCmWhereValue(args.dateFrom)}'`);
-        }
-
-        const cmdArgs: string[] = ["find", "shelve"];
-        if (whereClauses.length > 0)
-        {
-            cmdArgs.push(`where ${whereClauses.join(" and ")}`);
-        }
-
-        if (args.limit)
-        {
-            cmdArgs.push(`limit ${args.limit}`);
-        }
-
-        if (args.format)
-        {
-            cmdArgs.push(`--format=${args.format}`);
-        }
-
-        if (args.dateFormat)
-        {
-            cmdArgs.push(`--dateformat=${args.dateFormat}`);
-        }
-
-        cmdArgs.push("--nototal");
-        return runCm(cmdArgs, args.workdir);
-    },
-});
-
-export const codeReviewCreate = tool({
-    description: "Create a code review (cm codereview).",
-    args: {
-        target: tool.schema.string().min(1).describe("Review target spec (branch, changeset, or shelveset spec)."),
-        title: tool.schema.string().min(1).describe("Code review title."),
-        status: tool.schema.string().optional().describe("Initial review status."),
-        assignee: tool.schema.string().optional().describe("Initial review assignee."),
-        repository: tool.schema.string().optional().describe("Repository specification when no workspace is used."),
-        format: tool.schema.string().optional().describe("Format string for creation output."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        const cmdArgs: string[] = ["codereview", args.target, args.title];
-
-        if (args.status)
-        {
-            cmdArgs.push(`--status=${args.status}`);
-        }
-
-        if (args.assignee)
-        {
-            cmdArgs.push(`--assignee=${args.assignee}`);
-        }
-
-        if (args.repository)
-        {
-            cmdArgs.push(`--repository=${args.repository}`);
-        }
-
-        if (args.format)
-        {
-            cmdArgs.push(`--format=${args.format}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
-    },
-});
-
-export const codeReviewUpdate = tool({
-    description: "Update an existing code review (cm codereview -e).",
-    args: {
-        id: tool.schema.string().min(1).describe("Code review id or GUID."),
-        status: tool.schema.string().optional().describe("Updated review status."),
-        assignee: tool.schema.string().optional().describe("Updated review assignee."),
-        repository: tool.schema.string().optional().describe("Repository specification when no workspace is used."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        const cmdArgs: string[] = ["codereview", "-e", args.id];
-
-        if (args.status)
-        {
-            cmdArgs.push(`--status=${args.status}`);
-        }
-
-        if (args.assignee)
-        {
-            cmdArgs.push(`--assignee=${args.assignee}`);
-        }
-
-        if (args.repository)
-        {
-            cmdArgs.push(`--repository=${args.repository}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
-    },
-});
-
-export const codeReviewDelete = tool({
-    description: "Delete one or more code reviews (cm codereview -d).",
-    args: {
-        ids: tool.schema.array(tool.schema.string()).min(1).describe("Code review IDs or GUIDs to delete."),
-        repository: tool.schema.string().optional().describe("Repository specification when no workspace is used."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        const cmdArgs: string[] = ["codereview", "-d", ...args.ids];
-
-        if (args.repository)
-        {
-            cmdArgs.push(`--repository=${args.repository}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
-    },
-});
-
-export const codeReviewFind = tool({
-    description: "Find code reviews with filters using cm find review.",
-    args: {
-        status: tool.schema.string().optional().describe("Filter by review status."),
-        assignee: tool.schema.string().optional().describe("Filter by review assignee."),
-        owner: tool.schema.string().optional().describe("Filter by review owner."),
-        target: tool.schema.string().optional().describe("Filter by review target branch/changeset spec."),
-        targetType: tool.schema.enum(["branch", "changeset"]).optional().describe("Filter by review target type."),
-        titleLike: tool.schema.string().optional().describe("Filter by title pattern (supports % wildcard)."),
-        limit: tool.schema.number().int().min(1).optional().describe("Maximum number of reviews to return."),
-        orderBy: tool.schema.enum(["date", "modifieddate", "status"]).optional().describe("Sort field for review queries."),
-        descending: tool.schema.boolean().optional().describe("Sort descending when true."),
-        format: tool.schema.string().optional().describe("Format string for query output."),
-        dateFormat: tool.schema.string().optional().describe("Date format for query output."),
-        output: outputFormatArg,
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        const outputFormat = args.output ?? "text";
-        const whereClauses: string[] = [];
-
-        if (args.status)
-        {
-            whereClauses.push(cmWhereEquals("status", args.status));
-        }
-
-        if (args.assignee)
-        {
-            whereClauses.push(cmWhereEquals("assignee", args.assignee));
-        }
-
-        if (args.owner)
-        {
-            whereClauses.push(cmWhereEquals("owner", args.owner));
-        }
-
-        if (args.target)
-        {
-            whereClauses.push(cmWhereEquals("target", args.target));
-        }
-
-        if (args.targetType)
-        {
-            whereClauses.push(cmWhereEquals("targettype", args.targetType));
-        }
-
-        if (args.titleLike)
-        {
-            whereClauses.push(cmWhereLike("title", args.titleLike));
-        }
-
-        const cmdArgs: string[] = ["find", "review"];
-        if (whereClauses.length > 0)
-        {
-            cmdArgs.push(`where ${whereClauses.join(" and ")}`);
-        }
-
-        if (args.orderBy)
-        {
-            cmdArgs.push(`order by ${args.orderBy}${args.descending ? " desc" : " asc"}`);
-        }
-
-        if (args.limit)
-        {
-            cmdArgs.push(`limit ${args.limit}`);
-        }
-
-        if (args.format)
-        {
-            cmdArgs.push(`--format=${args.format}`);
-        }
-
-        if (args.dateFormat)
-        {
-            cmdArgs.push(`--dateformat=${args.dateFormat}`);
-        }
-
-        cmdArgs.push("--nototal");
-        const output = await runCm(cmdArgs, args.workdir);
-        return toStructuredResult(
-            "code-review-find",
-            outputFormat,
-            output,
-            {
-                command: ["cm", ...cmdArgs],
-                rawOutput: output,
-                resultCount: normalizeFindOutputLines(output).length,
-            },
-            args.workdir,
-        );
-    },
-});
-
-export const workspaceCreate = tool({
-    description: "Create a Plastic SCM workspace (cm workspace create).",
-    args: {
-        name: tool.schema.string().min(1).describe("Workspace name."),
-        path: tool.schema.string().min(1).describe("Workspace path."),
-        repositorySpec: tool.schema.string().optional().describe("Optional repository specification for the new workspace."),
-        selectorFile: tool.schema.string().optional().describe("Optional selector file path for the new workspace."),
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        if (args.repositorySpec && args.selectorFile)
-        {
-            throw new Error("Provide either repositorySpec or selectorFile, not both.");
-        }
-
-        const cmdArgs: string[] = ["workspace", "create", args.name, args.path];
-
-        if (args.repositorySpec)
-        {
-            cmdArgs.push(args.repositorySpec);
-        }
-
-        if (args.selectorFile)
-        {
-            cmdArgs.push(`--selector=${args.selectorFile}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
-    },
-});
-
-export const workspaceList = tool({
-    description: "List Plastic SCM workspaces (cm workspace list).",
-    args: {
-        format: tool.schema.string().optional().describe("Format string for workspace list output."),
-        output: outputFormatArg,
-        workdir: workdirArg,
-    },
-    async execute(args)
-    {
-        const outputFormat = args.output ?? "text";
-        const cmdArgs: string[] = ["workspace", "list"];
-
-        if (args.format)
-        {
-            cmdArgs.push(`--format=${args.format}`);
-        }
-
-        const output = await runCm(cmdArgs, args.workdir);
-        return toStructuredResult(
-            "workspace-list",
-            outputFormat,
-            output,
-            {
-                command: ["cm", ...cmdArgs],
-                rawOutput: output,
-                resultCount: normalizeFindOutputLines(output).length,
-            },
-            args.workdir,
         );
     },
 });
