@@ -5,6 +5,7 @@ import { PLASTIC_TOOL_REGISTRY, getRegisteredPlasticExportNames, toToolName } fr
 import { PLASTIC_TOOL_NAMES } from "../src/plastic-tool-loading.ts";
 import { getActiveAbortSignal } from "../src/execution/context.ts";
 import { statusOutputSchema } from "../src/pi/status-output.ts";
+import { shelvesetListOutputSchema } from "../src/pi/shelveset-list-output";
 import { workspaceListOutputSchema } from "../src/pi/workspace-list-output";
 import { branchListOutputSchema } from "../src/pi/branch-list-output";
 import { currentBranchOutputSchema, branchExistsOutputSchema } from "../src/pi/branch-output.ts";
@@ -12,7 +13,7 @@ import { currentBranchOutputSchema, branchExistsOutputSchema } from "../src/pi/b
 async function main(): Promise<void> {
   const tools = await loadRegisteredTools();
   for (const tool of tools.values()) {
-    assert.deepEqual(tool.outputSchema, tool.name === "plastic_status" ? statusOutputSchema : tool.name === "plastic_currentBranch" ? currentBranchOutputSchema : tool.name === "plastic_branchExists" ? branchExistsOutputSchema : tool.name === "plastic_branchList" ? branchListOutputSchema : tool.name === "plastic_workspaceList" ? workspaceListOutputSchema : undefined, "Exactly five read tools own structured output schemas");
+    assert.deepEqual(tool.outputSchema, tool.name === "plastic_status" ? statusOutputSchema : tool.name === "plastic_currentBranch" ? currentBranchOutputSchema : tool.name === "plastic_branchExists" ? branchExistsOutputSchema : tool.name === "plastic_branchList" ? branchListOutputSchema : tool.name === "plastic_workspaceList" ? workspaceListOutputSchema : tool.name === "plastic_shelvesetList" ? shelvesetListOutputSchema : undefined, "Exactly six read tools own structured output schemas");
   }
   const shape = [...tools.values()].map(({ name, label, description, parameters, prepareArguments, promptSnippet, promptGuidelines, constrainedSampling }) => ({
     name, label, description, parameters, defaults: prepareArguments?.({}), promptSnippet, promptGuidelines, constrainedSampling,

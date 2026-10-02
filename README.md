@@ -99,6 +99,25 @@ if (dto.ok && dto.data.mode === "fields") text(dto.data.rows.map(r => ({name:r.n
 
 Text/JSON use the same observation and DTO; canonical JSON adds no metadata command. Deterministic transport/schema/core and real file-loaded Pi 1.0.0 host tests cover direct/codemode/selective/nested consumers, errors, preabort, policy hooks and SDK-event serialization with no network/provider charges. RPC and foreign post-hook enforcement remain unclaimed.
 
+## Shelveset-list structured output
+
+`plastic_shelvesetList` is the sixth schema-bearing tool, with a closed versioned `action:"shelveset-list"` native/ids/error envelope. `source:"native"|"ids"` defaults to native. Existing owner/comment/date predicates, CLI limit, custom `format`/`dateFormat`, core native table/error behavior and `(no output)` sentinel remain intact. `output:"text"|"json"` is a separate presentation selector; it never repurposes the CLI templates or adds a version/metadata query.
+
+IDs uses exactly one `find shelve … --nototal --format={shelveid} --encoding=utf-8` response. Rows contain the observed bounded decimal `id` as a **string** (no JavaScript numeric precision loss) and its documented unqualified `sh:<id>` selector. These selectors are reusable only in the same workspace-repository context; no repository/server qualification is inferred (`scope="workspace_repository"`, `qualifierVerified:false`). Owner/comment/date values are requested filters, not returned metadata. No Unicode comment/date/owner rendering guarantee is implied by this numeric-ID source.
+
+Meaningful custom `format` or `dateFormat` conflicts with ids before dispatch; empty strings retain their ignored legacy meaning. Native/custom DTOs have null rows/counts and unknown read/capture, rather than table-derived IDs. Native JSON presentation contains that noncanonical envelope; native text remains the original string. No hidden second query, fallback or metadata recovery is performed.
+
+`maxItems` defaults to 100/max 500 and projects after full-response validation. CLI `limit` is independent and does not imply repository totals or exhaustion. Counts describe observed query records, not unique shelvesets; exact repeated IDs remain in order with full-response `diagnostics.duplicateRecords`. An accepted empty query yields []/0; failed, malformed or oversized output is an error with no partial reusable rows. The parser accepts canonical nonnegative decimal strings (at most 20 digits), LF/CRLF and one terminal newline, without trimming. Foreign/header/blank/negative/fractional/leading-zero/non-ASCII records, including those beyond projection, fail closed.
+
+Bounds: query strings/native templates 4096 UTF-16 code units, IDs stdout 1 MiB/stderr 64 KiB/timeout 30 seconds/records 20000, rows 500, compact envelope 131072 UTF-8 bytes and sanitized errors <=256 characters. Native raw presentation retains legacy bounds. Cancellation/stream/spawn/stderr/capture failures return native `isError:true` and `ok:false`; synchronous bounded parsing has boundary abort checks, not a hard JavaScript execution deadline. Foreign post-hook enforcement and RPC are unclaimed.
+
+```js
+const dto = await tools.plastic_shelvesetList({source:"ids", owner:"me", maxItems:20});
+text(dto.ok && dto.data.mode === "ids" ? dto.data.rows.map(r => r.shelveset) : dto.ok ? {rowsUnavailable:true} : dto.error);
+```
+
+The installed Windows cm 11.0.16.10371 help documents `shelveid`, workspace-repository default scope, templates and UTF-8 encoding. Read-only registered live checks verified clean empty queries, one query per call and unchanged selector/status; the test sandbox currently contains no shelvesets. **Populated live source/original equality has not been verified.** Positive rows, precision, grammar, projection, schema and transport are covered by deterministic tests and actual file-loaded Pi 1.0.0 host consumers without provider/network charges. No shelvesets were created/applied/deleted for validation.
+
 ## Plastic branch footer status
 
 When Pi starts inside a Plastic workspace, this package adds a themed `Plastic <branch>` status to Pi's built-in footer. It discovers the nearest enclosing `.plastic/plastic.workspace` and reads either the selector's `smartbranch` or `br` form as the credential-free branch source. A bounded `cm status` call is used only when the selector has no valid branch. Selector changes and successful same-workspace `plastic_*` tools refresh the status; sibling workspaces are ignored.

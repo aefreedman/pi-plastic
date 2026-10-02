@@ -1,3 +1,4 @@
+import { shelvesetListOutputSchema } from "../src/pi/shelveset-list-output";
 import { workspaceListOutputSchema } from "../src/pi/workspace-list-output";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
@@ -45,9 +46,9 @@ await writeFile(join(fixture, "scenario.json"), "{}", { flag: "wx" });
 await writeFile(join(fixture, "calls.jsonl"), "", { flag: "wx" });
 await writeFile(join(fixture, "version"), `require("node:fs").appendFileSync("calls.jsonl", "version\\n"); console.log("fixture-version");`, { flag: "wx" });
 await writeFile(modifierPath, `export default function(pi) {
-  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
+  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
   pi.on("tool_result", e => {
-    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList"].includes(e.toolName)) return;
+    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList"].includes(e.toolName)) return;
     if (globalThis.__plasticHostFixture.scenario === "content-only") return { content: [{ type: "text", text: "foreign replacement" }] };
   });
 }`, { flag: "wx" });
@@ -73,16 +74,16 @@ await writeFile(modifierPath, `export default function(pi) {
     settingsManager: SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } }),
     resourceLoaderOptions: { additionalExtensionPaths: [modifierPath, extensionPath], extensionFactories: [createCodemodeExtension({ mode: "on", models: false }), pi => {
       pi.registerTool({ name: "fixture_throw", label: "Throw", description: "Fixture", parameters: Type.Object({}), async execute() { throw Error("fixture thrown"); } });
-      pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Union([Type.Literal("xml"), Type.Literal("names"), Type.Literal("fields"), Type.Literal("native")])) }), async execute(_id, params, _signal, _update, ctx) {
+      pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Union([Type.Literal("xml"), Type.Literal("names"), Type.Literal("fields"), Type.Literal("ids"), Type.Literal("native")])) }), async execute(_id, params, _signal, _update, ctx) {
         const controller = new AbortController(); if (params.abort) controller.abort();
-        state.nested = await ctx.executeTool(params.child ?? "plastic_status", params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
+        state.nested = await ctx.executeTool(params.child ?? "plastic_status", params.child === "plastic_shelvesetList" ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
         return { content: [{ type: "text", text: "nested result inspected outside transcript" }], details: { childIsError: state.nested.isError } };
       } });
     }], noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true, systemPrompt: "Run only the local scripted action." },
   });
   assert.deepEqual(services.diagnostics.filter(d => d.type === "error"), []);
   assert.deepEqual(services.resourceLoader.getExtensions().errors, []);
-  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "codemode", "fixture_throw", "fixture_nested"] }));
+  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "codemode", "fixture_throw", "fixture_nested"] }));
   await session.bindExtensions({});
   assert.deepEqual(session.getToolDefinition("plastic_status").outputSchema, statusOutputSchema);
   assert.equal(resolve(session.getAllTools().find((tool: any) => tool.name === "plastic_status").sourceInfo.path), resolve(extensionPath));
@@ -94,7 +95,7 @@ await writeFile(modifierPath, `export default function(pi) {
     const start = records.length;
     await session.prompt(scenario);
     const parent = session.messages.filter((m: any) => m.role === "toolResult").at(-1);
-    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
+    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
   };
   const script = (args: object) => ({ code: `const dto = await tools.plastic_status(${JSON.stringify(args)}); if (typeof dto !== "object") throw Error("unexpected fallback"); text(dto);` });
   const text = (result: any) => result.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
@@ -240,6 +241,48 @@ await writeFile(modifierPath, `export default function(pi) {
   const workspaceAbort=await run("workspace-abort","fixture_nested",{child:"plastic_workspaceList",source:"fields",abort:true},workspaceOutput);assert(state.nested.isError);assert.equal(workspaceAbort.calls.length,0);
   const workspaceBlocked=await run("blocked","codemode",{code:'try { await tools.plastic_workspaceList({source:"fields"}); throw Error("must reject"); } catch(e){ text(String(e)); }'},workspaceOutput);assert.equal(workspaceBlocked.calls.length,0);assert.equal(workspaceBlocked.children[0].result.structuredContent,undefined);
   const workspaceReplaced=await run("content-only","codemode",{code:'text(await tools.plastic_workspaceList({source:"fields"}));'},workspaceOutput);assert.equal(workspaceReplaced.children[0].result.structuredContent,undefined);assert.match(text(workspaceReplaced.parent),/foreign replacement/);
+  assert.deepEqual(session.getToolDefinition("plastic_shelvesetList").outputSchema, shelvesetListOutputSchema);
+  assert.equal(resolve(session.getAllTools().find((t:any)=>t.name==="plastic_shelvesetList").sourceInfo.path),resolve(extensionPath));
+  const shelvesOutput="17\r\n9007199254740993\r\n";
+  const shelvesDirect=await run("shelves-direct","plastic_shelvesetList",{source:"ids"},shelvesOutput);
+  const shelvesDto=shelvesDirect.children[0].result.structuredContent;
+  assert(shelvesDto.ok);assert.equal(shelvesDirect.calls.length,1);
+  assert.deepEqual(shelvesDto.data.rows.map((r:any)=>r.shelveset),["sh:17","sh:9007199254740993"]);
+  for(const output of ["text","json"]){
+    const code='text(await tools.plastic_shelvesetList({source:"ids",output:'+JSON.stringify(output)+'}));';
+    const r=await run("shelves-code-"+output,"codemode",{code},shelvesOutput);
+    assert.deepEqual(r.children[0].result.structuredContent,shelvesDto);assert.equal(r.calls.length,1);
+    assert.equal(r.parent.details.calls[0].status,"ok");assert.deepEqual(JSON.parse(JSON.stringify(r.children[0])),r.children[0]);
+  }
+  const shelvesSubset=await run("shelves-subset","codemode",{code:'const d=await tools.plastic_shelvesetList({source:"ids",maxItems:1});text(d.ok&&d.data.mode==="ids"?d.data.rows.map(r=>r.shelveset):[]);'},shelvesOutput);
+  assert.match(text(shelvesSubset.parent),/sh:17/);assert.doesNotMatch(text(shelvesSubset.parent),/schemaVersion|9007199254740993/);
+  await run("shelves-nested","fixture_nested",{child:"plastic_shelvesetList",source:"ids"},shelvesOutput);
+  assert.deepEqual(state.nested.result.structuredContent,shelvesDto);
+  for(const [scenario,args,output,fail,count] of [
+    ["shelves-error",{source:"ids"},"",true,1],
+    ["shelves-native-error",{source:"native"},"",true,1],
+    ["shelves-malformed",{source:"ids"},"17\nforeign",false,1],
+    ["shelves-format",{source:"ids",format:"{comment}"},shelvesOutput,false,0],
+    ["shelves-date",{source:"ids",dateFormat:"yyyy"},shelvesOutput,false,0],
+  ] as const){
+    const code="text(await tools.plastic_shelvesetList("+JSON.stringify(args)+"));";
+    const r=await run(scenario,"codemode",{code},output,fail);
+    assert(r.children[0].isError);assert.equal(r.parent.details.calls[0].status,"error");assert.equal(r.calls.length,count);
+    assert.doesNotMatch(JSON.stringify(r),/private fixture error/);
+  }
+  const shelvesEmpty=await run("shelves-empty","plastic_shelvesetList",{source:"ids"},"");
+  assert.deepEqual(shelvesEmpty.children[0].result.structuredContent.data.rows,[]);
+  const shelvesNative=await run("shelves-native","plastic_shelvesetList",{format:"{comment}",dateFormat:"yyyy"},"native table");
+  assert.equal(shelvesNative.children[0].result.structuredContent.data.rows,null);
+  assert.equal(shelvesNative.children[0].result.details.rawResult,"native table");
+  const shelvesRepeat=await run("shelves-repeat","plastic_shelvesetList",{source:"ids",maxItems:1},"17\n17");
+  assert.equal(shelvesRepeat.children[0].result.structuredContent.data.diagnostics.duplicateRecords,1);
+  const shelvesAbort=await run("shelves-abort","fixture_nested",{child:"plastic_shelvesetList",source:"ids",abort:true},shelvesOutput);
+  assert(state.nested.isError);assert.equal(shelvesAbort.calls.length,0);
+  const shelvesBlocked=await run("blocked","codemode",{code:'try{await tools.plastic_shelvesetList({source:"ids"});throw Error("must reject");}catch(e){text(String(e));}'},shelvesOutput);
+  assert.equal(shelvesBlocked.calls.length,0);assert.equal(shelvesBlocked.children[0].result.structuredContent,undefined);
+  const shelvesReplaced=await run("content-only","codemode",{code:'text(await tools.plastic_shelvesetList({source:"ids"}));'},shelvesOutput);
+  assert.equal(shelvesReplaced.children[0].result.structuredContent,undefined);assert.match(text(shelvesReplaced.parent),/foreign replacement/);
   console.log(`PASS: real Pi host, ${turns} local scripted turns; finalizer/codemode/nested consumers, SDK JSON events, native errors, selective context and foreign-hook fallback; zero network`);
 } finally {
   session?.dispose(); globalThis.fetch = originalFetch; delete (globalThis as any).__plasticHostFixture;

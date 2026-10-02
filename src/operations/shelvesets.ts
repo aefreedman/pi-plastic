@@ -1,7 +1,7 @@
 import { tool } from "../tool-definition";
 import { workdirArg } from "./arguments";
 import { runCm } from "../execution/cm";
-import { cmWhereEquals, cmWhereLike, escapeCmWhereValue } from "../domain/branches";
+import { executeShelvesetList } from "./shelveset-list";
 
 export const shelvesetCreate = tool({
     description: "Create a shelveset (cm shelveset create).",
@@ -124,51 +124,15 @@ export const shelvesetList = tool({
         commentLike: tool.schema.string().optional().describe("Filter by shelveset comment pattern (supports % wildcard)."),
         limit: tool.schema.number().int().min(1).optional().describe("Maximum number of shelvesets to return."),
         dateFrom: tool.schema.string().optional().describe("Filter shelvesets created on or after this date/date constant."),
-        format: tool.schema.string().optional().describe("Format string for query output."),
+        source: tool.schema.enum(["native", "ids"]).optional().describe("Native output (default) or one canonical shelveset-ID query."),
+        output: tool.schema.enum(["text", "json"]).optional().describe("Presentation only; does not change query source."),
+        maxItems: tool.schema.number().int().min(1).max(500).optional().describe("Projected record cap (default 100); separate from CLI limit."),
+        format: tool.schema.string().optional().describe("Format string for query output; conflicts with ids source."),
         dateFormat: tool.schema.string().optional().describe("Date format for query output."),
         workdir: workdirArg,
     },
     async execute(args)
     {
-        const whereClauses: string[] = [];
-
-        if (args.owner)
-        {
-            whereClauses.push(cmWhereEquals("owner", args.owner));
-        }
-
-        if (args.commentLike)
-        {
-            whereClauses.push(cmWhereLike("comment", args.commentLike));
-        }
-
-        if (args.dateFrom)
-        {
-            whereClauses.push(`date >= '${escapeCmWhereValue(args.dateFrom)}'`);
-        }
-
-        const cmdArgs: string[] = ["find", "shelve"];
-        if (whereClauses.length > 0)
-        {
-            cmdArgs.push(`where ${whereClauses.join(" and ")}`);
-        }
-
-        if (args.limit)
-        {
-            cmdArgs.push(`limit ${args.limit}`);
-        }
-
-        if (args.format)
-        {
-            cmdArgs.push(`--format=${args.format}`);
-        }
-
-        if (args.dateFormat)
-        {
-            cmdArgs.push(`--dateformat=${args.dateFormat}`);
-        }
-
-        cmdArgs.push("--nototal");
-        return runCm(cmdArgs, args.workdir);
+        return executeShelvesetList(args);
     },
 });

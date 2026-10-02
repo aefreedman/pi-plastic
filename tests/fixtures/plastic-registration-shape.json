@@ -1181,9 +1181,41 @@
           "type": "string",
           "description": "Filter shelvesets created on or after this date/date constant."
         },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "native"
+            },
+            {
+              "type": "string",
+              "const": "ids"
+            }
+          ],
+          "description": "Native output (default) or one canonical shelveset-ID query."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Presentation only; does not change query source."
+        },
+        "maxItems": {
+          "type": "integer",
+          "description": "Projected record cap (default 100); separate from CLI limit.",
+          "minimum": 1,
+          "maximum": 500
+        },
         "format": {
           "type": "string",
-          "description": "Format string for query output."
+          "description": "Format string for query output; conflicts with ids source."
         },
         "dateFormat": {
           "type": "string",

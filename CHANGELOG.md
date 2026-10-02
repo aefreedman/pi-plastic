@@ -9,6 +9,9 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Shelveset-list closed native/ids/error structured output with one explicit UTF-8 numeric-ID observation, exact decimal-string IDs and workspace-scoped unqualified selectors, bounded projection/counts/duplicate diagnostics, preserved native custom templates and independent text/JSON presentation. No metadata query or mutation.
+- Shelveset-list schema/core/transport regressions and real file-loaded Pi host consumers; read-only live empty-query acceptance. Populated live identities remain unverified because the sandbox has no shelvesets; no fixtures were created.
+
 - Workspace-list closed native/fields/error structured output with explicit ASCII-original-name/path configuration prerequisite and formatter-loss caveat, one supported template observation, bounded projection and observed-record accounting. Exact repeated records remain in order with full-response duplicate diagnostics; conflicting identities fail closed. Native custom templates and legacy text/JSON behavior remain intact.
 - Workspace-list strict raw capture, schema/core/transport/limits regression tests and deterministic real Pi host consumers; read-only live acceptance against independently known ASCII originals without runtime registry access.
 
