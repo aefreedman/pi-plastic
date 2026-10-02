@@ -9,6 +9,10 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Historical revision-diff closed success/error observations with exact requested selectors, source byte classification, explicit comparison basis and normalized bounded excerpt/count/completeness fields. Preserves compatible text/fenced JSON/version caching; no resolved revision identity is fabricated.
+- Selected-tool-only historical selector/export, signal/timeout/capture/fatal-UTF-8/unified-output and cleanup safeguards; bounded retained file reads and surrogate-safe UTF-8-envelope projection. Shared pending-workspace diff primitives remain unchanged.
+- Historical source/core/transport/limit/consumer regressions and read-only live original-byte/changed/unchanged/failed-export acceptance on existing fixtures, without workspace or fixture mutations.
+
 - Code-review-find closed native/ids/error output with a single bounded UTF-8 numeric-ID source, exact decimal strings, query/projection counts and duplicate diagnostics. Preserves all filters, ordering, CLI limits/templates/aliases and native text/fenced JSON with existing version caching; no review mutation or metadata recovery.
 - Code-review schema/core/transport/ordering/precision regressions, file-loaded Pi host consumer checks and read-only live empty-query/native JSON acceptance. Populated live review IDs remain unverified; no reviews were created for fixtures.
 

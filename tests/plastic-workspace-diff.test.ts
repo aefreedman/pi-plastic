@@ -109,7 +109,7 @@ function stressCommands(calls: Call[]) {
         return;
       }
       if (args[0] === "-u") {
-        proc.stdout.write(`--- left\n+++ right\n${"+\\\"\\\\\n".repeat(30_000)}`);
+        proc.stdout.write(`--- left\n+++ right\n@@ -0,0 +1,30000 @@\n${"+\\\"\\\\\n".repeat(30_000)}`);
         proc.close(1);
         return;
       }

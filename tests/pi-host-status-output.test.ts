@@ -10,6 +10,7 @@ import { Type } from "typebox";
 import { createAgentSessionServices, createAgentSessionFromServices, createCodemodeExtension, ModelRuntime, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { branchListOutputSchema } from "../src/pi/branch-list-output";
 import { currentBranchOutputSchema, branchExistsOutputSchema } from "../src/pi/branch-output";
+import { diffRevisionsOutputSchema } from "../src/pi/diff-revisions-output";
 import { statusOutputSchema } from "../src/pi/status-output";
 import { xmlStatus, xmlRecord } from "./fixtures/status-xml";
 
@@ -43,13 +44,14 @@ try {
 await writeFile(join(fixture, "status"), commandFixture, { flag: "wx" });
 await writeFile(join(fixture, "find"), commandFixture, { flag: "wx" });
 await writeFile(join(fixture, "workspace"), commandFixture, { flag: "wx" });
+await writeFile(join(fixture, "cat"), `const fs=require("node:fs");fs.appendFileSync("calls.jsonl",JSON.stringify(process.argv.slice(1))+"\\n");const data=JSON.parse(fs.readFileSync("scenario.json","utf8"));if(data.fail){process.stderr.write("private fixture error");process.exit(1);}const pair=JSON.parse(data.output);const dest=process.argv.find(a=>a.startsWith("--file=")).slice(7);fs.writeFileSync(dest,Buffer.from(process.argv[2].endsWith("#cs:2")?pair.right:pair.left,"base64"),{flag:"wx"});`, {flag:"wx"});
 await writeFile(join(fixture, "scenario.json"), "{}", { flag: "wx" });
 await writeFile(join(fixture, "calls.jsonl"), "", { flag: "wx" });
 await writeFile(join(fixture, "version"), `require("node:fs").appendFileSync("calls.jsonl", "version\\n"); console.log("fixture-version");`, { flag: "wx" });
 await writeFile(modifierPath, `export default function(pi) {
-  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
+  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diffRevisions"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
   pi.on("tool_result", e => {
-    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind"].includes(e.toolName)) return;
+    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diffRevisions"].includes(e.toolName)) return;
     if (globalThis.__plasticHostFixture.scenario === "content-only") return { content: [{ type: "text", text: "foreign replacement" }] };
   });
 }`, { flag: "wx" });
@@ -77,14 +79,14 @@ await writeFile(modifierPath, `export default function(pi) {
       pi.registerTool({ name: "fixture_throw", label: "Throw", description: "Fixture", parameters: Type.Object({}), async execute() { throw Error("fixture thrown"); } });
       pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Union([Type.Literal("xml"), Type.Literal("names"), Type.Literal("fields"), Type.Literal("ids"), Type.Literal("native")])) }), async execute(_id, params, _signal, _update, ctx) {
         const controller = new AbortController(); if (params.abort) controller.abort();
-        state.nested = await ctx.executeTool(params.child ?? "plastic_status", ["plastic_shelvesetList", "plastic_codeReviewFind"].includes(params.child ?? "") ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
+        state.nested = await ctx.executeTool(params.child ?? "plastic_status", params.child === "plastic_diffRevisions" ? { leftRevision:"Assets/Fictional.txt#cs:1", rightRevision:"Assets/Fictional.txt#cs:2" } : ["plastic_shelvesetList", "plastic_codeReviewFind"].includes(params.child ?? "") ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
         return { content: [{ type: "text", text: "nested result inspected outside transcript" }], details: { childIsError: state.nested.isError } };
       } });
     }], noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true, systemPrompt: "Run only the local scripted action." },
   });
   assert.deepEqual(services.diagnostics.filter(d => d.type === "error"), []);
   assert.deepEqual(services.resourceLoader.getExtensions().errors, []);
-  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "codemode", "fixture_throw", "fixture_nested"] }));
+  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diffRevisions", "codemode", "fixture_throw", "fixture_nested"] }));
   await session.bindExtensions({});
   assert.deepEqual(session.getToolDefinition("plastic_status").outputSchema, statusOutputSchema);
   assert.equal(resolve(session.getAllTools().find((tool: any) => tool.name === "plastic_status").sourceInfo.path), resolve(extensionPath));
@@ -96,7 +98,7 @@ await writeFile(modifierPath, `export default function(pi) {
     const start = records.length;
     await session.prompt(scenario);
     const parent = session.messages.filter((m: any) => m.role === "toolResult").at(-1);
-    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
+    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diffRevisions"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
   };
   const script = (args: object) => ({ code: `const dto = await tools.plastic_status(${JSON.stringify(args)}); if (typeof dto !== "object") throw Error("unexpected fallback"); text(dto);` });
   const text = (result: any) => result.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
@@ -333,6 +335,34 @@ await writeFile(modifierPath, `export default function(pi) {
   const reviewOrdered=await run("reviews-ordered","plastic_codeReviewFind",{source:"ids",status:"pending",assignee:"me",target:"br:/main",targetType:"branch",titleLike:"Feature_%",orderBy:"modifieddate",descending:true,limit:2,maxItems:1},reviewsOutput);
   assert(reviewOrdered.children[0].result.structuredContent.ok);assert.equal(reviewOrdered.calls.length,1);
   assert.deepEqual(JSON.parse(reviewOrdered.calls[0]).slice(1),["review","where status = 'pending' and assignee = 'me' and target = 'br:/main' and targettype = 'branch' and title like 'Feature_%'","order by modifieddate desc","limit 2","--nototal","--format={id}","--encoding=utf-8"]);
+  const historical={leftRevision:"Assets/Fictional.txt#cs:1",rightRevision:"Assets/Fictional.txt#cs:2"};
+  const historicalPair=(l:string|Buffer,r:string|Buffer)=>JSON.stringify({left:Buffer.from(l).toString("base64"),right:Buffer.from(r).toString("base64")});
+  const pair=historicalPair("before 日本 😀\n","after 日本 😀\n");
+  assert.deepEqual(session.getToolDefinition("plastic_diffRevisions").outputSchema,diffRevisionsOutputSchema);
+  assert.equal(resolve(session.getAllTools().find((t:any)=>t.name==="plastic_diffRevisions").sourceInfo.path),resolve(extensionPath));
+  const historicalDirect=await run("historical-direct","plastic_diffRevisions",historical,pair),historicalDto=historicalDirect.children[0].result.structuredContent;
+  assert(historicalDto.ok);assert.equal(historicalDto.data.status,"changed");assert.equal(historicalDirect.calls.length,2);assert.match(historicalDto.data.excerpt.text,/\+after 日本 😀/);
+  for(const format of ["text","json"]){
+    const r=await run("historical-code-"+format,"codemode",{code:"text(await tools.plastic_diffRevisions("+JSON.stringify({...historical,format})+"));"},pair);
+    assert.deepEqual(r.children[0].result.structuredContent,historicalDto);assert.equal(r.parent.details.calls[0].status,"ok");assert.equal(r.calls.filter(c=>c!=="version").length,2);assert.deepEqual(JSON.parse(JSON.stringify(r.children[0])),r.children[0]);
+  }
+  const historicalSubset=await run("historical-subset","codemode",{code:"const d=await tools.plastic_diffRevisions("+JSON.stringify(historical)+");text(d.ok?{status:d.data.status}:d.error.code);"},pair);
+  assert.match(text(historicalSubset.parent),/changed/);assert.doesNotMatch(text(historicalSubset.parent),/schemaVersion|before 日本/);
+  await run("historical-nested","fixture_nested",{child:"plastic_diffRevisions"},pair);assert.deepEqual(state.nested.result.structuredContent,historicalDto);
+  for(const [scenario,output,status,binary] of [
+    ["historical-empty",historicalPair("",""),"unchanged",false],
+    ["historical-same",historicalPair("same\n","same\n"),"unchanged",false],
+    ["historical-binary",historicalPair(Buffer.from([0,1]),Buffer.from([0,2])),"binary-different",true],
+    ["historical-binary-same",historicalPair(Buffer.from([255]),Buffer.from([255])),"unchanged",true],
+  ] as const){const r=await run(scenario,"plastic_diffRevisions",historical,output);assert(r.children[0].result.structuredContent.ok);assert.equal(r.children[0].result.structuredContent.data.status,status);assert.equal(r.children[0].result.structuredContent.data.binary,binary);assert.equal(r.calls.length,2);}
+  for(const [scenario,args,fail,count] of [
+    ["historical-export-error",historical,true,1],
+    ["historical-selector",{...historical,leftRevision:"revid:17;C:/Fictional/output.txt"},false,0],
+  ] as const){const r=await run(scenario,"codemode",{code:"text(await tools.plastic_diffRevisions("+JSON.stringify(args)+"));"},pair,fail);assert(r.children[0].isError);assert.equal(r.parent.details.calls[0].status,"error");assert.equal(r.calls.length,count);assert.doesNotMatch(JSON.stringify(r),/private fixture error/);}
+  const historicalAbort=await run("historical-abort","fixture_nested",{child:"plastic_diffRevisions",abort:true},pair);assert(state.nested.isError);assert.equal(historicalAbort.calls.length,0);
+  const historicalBlocked=await run("blocked","codemode",{code:"try{await tools.plastic_diffRevisions("+JSON.stringify(historical)+");throw Error('must reject');}catch(e){text(String(e));}"},pair);assert.equal(historicalBlocked.calls.length,0);assert.equal(historicalBlocked.children[0].result.structuredContent,undefined);
+  const historicalReplaced=await run("content-only","codemode",{code:"text(await tools.plastic_diffRevisions("+JSON.stringify(historical)+"));"},pair);assert.equal(historicalReplaced.children[0].result.structuredContent,undefined);assert.match(text(historicalReplaced.parent),/foreign replacement/);
+  const historicalLong=await run("historical-projection","plastic_diffRevisions",{...historical,maxChars:500},historicalPair("before 日本 😀\n".repeat(100),"after 日本 😀\n".repeat(100)));assert(historicalLong.children[0].result.structuredContent.ok);assert.equal(historicalLong.children[0].result.structuredContent.completeness.projection,false);assert(historicalLong.children[0].result.structuredContent.data.excerpt.returnedChars<=500);
   console.log(`PASS: real Pi host, ${turns} local scripted turns; finalizer/codemode/nested consumers, SDK JSON events, native errors, selective context and foreign-hook fallback; zero network`);
 } finally {
   session?.dispose(); globalThis.fetch = originalFetch; delete (globalThis as any).__plasticHostFixture;

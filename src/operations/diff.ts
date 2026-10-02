@@ -1,3 +1,4 @@
+import { executeDiffRevisions } from "./diff-revisions";
 import { DIFF_OUTPUT_MAX_CHARS, isBinaryContent, stableDiffHeaders, boundDiffOutput, runPortableTextDiff, safeTempExtension, isAsciiPath, createAsciiTempDirectory, materializeRevision, isNoDataError, withWorkspaceBaseUnavailableDiagnostic, TextDiffResult } from "../diff/text";
 import { DIFF_RESPONSE_DEFAULT_MAX_CHARS, DIFF_RESPONSE_MAX_CHARS, DIFF_RESPONSE_MIN_CHARS, DIFF_RESPONSE_TOTAL_MAX_CHARS, normalizeDiffResponseMaxChars, boundTextDiffResult, formatTextDiff, WORKSPACE_DIFF_PATH_MAX_CHARS, WORKSPACE_DIFF_MAX_PATHS, WORKSPACE_DIFF_MAX_FILES, WORKSPACE_DIFF_DEFAULT_MAX_FILES, WORKSPACE_DIFF_MIN_CHARS, WORKSPACE_DIFF_PER_FILE_MAX_CHARS, WORKSPACE_DIFF_DEFAULT_MAX_CHARS, boundWorkspaceValue, WORKSPACE_DIFF_CONTENT_MAX_CHARS, WORKSPACE_DIFF_DISPLAY_PATH_MAX_CHARS, boundWorkspaceDiffResult, WORKSPACE_DIFF_ERROR_MAX_CHARS, workspacePathPreview, WORKSPACE_DIFF_TOTAL_MAX_CHARS, formatWorkspaceDiffResult } from "../presentation/diff-results";
 import { resolveDiffFileRevision, isUnscopedDiffRevisionSpec, extractBranchSelectorFromRevision, extractBranchNameFromSelector, PendingBaseIdentityResolver, isRevisionNotFoundError, createPendingBaseIdentityResolver } from "../domain/revisions";
@@ -113,29 +114,7 @@ export const diffRevisions = tool({
     },
     async execute(args)
     {
-        if (isUnscopedDiffRevisionSpec(args.leftRevision) || isUnscopedDiffRevisionSpec(args.rightRevision))
-        {
-            throw new Error("plastic_diffRevisions requires file-qualified revspecs. For workspace-vs-revision comparisons, use plastic_diffFile(path=..., revision=...).");
-        }
-
-        const cwd = args.workdir ?? process.cwd();
-        const leftLabel = args.leftRevision.includes("#") ? args.leftRevision.replace("#", "@") : args.leftRevision;
-        const rightLabel = args.rightRevision.includes("#") ? args.rightRevision.replace("#", "@") : args.rightRevision;
-        const tempDir = await createAsciiTempDirectory("plastic-core-");
-        const leftPath = join(tempDir, `left${safeTempExtension(args.leftRevision)}`);
-        const rightPath = join(tempDir, `right${safeTempExtension(args.rightRevision)}`);
-
-        try
-        {
-            await materializeRevision(args.leftRevision, leftPath, args.workdir);
-            await materializeRevision(args.rightRevision, rightPath, args.workdir);
-            const result = await runPortableTextDiff(leftPath, rightPath, cwd, leftLabel, rightLabel);
-            return formatTextDiff("diffRevisions", args.format, "revision-to-revision", result, args.workdir, {}, args.maxChars);
-        }
-        finally
-        {
-            await fs.rm(tempDir, { recursive: true, force: true });
-        }
+        return executeDiffRevisions(args);
     },
 });
 
