@@ -48,11 +48,11 @@ cm codereview -e <review-id> --reviewer="reviewer-name"
 - `cm diff` is blocked in Pi because it can launch GUI windows and hang the CLI.
 - Use text-only alternatives:
   - `plastic_status(machineReadable=true)` for changed paths/statuses.
-  - `plastic_diffFile(path="<workspace-path>", maxChars=4000)` when one intentional file comparison is needed.
-  - `plastic_workspaceDiff(paths=["<workspace-path>"], maxChars=3000)` for an explicitly scoped pending review, or `allPending=true` for an intentional small whole-workspace review.
+  - `plastic_diff(mode="file", path="<workspace-path>", maxChars=4000)` when one intentional file comparison is needed.
+  - `plastic_diff(mode="workspace", paths=["<workspace-path>"], maxChars=3000)` for an explicitly scoped pending review, or `allPending=true` for an intentional small whole-workspace review.
   - Use `plastic_status` instead when only pending paths are needed; do not diff routinely.
-  - `plastic_diffFile(path="<workspace-path>", revision="cs:<number>")` for an explicit supported revision.
-  - `plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")` for two historical files.
+  - `plastic_diff(mode="file", path="<workspace-path>", revision="cs:<number>")` for an explicit supported revision.
+  - `plastic_diff(mode="revisions", leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")` for two historical files.
 
 ## GUI/Prompt Opens During Merge
 

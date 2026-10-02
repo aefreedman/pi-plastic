@@ -26,7 +26,7 @@ const expectAllowed = (command: string): void =>
 
 const main = async (): Promise<void> =>
 {
-    assert(/plastic_status.*plastic_diffFile.*plastic_workspaceDiff.*plastic_diffRevisions/.test(__bashCmDiffGuardInternals.blockMessage), "Expected cm diff guard guidance to route listing, one-file, pending-review, and historical-pair requests to safe tools.");
+    assert(/plastic_status.*plastic_diff.*mode=file, revisions, or workspace/.test(__bashCmDiffGuardInternals.blockMessage), "Expected cm diff guard guidance to route listing, one-file, pending-review, and historical-pair requests to safe tools.");
     expectBlocked("cm diff cs:123");
     expectBlocked("env FOO=bar cm diff cs:123");
     expectBlocked("command cm diff cs:123");

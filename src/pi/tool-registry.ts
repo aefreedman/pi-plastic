@@ -1,7 +1,7 @@
 import { status } from "../operations/status";
 import { update, add, undo, resolveDeleteChangeConflict, workspaceList } from "../operations/workspace";
 import { checkin } from "../operations/checkin";
-import { diff, diffRevisions, diffFile, workspaceDiff } from "../operations/diff";
+import { diff } from "../operations/diff";
 import { patch } from "../operations/patch";
 import { branchCreate, currentBranch, branchList, branchExists, branchDelete } from "../operations/branches";
 import { switchBranch } from "../operations/switch";
@@ -27,9 +27,6 @@ export const PLASTIC_TOOL_REGISTRY = {
   resolveDeleteChangeConflict,
   diff,
   patch,
-  diffRevisions,
-  diffFile,
-  workspaceDiff,
   branchCreate,
   switchBranch,
   merge,

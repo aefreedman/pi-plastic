@@ -13,8 +13,7 @@ const separator = " \u00b7 ";
 
 const titles: Record<string, string> = {
   status: "Status", currentBranch: "Current branch", update: "Update", add: "Add", checkin: "Check in", undo: "Undo",
-  resolveDeleteChangeConflict: "Resolve deletion", diff: "Diff (disabled)", patch: "Review patch", diffRevisions: "Revision diff",
-  diffFile: "File diff", workspaceDiff: "Workspace diff", branchCreate: "Create branch", switchBranch: "Switch branch",
+  resolveDeleteChangeConflict: "Resolve deletion", diff: "Diff", patch: "Review patch", branchCreate: "Create branch", switchBranch: "Switch branch",
   merge: "Merge", mergeBranches: "Server merge", mergeToBranch: "Merge and check in", finalizeMerge: "Finalize merge",
   branchList: "Branches", branchExists: "Branch exists", branchDelete: "Delete branch", shelvesetCreate: "Create shelveset",
   shelvesetApply: "Apply shelveset", shelvesetDelete: "Delete shelveset", shelvesetList: "Shelvesets",
@@ -60,10 +59,10 @@ function list(value: unknown): string {
 }
 function target(name: string, args: Args): string {
   if (name === "tool_search") return list(args.toolNames) || scalar(args.query) || "Browse capabilities";
-  if (name === "diffRevisions") return `${scalar(args.leftRevision) || "..."} -> ${scalar(args.rightRevision) || "..."}`;
+  if (name === "diff" && args.mode === "revisions") return `${scalar(args.leftRevision) || "..."} -> ${scalar(args.rightRevision) || "..."}`;
   if (name === "mergeBranches" || name === "mergeToBranch") return `${scalar(args.source) || "..."} -> ${scalar(args.target) || "parent branch"}`;
-  if (name === "patch" || name === "diff") return [scalar(args.source), scalar(args.destination)].filter(Boolean).join(" -> ");
-  if (name === "diffFile") return [scalar(args.path), args.revision ? `vs ${scalar(args.revision)}` : "vs workspace base"].join(" ");
+  if (name === "patch") return [scalar(args.source), scalar(args.destination)].filter(Boolean).join(" -> ");
+  if (name === "diff" && args.mode === "file") return [scalar(args.path), args.revision ? `vs ${scalar(args.revision)}` : "vs workspace base"].join(" ");
   return scalar(args.branch) || scalar(args.source) || scalar(args.path) || list(args.paths) || scalar(args.shelveset)
     || list(args.ids) || scalar(args.id) || scalar(args.target) || scalar(args.nameLike) || scalar(args.titleLike)
     || (args.allPending === true ? "All pending files" : "");
@@ -73,7 +72,8 @@ export function renderPlasticCall(name: string, input: unknown, theme: RenderThe
   const args = record(input);
   const workdir = scalar(args.workdir) || context?.cwd || "";
   const workspace = name === "mergeBranches" ? "server" : workdir.replace(/[\\/]+$/, "").split(/[\\/]/).pop();
-  let text = theme.fg("toolTitle", theme.bold(`Plastic${separator}${titles[name] ?? name}`));
+  const title=name==="diff" ? args.mode==="file"?"File diff":args.mode==="revisions"?"Revision diff":args.mode==="workspace"?"Workspace diff":"Diff" : titles[name] ?? name;
+  let text = theme.fg("toolTitle", theme.bold(`Plastic${separator}${title}`));
   if (workspace && name !== "tool_search") text += theme.fg("dim", `  ${compact(workspace, 60)}`);
   if (args.preflight === true) text += theme.fg("warning", `${separator}preview`);
   const subtitle = target(name, args);
@@ -82,6 +82,8 @@ export function renderPlasticCall(name: string, input: unknown, theme: RenderThe
 }
 
 function payload(result: Result, raw: string): Record<string, unknown> {
+  const structured = record((result as Result & {structuredContent?:unknown}).structuredContent);
+  if (structured.action === "diff") return structured;
   const rawResult = record(result.details).rawResult;
   if (rawResult !== null && typeof rawResult === "object") return record(rawResult);
   // Only decode the package's whole JSON envelope, never a JSON fragment in CLI or diff output.
@@ -110,7 +112,7 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
   const summary: Summary = { label: "Result returned", tone: "toolOutput", notices, rows: [] };
   const textLines = raw.split(/\r?\n/).filter(line => line.trim());
   const preview = record(context?.args).preflight === true || action.endsWith("-preflight") || envelope.outcome === "preflight";
-  if (context?.isError) {
+  if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes))) {
     summary.label = "Failed";
     summary.tone = "error";
     summary.rows = textLines.slice(0, 3);
@@ -135,7 +137,7 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
     summary.tone = "warning";
     const reason = scalar(record(data.switchOutcome).reason) || scalar(data.reason);
     if (reason) notices.unshift(reason);
-  } else if (envelope.ok === false) {
+  } else if (envelope.ok === false && !(name === "diff" && Array.isArray(data.outcomes))) {
     summary.label = "Operation not successful";
     summary.tone = "error";
   } else if (name === "status" && count(record(data.summary).totalPending) !== undefined) {
@@ -147,20 +149,24 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
     summary.label = data.branch;
   } else if (name === "branchExists" && /^(true|false)$/.test(raw.trim())) {
     summary.label = raw.trim() === "true" ? "Branch found" : "Branch not found";
-  } else if ((name === "diffFile" || name === "diffRevisions") && typeof data.status === "string") {
+  } else if (name === "diff" && typeof data.status === "string") {
     summary.label = data.status === "unchanged" ? "No differences" : data.status === "binary-different" ? "Binary content differs" : data.status === "added-empty" ? "Added file is empty" : "Text differences";
     if (data.binary === true) notices.push("Binary comparison; no text hunks.");
-  } else if (name === "workspaceDiff" && Array.isArray(data.outcomes)) {
+  } else if (name === "diff" && Array.isArray(data.outcomes)) {
     const outcomes = records(data.outcomes);
+    const counts = record(data.counts);
     const unavailable = outcomes.filter(item => item.status === "unavailable");
     const skipped = outcomes.filter(item => item.status === "skipped-directory");
-    summary.label = `${outcomes.length} results${separator}${outcomes.filter(item => item.changed === true).length} changed${separator}${unavailable.length} unavailable`;
-    if (unavailable.length) summary.tone = "warning";
+    summary.label = `${outcomes.length} returned results${separator}${outcomes.filter(item => record(item.comparison).changed === true).length} changed${separator}${count(counts.failed) ?? unavailable.length} unavailable`;
+    if (unavailable.length || envelope.ok === false) summary.tone = "warning";
     if (skipped.length) notices.push(`${skipped.length} directories skipped.`);
-    summary.rows = [...unavailable, ...outcomes.filter(item => item.status !== "unavailable" && item.status !== "skipped-directory"), ...skipped].map(item => `${scalar(item.path)}: ${scalar(item.status)}${item.error ? ` - ${scalar(item.error)}` : ""}`);
-    if (outcomes.some(item => item.truncated === true)) notices.push("Some file diffs were truncated by the tool.");
-    if (count(data.omittedOutcomes)) notices.push(`${data.omittedOutcomes} outcomes omitted by the tool.`);
-    if (count(data.skippedByLimit)) notices.push(`${data.skippedByLimit} pending items skipped by the file limit.`);
+    summary.rows = [...unavailable, ...outcomes.filter(item => item.status !== "unavailable" && item.status !== "skipped-directory"), ...skipped].map(item => `${scalar(item.path)}: ${scalar(item.status)}${item.error ? ` - ${scalar(record(item.error).code)}` : ""}`);
+    if (outcomes.some(item => record(record(item.comparison).excerpt).truncated === true)) notices.push("Some file diffs were truncated by the tool.");
+    if (count(counts.omitted)) notices.push(`${counts.omitted} outcomes omitted by the tool.`);
+    if (count(counts.limited)) notices.push(`${counts.limited} pending items skipped by the file limit.`);
+    if (count(counts.unattempted)) notices.push(`${counts.unattempted} selected items not attempted.`);
+    if (count(data.excludedPrivate)) notices.push(`${data.excludedPrivate} private items excluded.`);
+    if (strings(data.unmatched).length) notices.push(`${strings(data.unmatched).length} selected paths had no pending match.`);
   } else if (name === "patch" && typeof envelope.status === "string") {
     summary.label = `Patch ${envelope.status}${count(envelope.bytes) !== undefined ? `${separator}${envelope.bytes} bytes` : ""}`;
     if (envelope.binaryLimited === true) notices.push("Binary content could not be fully represented.");
@@ -189,7 +195,7 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
     notices.unshift(...urgent.map(line => line.replace(/^#+\s*/, "")));
     notices.push(...warnings);
   }
-  if (data.truncated === true || data.outputTruncated === true) notices.push("Output truncated by the tool.");
+  if (data.truncated === true || data.outputTruncated === true || record(data.excerpt).truncated === true) notices.push("Output truncated by the tool.");
   const limited = data.truncated === true || data.outputTruncated === true || envelope.truncated === true
     || Boolean(count(record(data.itemCount).omitted) || count(data.omittedOutcomes) || count(data.skippedByLimit))
     || records(data.outcomes).some(item => item.truncated === true);
@@ -234,8 +240,11 @@ export function renderPlasticResult(name: string, result: Result, options: Optio
     const envelope = payload(result, raw);
     const data = record(envelope.data);
     if (typeof data.diff === "string") section("Diff", evidence(data.diff, theme));
+    if (typeof record(data.excerpt).text === "string") section("Diff", evidence(scalar(record(data.excerpt).text), theme));
     for (const item of records(data.outcomes)) {
       if (typeof item.diff === "string") section(safe(scalar(item.path)), evidence(item.diff, theme));
+      const excerpt=record(record(item.comparison).excerpt);
+      if (typeof excerpt.text === "string") section(safe(scalar(item.path)), evidence(excerpt.text, theme));
     }
     if (name === "patch" && typeof envelope.content === "string") section("Patch", evidence(envelope.content, theme));
     // Keep original content, including JSON numeric lexemes and duplicate keys, as the evidence.

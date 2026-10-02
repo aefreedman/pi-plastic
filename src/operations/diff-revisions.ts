@@ -20,10 +20,10 @@ export class DiffRevisionsError extends Error {
 const abort = (stage: DiffRevisionsStage) => { if (getActiveAbortSignal()?.aborted) throw new DiffRevisionsError("aborted", stage); };
 export const validDiffRevisionsSelector = (s: unknown): s is string => {
     if (typeof s !== "string" || !s.length || s.length > 4096 || s.trim() !== s
-        || /[;\u0000-\u001f\u007f-\u009f\uD800-\uDFFF]/u.test(s) || s.startsWith("-") || !isValidDiffRevisionSpec(s)) return false;
+        || /[;\u0000-\u001f\u007f-\u009f\uD800-\uDFFF]/u.test(s) || s.startsWith("-")) return false;
     const parts = s.split("#");
     if (parts.length > 2) return false;
-    const validGlobal = (value: string) => /^revid:(?:0|[1-9][0-9]*)(?:@rep:[^@\s]+@repserver:\S+)?$/i.test(value) || /^rev:[^\s#]+$/i.test(value);
+    const validGlobal = (value: string) => /^revid:(?:0|[1-9][0-9]*)(?:@rep:[^@]+@repserver:\S+)?$/i.test(value) || /^rev:[^\s#]+$/i.test(value);
     if (parts.length === 1) return validGlobal(s);
     const [path, selector] = parts;
     if (!path || path.trim() !== path || path.startsWith("-") || /^itemid:/i.test(path) && !/^itemid:(?:0|[1-9][0-9]*)$/i.test(path)) return false;
@@ -65,7 +65,7 @@ export function validateRevisionUnifiedDiff(raw: string): number {
     if (!hunks || !changes || left || right) throw new DiffRevisionsError("malformed_output", "comparison");
     return hunks;
 }
-async function materialize(selector: string, path: string, stage: "left" | "right", cwd: string): Promise<Buffer> {
+export async function materializeDiffRevision(selector: string, path: string, stage: "left" | "right", cwd: string): Promise<Buffer> {
     abort(stage);
     await runDiffRevisionsCommand(getCmExecutable(), ["cat", selector, "--file=" + path], cwd, [0])
         .catch(error => { throw error instanceof DiffRevisionsCommandError ? new DiffRevisionsError(error.code, stage) : new DiffRevisionsError("materialization_failed", stage); });
@@ -93,17 +93,21 @@ export async function assembleDiffRevisionsObservation(args: DiffRevisionsArgs):
     try {
         const leftPath = join(root, "left" + safeTempExtension(request.leftRevision));
         const rightPath = join(root, "right" + safeTempExtension(request.rightRevision));
-        const leftBytes = await materialize(request.leftRevision, leftPath, "left", args.workdir ?? process.cwd());
-        const rightBytes = await materialize(request.rightRevision, rightPath, "right", args.workdir ?? process.cwd());
-        abort("comparison");
+        const leftBytes = await materializeDiffRevision(request.leftRevision, leftPath, "left", args.workdir ?? process.cwd());
+        const rightBytes = await materializeDiffRevision(request.rightRevision, rightPath, "right", args.workdir ?? process.cwd());
         const side = (selector: string, bytes: Buffer): RevisionSide => ({ selector, kind: selector.includes("#") ? "file-qualified" : "global-revision", resolvedIdentity: null, bytes: bytes.length, binary: isBinaryContent(bytes) });
-        const left = side(request.leftRevision, leftBytes), right = side(request.rightRevision, rightBytes);
-        const binary = left.binary || right.binary;
-        if (binary) return { left, right, maxChars: request.maxChars, binary: true, changed: !leftBytes.equals(rightBytes), normalized: "", hunkCount: 0, diffStdoutBytes: null, diffExitCode: null, legacyResult: { backend: "diff", binary: true, changed: !leftBytes.equals(rightBytes), output: "", truncated: false, totalChars: 0 } };
+        return { left: side(request.leftRevision,leftBytes), right: side(request.rightRevision,rightBytes), maxChars:request.maxChars, ...await compareDiffBytes(leftBytes,rightBytes,request.leftRevision.replace("#","@"),request.rightRevision.replace("#","@")) };
+    } finally { await fs.rm(root, { recursive: true, force: true }).catch(() => { throw new DiffRevisionsError("cleanup_failed", "cleanup"); }); }
+}
+
+export async function compareDiffBytes(leftBytes: Buffer, rightBytes: Buffer, leftLabel: string, rightLabel: string): Promise<Omit<DiffRevisionsObservation,"left"|"right"|"maxChars">> {
+    abort("comparison");
+        const binary = isBinaryContent(leftBytes) || isBinaryContent(rightBytes);
+        if (binary) return { binary: true, changed: !leftBytes.equals(rightBytes), normalized: "", hunkCount: 0, diffStdoutBytes: null, diffExitCode: null, legacyResult: { backend: "diff", binary: true, changed: !leftBytes.equals(rightBytes), output: "", truncated: false, totalChars: 0 } };
         // Match the old portable helper: ASCII-safe immutable backend operands and no logical labels in argv.
         const operands = await createAsciiTempDirectory("pi-plastic-diff-");
         try {
-            const l = join(operands, "left" + safeTempExtension(leftPath)), r = join(operands, "right" + safeTempExtension(rightPath));
+            const l = join(operands, "left" + safeTempExtension(leftLabel)), r = join(operands, "right" + safeTempExtension(rightLabel));
             await Promise.all([fs.writeFile(l, leftBytes, { flag: "wx" }), fs.writeFile(r, rightBytes, { flag: "wx" })]);
             abort("comparison");
             const capture = await runDiffRevisionsCommand(getDiffExecutable(), ["-u", l, r], operands, [0, 1])
@@ -113,16 +117,15 @@ export async function assembleDiffRevisionsObservation(args: DiffRevisionsArgs):
             catch { throw new DiffRevisionsError("invalid_utf8", "comparison"); }
             if (capture.exitCode === 0 && raw !== "") throw new DiffRevisionsError("malformed_output", "comparison");
             const hunks = capture.exitCode === 1 ? validateRevisionUnifiedDiff(raw) : 0;
-            const leftLabel = request.leftRevision.replace("#", "@"), rightLabel = request.rightRevision.replace("#", "@");
             const normalized = stableDiffHeaders(raw, leftLabel, rightLabel);
             const legacyOutput = stableDiffHeaders(raw.slice(0, DIFF_OUTPUT_MAX_CHARS), leftLabel, rightLabel);
             const truncated = raw.length > DIFF_OUTPUT_MAX_CHARS;
             const legacyResult: TextDiffResult = { backend: "diff", changed: capture.exitCode === 1, binary: false, output: truncated ? legacyOutput + "\n\n[Diff output truncated at " + DIFF_OUTPUT_MAX_CHARS + " characters; inspect a narrower file or generate a review patch for the complete change.]" : normalized, truncated, totalChars: truncated ? raw.length : normalized.length };
             abort("comparison");
-            return { left, right, maxChars: request.maxChars, binary: false, changed: capture.exitCode === 1, normalized, hunkCount: hunks, diffStdoutBytes: capture.stdout.length, diffExitCode: capture.exitCode, legacyResult };
+            return { binary: false, changed: capture.exitCode === 1, normalized, hunkCount: hunks, diffStdoutBytes: capture.stdout.length, diffExitCode: capture.exitCode, legacyResult };
         } finally { await fs.rm(operands, { recursive: true, force: true }).catch(() => { throw new DiffRevisionsError("cleanup_failed", "cleanup"); }); }
-    } finally { await fs.rm(root, { recursive: true, force: true }).catch(() => { throw new DiffRevisionsError("cleanup_failed", "cleanup"); }); }
 }
+
 export type RevisionExcerpt = { countBasis: "normalized_diff_utf16"; text: string; observedChars: number; sourceChars: number; returnedChars: number; omittedChars: number; markerChars: number; truncated: boolean };
 export const DIFF_REVISIONS_EXCERPT_MARKER = "\n\n[Diff excerpt truncated; not a complete/applyable patch.]";
 const prefix = (s: string, count: number) => { let end = Math.min(count, s.length); if (end > 0 && end < s.length && /[\uD800-\uDBFF]/.test(s[end - 1])) end--; return s.slice(0, end); };

@@ -7,7 +7,7 @@ export { codeReviewCreate, codeReviewUpdate, codeReviewDelete, codeReviewFind } 
 export { checkin, __plasticCheckinInternals } from "./operations/checkin";
 export { switchBranch, __plasticSwitchInternals } from "./operations/switch";
 export { getPatchBackendCapabilityWarning, __plasticPatchInternals, patch } from "./operations/patch";
-export { __plasticDiffInternals, diff, diffRevisions, diffFile, workspaceDiff } from "./operations/diff";
+export { __plasticDiffInternals, diff } from "./operations/diff";
 export { __plasticProcessInternals } from "./execution/test-seams";
 export { merge, finalizeMerge } from "./operations/merge";
 export { mergeBranches } from "./operations/server-merge";

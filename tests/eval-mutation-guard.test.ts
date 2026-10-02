@@ -19,7 +19,7 @@ for (const entry of PLASTIC_SEARCH_CATALOG.filter((entry) => entry.tags.includes
 }
 // Catalog tags alone are insufficient: update synchronizes disk, and merge/conflict
 // workflows mutate despite not carrying a mutation tag. Keep an exhaustive read classification.
-const reads = ["plastic_status", "plastic_diffFile", "plastic_workspaceDiff", "plastic_diffRevisions", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_workspaceList", "plastic_diff", "plastic_tool_search"];
+const reads = ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_workspaceList", "plastic_diff", "plastic_tool_search"];
 assert.deepEqual(new Set(harness.registry.keys()), new Set([...MUTATING_PLASTIC_TOOLS, "plastic_patch", ...reads]), "new registrations require effect classification");
 for (const name of MUTATING_PLASTIC_TOOLS) {
   assert(await dispatch(name));

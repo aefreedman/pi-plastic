@@ -182,6 +182,6 @@ export const withWorkspaceBaseUnavailableDiagnostic = (path: string, error: unkn
 
     return new Error(
         `Plastic cannot supply historical/base bytes for '${path}' because this workspace/status record is --nodata. `
-        + "A workspace diff cannot be calculated without those bytes. Run plastic_status(machineReadable=true, includeRevId=true) to verify the item, then update/refresh the workspace or use plastic_diffRevisions with two known file-qualified revisions when historical content is available.",
+        + "A workspace diff cannot be calculated without those bytes. Run plastic_status(machineReadable=true, includeRevId=true) to verify the item, then update/refresh the workspace or use plastic_diff with mode=revisions and two known file-qualified revisions when historical content is available.",
     );
 };

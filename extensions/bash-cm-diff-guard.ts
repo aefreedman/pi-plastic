@@ -6,7 +6,7 @@ import {
 } from "./shared/bash-command-guards";
 
 const BLOCK_MESSAGE =
-  "`cm diff` is blocked in Pi because it can launch a GUI window and hang CLI automation. Use `plastic_status` when only changed paths are needed. Do not diff routinely; when change-boundary evidence is necessary, use a focused `plastic_diffFile`, explicitly scoped `plastic_workspaceDiff`, or `plastic_diffRevisions`.";
+  "`cm diff` is blocked in Pi because it can launch a GUI window and hang CLI automation. Use `plastic_status` when only changed paths are needed. Do not diff routinely; when change-boundary evidence is necessary, use `plastic_diff` with explicit mode=file, revisions, or workspace and bounded scope.";
 
 const CM_EXECUTABLE = String.raw`(?:"(?:[^"]*[\\/])?cm(?:\.exe)?"|'(?:[^']*[\\/])?cm(?:\.exe)?'|(?:[^"'\s]*[\\/])?cm(?:\.exe)?)`;
 const DIFF_SUBCOMMAND = String.raw`(?:diff|differences)`;

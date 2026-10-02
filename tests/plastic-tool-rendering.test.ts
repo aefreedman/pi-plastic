@@ -31,10 +31,10 @@ const render = (name: string, result: Parameters<typeof renderPlasticResult>[1],
 try {
   const call = renderPlasticCall("mergeBranches", { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", preflight: true }, theme);
   assert.match(plain(call), /Plastic.*Server merge.*server.*preview\n.*task@Game@cloud -> br:\/main@Game@cloud/);
-  const workspaceCall = renderPlasticCall("workspaceDiff", { workdir: "C:\\Projects\\MyGame", paths: ["Assets/Player.cs", "Assets/UI.cs", "Assets/Game.cs"] }, theme);
+  const workspaceCall = renderPlasticCall("diff", { mode:"workspace", workdir: "C:\\Projects\\MyGame", paths: ["Assets/Player.cs", "Assets/UI.cs", "Assets/Game.cs"] }, theme);
   assert.match(plain(workspaceCall), /Workspace diff.*MyGame\nAssets\/Player.cs, Assets\/UI.cs \(\+1 more\)/);
   assert(!plain(workspaceCall).includes("C:\\Projects"));
-  const revisionCall = renderPlasticCall("diffRevisions", { leftRevision: "Assets/A.cs#cs:1", rightRevision: "Assets/A.cs#cs:2" }, theme);
+  const revisionCall = renderPlasticCall("diff", { mode:"revisions", leftRevision: "Assets/A.cs#cs:1", rightRevision: "Assets/A.cs#cs:2" }, theme);
   assert.match(plain(revisionCall), /cs:1 -> Assets\/A.cs#cs:2/);
   components.push(call, workspaceCall, revisionCall);
 
@@ -83,24 +83,24 @@ try {
   assert.match(noChangesRecovery, /clean-workspace recovery/);
 
   const diff = "--- Assets/Player.cs (base)\n+++ Assets/Player.cs (workspace)\n@@ -1 +1 @@\n-old\n+new";
-  const workspaceDiff = structured("workspaceDiff", { outcomes: [
+  const workspaceDiff = structured("diff", { outcomes: [
     ...Array.from({ length: 8 }, (_, index) => ({ path: `Assets/Skip${index}`, status: "skipped-directory" })),
-    { path: "Assets/Unavailable.cs", status: "unavailable", error: "Base repository unresolved" },
-    { path: "Assets/Player.cs", status: "changed", changed: true, diff, truncated: true },
-  ], omittedOutcomes: 2, skippedByLimit: 3 });
-  const diffCollapsed = render("workspaceDiff", workspaceDiff);
+    { path: "Assets/Unavailable.cs", status: "unavailable", error: {code:"base_unavailable"} },
+    { path: "Assets/Player.cs", status: "compared", comparison:{changed: true, excerpt:{text:diff,truncated: true}} },
+  ], counts:{omitted:2,limited:3,failed:1} });
+  const diffCollapsed = render("diff", workspaceDiff);
   assert.match(diffCollapsed, /1 changed.*1 unavailable/);
-  assert.match(diffCollapsed, /Assets\/Unavailable.cs: unavailable - Base repository unresolved/);
-  const textDiff = render("workspaceDiff", textResult("## Workspace Diff\n- Warning: private files excluded\n- Warning: file limit reached\n- Warning: more skipped\n### Assets/Broken.cs\nUnavailable: cannot resolve historical bytes"));
+  assert.match(diffCollapsed, /Assets\/Unavailable.cs: unavailable - base_unavailable/);
+  const textDiff = render("diff", textResult("## Workspace Diff\n- Warning: private files excluded\n- Warning: file limit reached\n- Warning: more skipped\n### Assets/Broken.cs\nUnavailable: cannot resolve historical bytes"));
   assert.match(textDiff, /Unavailable: cannot resolve historical bytes/);
-  const diffExpanded = render("workspaceDiff", workspaceDiff, true);
+  const diffExpanded = render("diff", workspaceDiff, true);
   assert.match(diffExpanded, /Assets\/Player.cs\n--- Assets\/Player.cs/);
   assert.match(diffExpanded, /2 outcomes omitted/);
   assert.match(diffExpanded, /3 pending items skipped/);
   assert(colors.some(row => row.color === "toolDiffAdded" && row.text === "+new"));
   assert(colors.some(row => row.color === "toolDiffRemoved" && row.text === "-old"));
-  assert.match(render("diffFile", structured("diffFile", { status: "binary-different", binary: true, truncated: false })), /Binary content differs/);
-  assert.match(render("diffFile", structured("diffFile", { status: "changed", diff, truncated: true })), /Output truncated/);
+  assert.match(render("diff", structured("diff", { status: "binary-different", binary: true, truncated: false })), /Binary content differs/);
+  assert.match(render("diff", structured("diff", { status: "changed", diff, truncated: true })), /Output truncated/);
   assert.match(render("patch", textResult('{"status":"generated","output":"review.patch","bytes":200,"binaryLimited":true,"truncated":false}')), /Patch generated.*200 bytes[\s\S]*Binary content/);
 
   const exact = '{"id":9007199254740993,"number":1.2300e+5,"zero":-0,"key":"a","key":"b","escaped":"\\u0061\\n","empty":{}}';
@@ -127,12 +127,12 @@ try {
   assert(colors.some(row => row.color === "error" && row.text.includes("Failed")));
   components.push(failed);
 
-  const search = { ...textResult("Activated plastic_workspaceDiff.\nGuidance: select exact paths."), details: { matches: ["plastic_workspaceDiff"], added: ["plastic_workspaceDiff"], alreadyActive: [], unavailableToolNames: ["plastic_missing"] } };
+  const search = { ...textResult("Activated plastic_diff.\nGuidance: select exact paths."), details: { matches: ["plastic_diff"], added: ["plastic_diff"], alreadyActive: [], unavailableToolNames: ["plastic_missing"] } };
   const searched = renderPlasticSearchResult(search, {}, theme);
   assert.match(plain(searched), /1 activated.*0 already active[\s\S]*Unavailable: plastic_missing/);
   assert.match(plain(renderPlasticSearchResult(search, { expanded: true }, theme)), /Guidance:[ ]select exact paths/);
   components.push(searched);
-  const unicode = renderPlasticCall("diffFile", { path: "Assets/\u4e2d\u6587/\ud83d\ude80-e\u0301.cs", workdir: "C:/\u4e2d\u6587" }, theme);
+  const unicode = renderPlasticCall("diff", { mode:"file", path: "Assets/\u4e2d\u6587/\ud83d\ude80-e\u0301.cs", workdir: "C:/\u4e2d\u6587" }, theme);
   components.push(unicode);
   for (const width of [24, 40, 80, 120]) for (const component of components) {
     for (const line of component.render(width)) assert(visibleWidth(line) <= width, `Overflow at width ${width}`);
@@ -141,7 +141,7 @@ try {
   // Verify the registration boundary and a real command-only preflight without launching cm.
   const tools: ToolDefinition[] = [];
   registerPlastic({ registerTool: tool => tools.push(tool), on() {} } as ExtensionAPI);
-  assert.equal(tools.length, 31);
+  assert.equal(tools.length, 28);
   for (const tool of tools) assert(tool.renderCall && tool.renderResult, `${tool.name} needs both renderers`);
   const serverMerge = tools.find(tool => tool.name === "plastic_mergeBranches")!;
   const actual = await serverMerge.execute("preview", { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", message: "Review", preflight: true, format: "json" }, undefined, undefined, { cwd: "C:/Projects/MyGame" } as ExtensionContext);
@@ -165,7 +165,7 @@ try {
     console.log("\nStatus\n" + plain(renderPlasticCall("status", { workdir: "C:/Projects/MyGame" }, theme)) + "\n" + collapsedStatus);
     console.log("\nWorkspace diff\n" + plain(workspaceCall) + "\n" + diffCollapsed);
     console.log("\nServer merge preview\n" + plain(call) + "\n" + render("mergeBranches", actual));
-    console.log("\nExpanded file diff\n" + render("diffFile", structured("diffFile", { status: "changed", diff, truncated: false }), true));
+    console.log("\nExpanded file diff\n" + render("diff", structured("diff", { status: "changed", diff, truncated: false }), true));
   }
 } finally {
   setKeybindings(previousBindings);

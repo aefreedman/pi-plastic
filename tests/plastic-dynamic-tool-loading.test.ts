@@ -36,7 +36,7 @@ async function loadHarness(activeTools: string[], branchEntries: unknown[] = [],
 async function main(): Promise<void> {
   await withMode(undefined, async () => {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
-    assert.equal(harness.registry.size, 31, "all 30 public Plastic tools plus the loader should be registered");
+    assert.equal(harness.registry.size, 28, "all 27 public Plastic tools plus the loader should be registered");
     assert(harness.registry.has(PLASTIC_TOOL_SEARCH_NAME));
     assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", PLASTIC_TOOL_SEARCH_NAME, ...BALANCED_ACTIVE_PLASTIC_TOOL_NAMES]));
   });
@@ -88,12 +88,10 @@ async function main(): Promise<void> {
   assert.deepEqual(searchPlasticTools({ query: "find existing code reviews" }).map((match) => match.name), ["plastic_codeReviewFind"], "contextual review discovery should select the smallest sufficient query tool");
   assert.deepEqual(searchPlasticTools({ query: "what changed" }).map((match) => match.name), ["plastic_status"], "changed-file questions should route to status rather than GUI-capable diff commands");
   const diffMatches = searchPlasticTools({ query: "diff" }).map((match) => match.name);
-  assert(!diffMatches.includes("plastic_diff"), "the disabled compatibility diff alias must never be executable through search");
-  assert.deepEqual(diffMatches, ["plastic_diffFile"], "generic diff searches should activate only the smallest focused comparison capability");
-  assert.deepEqual(searchPlasticTools({ query: "workspace diff" }).map((match) => match.name), ["plastic_workspaceDiff"], "workspace diff intent should select the bounded pending-review tool");
-  assert.deepEqual(searchPlasticTools({ query: "pending review" }).map((match) => match.name), ["plastic_workspaceDiff"], "pending review should route to the batch workspace diff tool");
-  assert.deepEqual(searchPlasticTools({ query: "compare revisions" }).map((match) => match.name), ["plastic_diffRevisions"], "explicit revision comparison should select the advanced tool");
-  assert.deepEqual(searchPlasticTools({ toolNames: ["plastic_diff"] }).map((match) => match.name), [], "the disabled diff alias must not be exactly selectable");
+  assert.deepEqual(diffMatches, ["plastic_diff"]);
+  for(const query of ["workspace diff","pending review","compare revisions"]) assert.deepEqual(searchPlasticTools({query}).map(m=>m.name),["plastic_diff"]);
+  assert.deepEqual(searchPlasticTools({toolNames:["plastic_diff"]}).map(m=>m.name),["plastic_diff"]);
+  for(const name of ["plastic_diffFile","plastic_diffRevisions","plastic_workspaceDiff"]) { assert.deepEqual(searchPlasticTools({toolNames:[name]}),[],"retired names have no redirect"); assert.deepEqual(searchPlasticTools({query:name}),[],"retired query names do not activate another tool"); }
   assert.deepEqual(searchPlasticTools({ toolNames: ["plastic_workspaceCreate"] }).map((match) => match.name), [], "workspace creation must not be discoverable until paired cleanup is available");
   assert.deepEqual(searchPlasticTools({ toolNames: ["foreign_tool"] }).map((match) => match.name), [], "unknown names must not be selectable");
   assert.equal(searchPlasticTools({ toolNames: ["plastic_branchDelete", "plastic_branchCreate", "plastic_branchList", "plastic_currentBranch"] }).length, 4, "up to four exact names should all be selected when no limit is supplied");
@@ -130,8 +128,8 @@ async function main(): Promise<void> {
     assert.equal(harness.setActiveToolsCalls.length, noMatchCallsBefore, "no-match searches must not change active tools");
 
     const disabledDiff = await loader.execute("loader", { toolNames: ["plastic_diff"] });
-    assert.deepEqual(disabledDiff.details.matches, []);
-    assert.deepEqual(disabledDiff.details.unavailableToolNames, ["plastic_diff"], "the compatibility diff alias must be reported as unavailable rather than activated");
+    assert.deepEqual(disabledDiff.details.matches, ["plastic_diff"]);
+    assert.deepEqual(disabledDiff.details.added, ["plastic_diff"]);
   });
 
   await withMode("loader-only", async () => {

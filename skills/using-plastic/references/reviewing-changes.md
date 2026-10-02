@@ -4,7 +4,7 @@
 
 Never run `cm diff` in Pi. It may open a GUI window and block CLI automation.
 
-`plastic_diff` is disabled by design.
+`plastic_diff` requires an explicit mode and performs bounded non-GUI comparison.
 
 ## Focused Patch Generation
 
@@ -24,14 +24,14 @@ Do not use diffs as routine post-edit validation or checkin preflight. Prefer fo
 
 ```text
 plastic_status(machineReadable=true) # “what changed?” / changed-path listing
-plastic_diffFile(path="<workspace-path>", maxChars=4000) # one intentional file comparison
-plastic_workspaceDiff(paths=["<workspace-path>"], maxChars=3000) # explicitly scoped pending review
-plastic_workspaceDiff(allPending=true) # explicit small whole-workspace review
-plastic_diffFile(path="<workspace-path>", revision="cs:<number>") # explicit historical comparison
-plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
+plastic_diff(mode="file", path="<workspace-path>", maxChars=4000) # one intentional file comparison
+plastic_diff(mode="workspace", paths=["<workspace-path>"], maxChars=3000) # explicitly scoped pending review
+plastic_diff(mode="workspace", allPending=true) # explicit small whole-workspace review
+plastic_diff(mode="file", path="<workspace-path>", revision="cs:<number>") # explicit historical comparison
+plastic_diff(mode="revisions", leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```
 
-The diff tools materialize historical bytes and remove their temporary files internally. Added and explicitly selected private/new files use an empty base; an added empty file is reported as `added-empty`, not generic unchanged. Changed, moved, and deleted records use their status revision ID when available. A `--nodata` item cannot supply historical/base bytes: refresh the workspace or use two known file-qualified revisions. `plastic_workspaceDiff` requires selected paths or `allPending=true` and returns per-file unavailable outcomes instead of aborting the batch. Text-diff tools use bounded GNU/POSIX text diff, materialize backend operands to ASCII-safe package paths while preserving logical Unicode output labels, treat valid Unity YAML as text, and report genuine binary content explicitly. Do not construct `cm cat` temporary-file recipes for ordinary review. `cm cat --raw` is unsupported in this workflow; typed retrieval owns cleanup, and `cm cat --file` is the byte-preserving low-level fallback only when needed.
+The consolidated tool owns historical exports, stable bounded local snapshots and cleanup. Added and explicitly selected private files use a deliberate empty base; added-empty is distinct from unchanged. Loaded bases use strict fileinfo/ls metadata, a genuine qualified file revision ID, and hash-verified exported bytes, never status changesets relabeled as revisions. Controlled deletions use the frozen loaded workspace tree; local moves use observed OldPath metadata. Workspace mode retains per-file failures with ok=false; inspect counts, exclusions, unmatched paths and read/projection completeness, including limited, skipped and unattempted comparisons. Default all-pending review selects at most three items. Directory selections include pending descendants; directory rows are explicitly skipped. No failed export becomes an empty side, no atomic snapshot is claimed, and general mixed-Xlink ownership remains unverified. Text uses one configured GNU/POSIX backend with ASCII-safe operands and logical Unicode labels; binary inputs use byte equality. Do not construct cm cat recipes for ordinary review.
 
 `cm cat --file` is a filesystem write: its argument is the output destination, never the source file. Pointing it at a working file overwrites pending changes even if stdout is piped to a temporary file. Reviewers must use typed comparisons for ordinary baseline review; a necessary unsupported export must follow the [historical export rules](changeset-operations.md#historical-export-fallback), with a new absolute temporary destination outside the workspace and a verified file revision selector.
 
@@ -52,9 +52,9 @@ Use the Read tool for full context instead of GUI diffs.
 Use the common no-revision path first; `base`, `head`, and `cs:head` are rejected rather than guessed:
 
 ```text
-plastic_diffFile(path="<workspace-path>", maxChars=4000)
-plastic_diffFile(path="<workspace-path>", revision="br:/<branch>", maxChars=4000)
-plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>", maxChars=4000)
+plastic_diff(mode="file", path="<workspace-path>", maxChars=4000)
+plastic_diff(mode="file", path="<workspace-path>", revision="br:/<branch>", maxChars=4000)
+plastic_diff(mode="revisions", leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>", maxChars=4000)
 ```
 
 ## Pending Changes

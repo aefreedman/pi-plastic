@@ -75,18 +75,18 @@ Never run `cm diff` in Pi. Do not replace it with a routine safe-diff call: use 
 
 ```text
 plastic_status(machineReadable=true) # list pending paths/statuses
-plastic_diffFile(path="<workspace-path>", maxChars=4000) # one intentional file comparison
-plastic_workspaceDiff(paths=["<workspace-path>"], maxChars=3000) # explicitly scoped review
-plastic_workspaceDiff(allPending=true) # explicit small whole-workspace review
-plastic_diffFile(path="<workspace-path>", revision="cs:<number>")
-plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
+plastic_diff(mode="file", path="<workspace-path>", maxChars=4000) # one intentional file comparison
+plastic_diff(mode="workspace", paths=["<workspace-path>"], maxChars=3000) # explicitly scoped review
+plastic_diff(mode="workspace", allPending=true) # explicit small whole-workspace review
+plastic_diff(mode="file", path="<workspace-path>", revision="cs:<number>")
+plastic_diff(mode="revisions", leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```
 
 The typed diff tools own historical `cm cat --file` materialization and cleanup; do not create agent-authored temporary files for ordinary diffs. `cm cat --raw` is unsupported for this workflow. Use typed retrieval first; `cm cat --file` is the byte-preserving low-level fallback only when a typed tool cannot represent the case.
 
 ## Historical Export Fallback
 
-Use this fallback only when typed retrieval cannot represent the required case. For an ordinary workspace-base comparison, omit `revision` from `plastic_diffFile`; for a changeset comparison, supply its `revision="cs:<number>"` argument.
+Use this fallback only when typed retrieval cannot represent the required case. For an ordinary workspace-base comparison, omit `revision` from `plastic_diff` in file mode; for a changeset comparison, supply its `revision="cs:<number>"` argument.
 
 `cm cat <revspec> --file=<output-file>` writes historical bytes to the output file and can overwrite it. `--file` does not select the source. Piping this command to `Set-Content` or redirecting stdout does not change the destination or protect it: with `--file`, the file contents are written there rather than to stdout.
 

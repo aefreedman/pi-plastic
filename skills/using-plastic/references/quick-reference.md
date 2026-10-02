@@ -18,10 +18,10 @@ Note: command examples target current `cm` 11.x CLI syntax; legacy aliases may d
 | Shelve | `plastic_shelvesetCreate(comment="description")` | `cm shelveset create -c="description"` | Save work temporarily |
 | Patch for review | `plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<new-patch-file>")` | `cm patch <branch-spec> --clean --integration --output=<patch-file>` | Uses `toolPath` then `PI_PLASTIC_PATCH_EXECUTABLE`; Windows requires a verified patch-capable non-GUI executable. New output is staged and atomically published without overwrite; use repository-qualified `br:/...@<repository>@<server>` if selector resolution is unavailable |
 | Changed-file listing | `plastic_status(machineReadable=true)` | `cm status --all` | Lists changed, added, moved, deleted, and private items without GUI diff |
-| Diff (one workspace file) | `plastic_diffFile(path="<workspace-path>", maxChars=4000)` | None recommended | Intentional focused comparison only; not routine validation |
-| Diff (pending review) | `plastic_workspaceDiff(paths=["<workspace-path>"], maxChars=3000)` | None recommended | Requires selected paths or explicit `allPending=true`; use status for changed-path listing |
-| Diff (workspace vs supported revision) | `plastic_diffFile(path="<workspace-path>", revision="cs:<number>")` | None recommended | Also accepts a branch, label, file-qualified, or global revision spec |
-| Diff (revision vs revision) | `plastic_diffRevisions(leftRevision="<left-revspec>", rightRevision="<right-revspec>")` | None recommended | Requires two file-qualified revisions; avoids GUI and package temp-file recipes |
+| Diff (one workspace file) | `plastic_diff(mode="file", path="<workspace-path>", maxChars=4000)` | None recommended | Intentional focused comparison only; not routine validation |
+| Diff (pending review) | `plastic_diff(mode="workspace", paths=["<workspace-path>"], maxChars=3000)` | None recommended | Requires selected paths or explicit `allPending=true`; use status for changed-path listing |
+| Diff (workspace vs supported revision) | `plastic_diff(mode="file", path="<workspace-path>", revision="cs:<number>")` | None recommended | Also accepts a branch, label, file-qualified, or global revision spec |
+| Diff (revision vs revision) | `plastic_diff(mode="revisions", leftRevision="<left-revspec>", rightRevision="<right-revspec>")` | None recommended | Requires two file-qualified revisions; avoids GUI and package temp-file recipes |
 
 ## Merge verification checklist
 

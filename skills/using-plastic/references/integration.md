@@ -42,11 +42,11 @@ plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<new
 - When change-boundary evidence is needed, inspect specific files first and opt into multi-file output explicitly:
 
 ```text
-plastic_diffFile(path="<workspace-path>", maxChars=4000) # one intentional file comparison
-plastic_workspaceDiff(paths=["<workspace-path>"], maxChars=3000) # explicitly scoped pending review
-plastic_workspaceDiff(allPending=true) # explicit small whole-workspace review
-plastic_diffFile(path="<workspace-path>", revision="cs:<number>")
-plastic_diffRevisions(leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
+plastic_diff(mode="file", path="<workspace-path>", maxChars=4000) # one intentional file comparison
+plastic_diff(mode="workspace", paths=["<workspace-path>"], maxChars=3000) # explicitly scoped pending review
+plastic_diff(mode="workspace", allPending=true) # explicit small whole-workspace review
+plastic_diff(mode="file", path="<workspace-path>", revision="cs:<number>")
+plastic_diff(mode="revisions", leftRevision="<left-file-qualified-revspec>", rightRevision="<right-file-qualified-revspec>")
 ```
 
 ## Plan Workflow

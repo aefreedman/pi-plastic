@@ -9,9 +9,11 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
-- Historical revision-diff closed success/error observations with exact requested selectors, source byte classification, explicit comparison basis and normalized bounded excerpt/count/completeness fields. Preserves compatible text/fenced JSON/version caching; no resolved revision identity is fabricated.
-- Selected-tool-only historical selector/export, signal/timeout/capture/fatal-UTF-8/unified-output and cleanup safeguards; bounded retained file reads and surrogate-safe UTF-8-envelope projection. Shared pending-workspace diff primitives remain unchanged.
-- Historical source/core/transport/limit/consumer regressions and read-only live original-byte/changed/unchanged/failed-export acceptance on existing fixtures, without workspace or fixture mutations.
+- Consolidated non-GUI `plastic_diff` with required file/revisions/workspace modes, closed input/output, qualified hash-verified loaded bases, bounded stable local snapshots and truthful partial workspace outcomes. Removed specialized diff registrations/core tools without aliases or stale-name redirects; raw GUI diff remains blocked. Text/JSON now present the unified observation without CLI-version decoration.
+
+- Reusable historical comparison observations with exact requested selectors, byte classification, explicit comparison basis and normalized bounded excerpt/count/completeness fields; unresolved identities remain null in consolidated revisions mode.
+- Diff-only selector/export, signal/timeout/capture/fatal-UTF-8/unified-output and cleanup safeguards; bounded retained file reads and surrogate-safe UTF-8-envelope projection, reused across consolidated modes without changing generic mutation/process primitives.
+- Historical source/transport/consumer regressions plus consolidated-mode coverage for loaded identities, Unicode controlled/local moves, controlled/local deletion, added-empty/private-binary files and bounded/partial workspace review; authorized sandbox probes restore original bytes, selector and clean status.
 
 - Code-review-find closed native/ids/error output with a single bounded UTF-8 numeric-ID source, exact decimal strings, query/projection counts and duplicate diagnostics. Preserves all filters, ordering, CLI limits/templates/aliases and native text/fenced JSON with existing version caching; no review mutation or metadata recovery.
 - Code-review schema/core/transport/ordering/precision regressions, file-loaded Pi host consumer checks and read-only live empty-query/native JSON acceptance. Populated live review IDs remain unverified; no reviews were created for fixtures.

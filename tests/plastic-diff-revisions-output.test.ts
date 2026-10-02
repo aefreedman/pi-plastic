@@ -6,12 +6,13 @@ import { dirname } from "node:path";
 import { Check } from "typebox/value";
 import { loadRegisteredTools } from "./pi-tool-harness";
 import { runWithAbortSignal } from "../src/execution/context";
-import { diffRevisions } from "../src/operations/diff";
+import { executeDiffRevisions } from "../src/operations/diff-revisions";
+import { diffOutputSchema, validateDiffOutput, type DiffOutput } from "../src/pi/diff-output";
 import { validDiffRevisionsSelector, validateRevisionUnifiedDiff, DIFF_REVISIONS_FILE_BYTES, diffRevisionsPayload, type DiffRevisionsObservation } from "../src/operations/diff-revisions";
 import { diffRevisionsOutputSchema, validateDiffRevisionsOutput, type DiffRevisionsOutput } from "../src/pi/diff-revisions-output";
 
-const tool=(await loadRegisteredTools()).get("plastic_diffRevisions")!;
-assert.deepEqual(tool.outputSchema,diffRevisionsOutputSchema);
+const tool=(await loadRegisteredTools()).get("plastic_diff")!;
+assert.deepEqual(tool.outputSchema,diffOutputSchema);
 const selectors={leftRevision:"Assets/Fictional ü 日本 😀.txt#cs:1",rightRevision:"Assets/Fictional ü 日本 😀.txt#cs:2"};
 const body="@@ -1 +1 @@\n-before\n+after\n";
 let calls:string[][]=[],children:any[]=[],roots=new Set<string>();
@@ -46,19 +47,19 @@ async function invoke(args:Record<string,unknown>={},o:Options={},core=false){
   }
   return c;
  }) as any;
- const result=await runWithAbortSignal(o.abort?.signal??o.abortDuring?.signal,()=>core?diffRevisions.execute({...selectors,...args} as any):tool.execute("fixture",{...selectors,...args},undefined,undefined,{cwd:"/fictional"}),{spawn,...(o.timeout?{timeoutMs:50,abortKillDelayMs:1}:{})});
- if(!core){const r=result as any;assert(Check(diffRevisionsOutputSchema,r.structuredContent));assert.equal(r.isError,!r.structuredContent.ok);assert.doesNotMatch(JSON.stringify(r),/private diagnostic|private --nodata|pi-plastic-revisions-|pi-plastic-diff-/);}
+ const result=await runWithAbortSignal(o.abort?.signal??o.abortDuring?.signal,()=>core?executeDiffRevisions({...selectors,...args} as any):tool.execute("fixture",{mode:"revisions",...selectors,...args},undefined,undefined,{cwd:"/fictional"}),{spawn,...(o.timeout?{timeoutMs:50,abortKillDelayMs:1}:{})});
+ if(!core){const r=result as any;assert(Check(diffOutputSchema,r.structuredContent));assert.equal(r.isError,!r.structuredContent.ok);assert.doesNotMatch(JSON.stringify(r),/private diagnostic|private --nodata|pi-plastic-revisions-|pi-plastic-diff-/);}
  for(const r of roots)assert.equal(await fs.stat(r).then(()=>true,()=>false),false,"owned temps removed");
  for(const c of children){assert.equal(c.listenerCount("close"),0);assert.equal(c.listenerCount("error"),0);assert.equal(c.stdout.listenerCount("data"),0);assert.equal(c.stderr.listenerCount("data"),0);}
  return result as any;
 }
-function typed(dto:DiffRevisionsOutput):string{if(!dto.ok)return dto.error.code;return dto.data.left.selector;}
+function typed(dto:DiffOutput):string{if(!dto.ok)return dto.error.code;if(dto.mode==="workspace")return "collection";return dto.data.left.selector??"";}
 const direct=await invoke(),dto=direct.structuredContent;
-assert(dto.ok);assert.equal(typed(dto),selectors.leftRevision);assert.equal(dto.data.status,"changed");assert.equal(dto.data.left.bytes,7);assert.equal(dto.data.right.bytes,6);assert.equal(dto.data.left.resolvedIdentity,null);assert.equal(dto.data.hunkCount,1);assert.equal(calls.length,3);
+assert(dto.ok);assert.equal(typed(dto),selectors.leftRevision);assert.equal(dto.data.status,"changed");assert.equal(dto.data.left.bytes,7);assert.equal(dto.data.right.bytes,6);assert.equal(dto.data.left.identity,null);assert.equal(dto.data.hunkCount,1);assert.equal(calls.length,3);
 assert.deepEqual(calls.slice(0,2).map(c=>c.slice(0,2)),[["cat",selectors.leftRevision],["cat",selectors.rightRevision]]);
 assert.match(dto.data.excerpt.text,/--- Assets\/Fictional ü 日本 😀\.txt@cs:1/);assert.equal(dto.data.excerpt.returnedChars,dto.data.excerpt.text.length);
-const json=await invoke({format:"json"});assert.deepEqual(json.structuredContent,dto);assert.match(json.content[0].text,/## diffRevisions/);assert.equal(calls.filter(c=>c[0]==="version").length,1);
-await invoke({format:"json"});assert.equal(calls.length,3,"native JSON version cache preserved");
+const json=await invoke({format:"json"});assert.deepEqual(json.structuredContent,dto);assert.equal(JSON.parse(json.content[0].text).action,"diff");assert.equal(calls.filter(c=>c[0]==="version").length,0);
+await invoke({format:"json"});assert.equal(calls.length,3,"unified JSON has no presentation metadata query");
 assert.equal((await invoke({}, {code:0})).structuredContent.data.status,"unchanged");
 for(const [left,right,status] of [[Buffer.from([0,1]),Buffer.from([0,2]),"binary-different"],[Buffer.from([255]),Buffer.from([255]),"unchanged"],[Buffer.alloc(0),Buffer.from([0]),"binary-different"]] as const){const r=await invoke({}, {left,right});assert.equal(r.structuredContent.data.status,status);assert.equal(r.structuredContent.data.comparisonBasis,"byte_equality");assert.equal(r.structuredContent.data.excerpt,null);assert.equal(calls.length,2);}
 for(const selector of ["revid:17","revid:17@rep:example@repserver:example-server","rev:example.txt","Assets/Example.txt#cs:1","Assets/Example.txt#br:/main/space 日本 😀","serverpath:/Assets/Example.txt#br:/main","itemid:17#cs:2","Assets/Example.txt#lb:release"]){assert(validDiffRevisionsSelector(selector),selector);}
@@ -75,7 +76,7 @@ assert.equal(validateRevisionUnifiedDiff("--- left\n+++ right\n@@ -0,0 +1 @@\n+a
 for(const raw of ["--- left\n+++ right\n", "--- left\n+++ right\n@@ -1 +1 @@\n-a\n+b\nextra", "--- left\n+++ right\n@@ -99999999999 +1 @@\n-a\n+b\n"] )assert.throws(()=>validateRevisionUnifiedDiff(raw));
 const n=12000,largeBody="@@ -1,"+n+" +1,"+n+" @@\n"+"-before 😀\n".repeat(n)+"+after 😀\n".repeat(n);
 const large=await invoke({maxChars:500},{body:largeBody});assert(large.structuredContent.ok);assert.equal(large.structuredContent.completeness.projection,false);assert(large.structuredContent.data.excerpt.text.length<=500);assert(large.structuredContent.data.excerpt.omittedChars>0);assert(!/[\uD800-\uDFFF]/u.test(large.structuredContent.data.excerpt.text));
-for(const mutate of [(x:any)=>x.data.left.selector="revid:1;output",(x:any)=>x.data.left.resolvedIdentity="invented",(x:any)=>x.data.excerpt.sourceChars++,(x:any)=>x.data.capture.diffExitCode=0,(x:any)=>x.completeness.projection=false,(x:any)=>x.data.status="unchanged",(x:any)=>x.data.extra="private"]){const x=structuredClone(dto);mutate(x);assert.equal(validateDiffRevisionsOutput(x).ok,false);}
+for(const mutate of [(x:any)=>x.data.left.selector="revid:1;output",(x:any)=>x.data.left.resolvedIdentity="invented",(x:any)=>x.data.excerpt.sourceChars++,(x:any)=>x.data.capture.diffExitCode=0,(x:any)=>x.completeness.projection=false,(x:any)=>x.data.status="unchanged",(x:any)=>x.data.extra="private"]){const x=structuredClone(dto);mutate(x);assert.equal(validateDiffOutput(x),false);}
 const obs:DiffRevisionsObservation={left:{selector:"\u0800".repeat(4090)+"#cs:1",kind:"file-qualified",resolvedIdentity:null,bytes:0,binary:false},right:{selector:"\u0801".repeat(4090)+"#cs:2",kind:"file-qualified",resolvedIdentity:null,bytes:0,binary:false},maxChars:20000,binary:false,changed:true,normalized:"\u0001".repeat(20000),hunkCount:1,diffStdoutBytes:20000,diffExitCode:1,legacyResult:{backend:"diff",changed:true,binary:false,output:"",truncated:false,totalChars:20000}};
 const bounded=diffRevisionsPayload(obs);assert(Buffer.byteLength(JSON.stringify(bounded))<=131072);assert.equal(bounded.completeness.projection,false);assert.equal(validateDiffRevisionsOutput(bounded).ok,true);
 assert.match(await invoke({}, {},true),/--- Assets\/Fictional/);
@@ -88,7 +89,7 @@ const spawn = (() => {
         kills.push(signal); if (signal === "SIGKILL") queueMicrotask(() => { escalating.stdout.end(); escalating.stderr.end(); escalating.emit("close", null); }); return true;
     } }); return escalating;
 }) as any;
-const timed = await runWithAbortSignal(undefined, () => tool.execute("synthetic", selectors, undefined, undefined, { cwd: "/synthetic" }), { spawn, timeoutMs: 1, abortKillDelayMs: 1, setTimeout: (callback, delay) => { const timer = setTimeout(callback, delay); timers.add(timer); return timer; }, clearTimeout: timer => { timers.delete(timer); clearTimeout(timer); } });
+const timed = await runWithAbortSignal(undefined, () => tool.execute("synthetic", {mode:"revisions",...selectors}, undefined, undefined, { cwd: "/synthetic" }), { spawn, timeoutMs: 1, abortKillDelayMs: 1, setTimeout: (callback, delay) => { const timer = setTimeout(callback, delay); timers.add(timer); return timer; }, clearTimeout: timer => { timers.delete(timer); clearTimeout(timer); } });
 assert.deepEqual(kills, ["SIGTERM", "SIGKILL"]); assert.equal(timers.size, 0); assert.equal(timed.structuredContent.error.code, "capture_incomplete");
 assert.equal(escalating.stdout.listenerCount("data"), 0); assert.equal(escalating.listenerCount("close"), 0);
 console.log("PASS: strict historical diff selectors, typed comparison/capture failures, bounded files/excerpts, byte classification, normalized counts, native JSON cache and cleanup");

@@ -1,7 +1,7 @@
 import { getActiveAbortSignal, commandExecutionStorage } from "./context";
 import { getCmExecutable, spawnAndCollect } from "./process";
 
-export const BLOCKED_CM_DIFF_MESSAGE = "`cm diff` is blocked in Pi because it may launch GUI windows and hang the CLI. Use `plastic_status` when only changed paths are needed. Do not diff routinely; when change-boundary evidence is necessary, use a focused `plastic_diffFile`, explicitly scoped `plastic_workspaceDiff`, or `plastic_diffRevisions`.";
+export const BLOCKED_CM_DIFF_MESSAGE = "`cm diff` is blocked in Pi because it may launch GUI windows and hang the CLI. Use `plastic_status` when only changed paths are needed. Do not diff routinely; when change-boundary evidence is necessary, use `plastic_diff` with explicit mode=file, revisions, or workspace and bounded scope.";
 
 export const ensureCmCommandAllowed = (args: string[]): void =>
 {

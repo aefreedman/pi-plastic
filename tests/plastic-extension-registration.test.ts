@@ -5,7 +5,7 @@ import { PLASTIC_TOOL_REGISTRY, getRegisteredPlasticExportNames, toToolName } fr
 import { PLASTIC_TOOL_NAMES } from "../src/plastic-tool-loading.ts";
 import { getActiveAbortSignal } from "../src/execution/context.ts";
 import { statusOutputSchema } from "../src/pi/status-output.ts";
-import { diffRevisionsOutputSchema } from "../src/pi/diff-revisions-output";
+import { diffOutputSchema } from "../src/pi/diff-output";
 import { codeReviewFindOutputSchema } from "../src/pi/code-review-find-output";
 import { shelvesetListOutputSchema } from "../src/pi/shelveset-list-output";
 import { workspaceListOutputSchema } from "../src/pi/workspace-list-output";
@@ -15,7 +15,7 @@ import { currentBranchOutputSchema, branchExistsOutputSchema } from "../src/pi/b
 async function main(): Promise<void> {
   const tools = await loadRegisteredTools();
   for (const tool of tools.values()) {
-    assert.deepEqual(tool.outputSchema, tool.name === "plastic_status" ? statusOutputSchema : tool.name === "plastic_currentBranch" ? currentBranchOutputSchema : tool.name === "plastic_branchExists" ? branchExistsOutputSchema : tool.name === "plastic_branchList" ? branchListOutputSchema : tool.name === "plastic_workspaceList" ? workspaceListOutputSchema : tool.name === "plastic_shelvesetList" ? shelvesetListOutputSchema : tool.name === "plastic_codeReviewFind" ? codeReviewFindOutputSchema : tool.name === "plastic_diffRevisions" ? diffRevisionsOutputSchema : undefined, "Exactly eight read tools own structured output schemas");
+    assert.deepEqual(tool.outputSchema, tool.name === "plastic_status" ? statusOutputSchema : tool.name === "plastic_currentBranch" ? currentBranchOutputSchema : tool.name === "plastic_branchExists" ? branchExistsOutputSchema : tool.name === "plastic_branchList" ? branchListOutputSchema : tool.name === "plastic_workspaceList" ? workspaceListOutputSchema : tool.name === "plastic_shelvesetList" ? shelvesetListOutputSchema : tool.name === "plastic_codeReviewFind" ? codeReviewFindOutputSchema : tool.name === "plastic_diff" ? diffOutputSchema : undefined, "Exactly eight read tools own structured output schemas");
   }
   const shape = [...tools.values()].map(({ name, label, description, parameters, prepareArguments, promptSnippet, promptGuidelines, constrainedSampling }) => ({
     name, label, description, parameters, defaults: prepareArguments?.({}), promptSnippet, promptGuidelines, constrainedSampling,
@@ -30,7 +30,7 @@ async function main(): Promise<void> {
   const packageManifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   const branchStatusText = readFileSync(new URL("../extensions/plastic-branch-status.ts", import.meta.url), "utf8");
 
-  assert.match(registerText, /parameters:\s*buildParameters\(coreTool\.args\)/, "plastic tools should derive schemas from core args without approval-only parameters");
+  assert.match(registerText, /buildParameters\(coreTool\.args\)/, "plastic tools should derive schemas from core args without approval-only parameters");
   assert.match(registerText, /prepareArguments:\s*config\.prepareArguments/, "plastic tools should wire prepareArguments");
   assert.match(registerText, /runWithAbortSignal\(signal, async \(\) => coreTool\.execute\(normalizedParams\)\)/, "plastic tools should propagate abort signals into core execution");
   assert.doesNotMatch(registerText, /authorizationToken|authorizationProvenance|ctx\.ui\.confirm/, "Plastic tool registration must not implement token or UI-confirmation approvals");

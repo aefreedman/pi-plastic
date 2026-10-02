@@ -246,88 +246,203 @@
   {
     "name": "plastic_diff",
     "label": "plastic_diff",
-    "description": "Disabled alias for cm diff; use text-only alternatives.",
+    "description": "Bounded non-GUI comparison. Require mode=file (one local file versus loaded base or revision), revisions (two historical selectors), or workspace (explicit pending paths or allPending=true). No implicit whole-workspace review.",
     "parameters": {
-      "type": "object",
-      "required": [
-        "source"
-      ],
-      "properties": {
-        "source": {
-          "type": "string",
-          "description": "Source changeset/label/shelveset/branch spec (cs:, lb:, sh:, br:, or a numeric changeset).",
-          "minimum": 1
-        },
-        "destination": {
-          "type": "string",
-          "description": "Optional destination changeset/label/shelveset/branch spec."
-        },
-        "added": {
-          "type": "boolean",
-          "description": "Show only added items."
-        },
-        "changed": {
-          "type": "boolean",
-          "description": "Show only changed items."
-        },
-        "moved": {
-          "type": "boolean",
-          "description": "Show only moved items."
-        },
-        "deleted": {
-          "type": "boolean",
-          "description": "Show only deleted items."
-        },
-        "repositoryPaths": {
-          "type": "boolean",
-          "description": "Print repository paths instead of workspace paths."
-        },
-        "format": {
-          "type": "string",
-          "description": "Format string for CLI output."
-        },
-        "dateFormat": {
-          "type": "string",
-          "description": "Date format for output dates."
-        },
-        "comparisonMethod": {
-          "anyOf": [
-            {
-              "type": "string",
-              "const": "ignoreeol"
-            },
-            {
-              "type": "string",
-              "const": "ignorewhitespaces"
-            },
-            {
-              "type": "string",
-              "const": "ignoreeolandwhitespaces"
-            },
-            {
-              "type": "string",
-              "const": "recognizeall"
-            }
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "path"
           ],
-          "description": "Comparison method used for diff calculations."
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "file"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            },
+            "revision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "workdir": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "format": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "text"
+                },
+                {
+                  "type": "string",
+                  "const": "json"
+                }
+              ]
+            },
+            "maxChars": {
+              "type": "integer",
+              "minimum": 500,
+              "maximum": 20000
+            }
+          },
+          "additionalProperties": false
         },
-        "clean": {
-          "type": "boolean",
-          "description": "Exclude changes produced by merges."
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "leftRevision",
+            "rightRevision"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "revisions"
+            },
+            "leftRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "rightRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "workdir": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "format": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "text"
+                },
+                {
+                  "type": "string",
+                  "const": "json"
+                }
+              ]
+            },
+            "maxChars": {
+              "type": "integer",
+              "minimum": 500,
+              "maximum": 20000
+            }
+          },
+          "additionalProperties": false
         },
-        "integration": {
-          "type": "boolean",
-          "description": "Show pending integration differences."
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "paths"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "workspace"
+            },
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "minItems": 1,
+              "maxItems": 20
+            },
+            "workdir": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "format": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "text"
+                },
+                {
+                  "type": "string",
+                  "const": "json"
+                }
+              ]
+            },
+            "maxChars": {
+              "type": "integer",
+              "minimum": 500,
+              "maximum": 8000
+            },
+            "maxFiles": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            }
+          },
+          "additionalProperties": false
         },
-        "fullPaths": {
-          "type": "boolean",
-          "description": "Force full workspace paths when possible."
-        },
-        "workdir": {
-          "type": "string",
-          "description": "Working directory for the workspace."
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "allPending"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "workspace"
+            },
+            "allPending": {
+              "type": "boolean",
+              "const": true
+            },
+            "includePrivate": {
+              "type": "boolean"
+            },
+            "workdir": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "format": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "text"
+                },
+                {
+                  "type": "string",
+                  "const": "json"
+                }
+              ]
+            },
+            "maxChars": {
+              "type": "integer",
+              "minimum": 500,
+              "maximum": 8000
+            },
+            "maxFiles": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            }
+          },
+          "additionalProperties": false
         }
-      }
+      ],
+      "type": "object"
     },
     "defaults": {}
   },
@@ -365,158 +480,6 @@
         "integration": {
           "type": "boolean",
           "description": "Show branch changes pending integration into the parent branch."
-        },
-        "workdir": {
-          "type": "string",
-          "description": "Working directory for the workspace."
-        }
-      }
-    },
-    "defaults": {}
-  },
-  {
-    "name": "plastic_diffRevisions",
-    "label": "plastic_diffRevisions",
-    "description": "Show a bounded text-only diff between two file-qualified Plastic revisions using portable diff -u; binary content is reported explicitly.",
-    "parameters": {
-      "type": "object",
-      "required": [
-        "leftRevision",
-        "rightRevision"
-      ],
-      "properties": {
-        "leftRevision": {
-          "type": "string",
-          "description": "Left file-qualified Plastic revision spec for cm cat.",
-          "minimum": 1
-        },
-        "rightRevision": {
-          "type": "string",
-          "description": "Right file-qualified Plastic revision spec for cm cat.",
-          "minimum": 1
-        },
-        "maxChars": {
-          "type": "integer",
-          "description": "Maximum diff-body characters returned (default 8000, maximum 20000).",
-          "minimum": 500,
-          "maximum": 20000
-        },
-        "format": {
-          "anyOf": [
-            {
-              "type": "string",
-              "const": "text"
-            },
-            {
-              "type": "string",
-              "const": "json"
-            }
-          ],
-          "description": "Output format. Defaults to text."
-        },
-        "workdir": {
-          "type": "string",
-          "description": "Working directory for the workspace."
-        }
-      }
-    },
-    "defaults": {}
-  },
-  {
-    "name": "plastic_diffFile",
-    "label": "plastic_diffFile",
-    "description": "Show a bounded text-only diff between a workspace file and its Plastic base (or a supported revision). Omit revision for the common workspace-base comparison.",
-    "parameters": {
-      "type": "object",
-      "required": [
-        "path"
-      ],
-      "properties": {
-        "path": {
-          "type": "string",
-          "description": "Workspace file path to diff.",
-          "minimum": 1
-        },
-        "revision": {
-          "type": "string",
-          "description": "Optional revision: changeset number/cs:<number>, br:/<branch>, lb:<label>, file-qualified '<path>#<selector>', or global revid:/rev:. Omit for the workspace base."
-        },
-        "maxChars": {
-          "type": "integer",
-          "description": "Maximum diff-body characters returned (default 8000, maximum 20000).",
-          "minimum": 500,
-          "maximum": 20000
-        },
-        "format": {
-          "anyOf": [
-            {
-              "type": "string",
-              "const": "text"
-            },
-            {
-              "type": "string",
-              "const": "json"
-            }
-          ],
-          "description": "Output format. Defaults to text."
-        },
-        "workdir": {
-          "type": "string",
-          "description": "Working directory for the workspace."
-        }
-      }
-    },
-    "defaults": {}
-  },
-  {
-    "name": "plastic_workspaceDiff",
-    "label": "plastic_workspaceDiff",
-    "description": "Review explicitly selected pending workspace file diffs, or opt into a small bounded whole-workspace review with allPending=true. Use plastic_status when only changed paths are needed.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "paths": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minimum": 1,
-            "maximum": 1024
-          },
-          "description": "Pending workspace paths to review (maximum 20, 1024 characters each). Selecting paths includes matching private files.",
-          "maximum": 20
-        },
-        "allPending": {
-          "type": "boolean",
-          "description": "Explicitly review pending non-private files when paths are omitted. Defaults to false; required for an unscoped workspace diff."
-        },
-        "includePrivate": {
-          "type": "boolean",
-          "description": "Include private pending files with allPending=true. Selected private paths do not require this flag."
-        },
-        "maxFiles": {
-          "type": "integer",
-          "description": "Maximum files to compare for allPending review (default 3, maximum 20); selected paths are all considered unless this is set.",
-          "minimum": 1,
-          "maximum": 20
-        },
-        "maxChars": {
-          "type": "integer",
-          "description": "Maximum diff-body characters returned per file (default 3000, maximum 8000).",
-          "minimum": 500,
-          "maximum": 8000
-        },
-        "format": {
-          "anyOf": [
-            {
-              "type": "string",
-              "const": "text"
-            },
-            {
-              "type": "string",
-              "const": "json"
-            }
-          ],
-          "description": "Output format. Defaults to text."
         },
         "workdir": {
           "type": "string",

@@ -1,464 +1,75 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, basename } from "node:path";
 import { PassThrough } from "node:stream";
-import { __plasticDiffInternals, diffFile, diffRevisions, runWithAbortSignal, workspaceDiff } from "../src/plastic-core.ts";
+import { createHash } from "node:crypto";
+import { Check } from "typebox/value";
+import { diff } from "../src/plastic-core";
+import { runWithAbortSignal } from "../src/execution/context";
+import { diffInputSchema, diffOutputSchema, validateDiffOutput } from "../src/pi/diff-output";
+import { validateDiffRequest } from "../src/operations/consolidated-diff";
+import { parseLoadedFileInfo, parseLoadedLs } from "../src/domain/diff-base-xml";
+import { parseDiffPending } from "../src/domain/diff-pending-xml";
+import { loadRegisteredTools } from "./pi-tool-harness";
 
-class FakeChildProcess extends EventEmitter {
-  readonly stdout = new PassThrough();
-  readonly stderr = new PassThrough();
-  readonly stdin = new PassThrough();
-  kill(): boolean { return true; }
-  close(code: number): void { this.stdout.end(); this.stderr.end(); this.emit("close", code, null); }
-}
-
-type Call = { command: string; args: string[] };
-const statusSeparator = "\x1f";
-
-function fakeCommands(calls: Call[], repositoryKeyword: "repository" | "rep" = "repository") {
-  return ((command: string, args: string[]) => {
-    const proc = new FakeChildProcess();
-    calls.push({ command, args });
-    queueMicrotask(async () => {
-      if (command === "cm" && args[0] === "status") {
-        proc.stdout.write([
-          `CH${statusSeparator}changed.txt${statusSeparator}False${statusSeparator}41${statusSeparator}NO_MERGES`,
-          `PR${statusSeparator}private.txt${statusSeparator}False${statusSeparator}45${statusSeparator}NO_MERGES`,
-          `AD${statusSeparator}added.txt${statusSeparator}False${statusSeparator}46${statusSeparator}NO_MERGES`,
-          `AD${statusSeparator}added-empty.txt${statusSeparator}False${statusSeparator}0${statusSeparator}NO_MERGES`,
-          `AD${statusSeparator}über added.txt${statusSeparator}False${statusSeparator}0${statusSeparator}NO_MERGES`,
-          `DE${statusSeparator}deleted.txt${statusSeparator}False${statusSeparator}42${statusSeparator}NO_MERGES`,
-          `CH${statusSeparator}nodata.txt${statusSeparator}False${statusSeparator}43${statusSeparator}NO_MERGES`,
-          `MV${statusSeparator}100%${statusSeparator}source moved.txt${statusSeparator}moved destination.txt${statusSeparator}False${statusSeparator}44${statusSeparator}NO_MERGES`,
-        ].join("\n"));
-        proc.close(0);
-        return;
-      }
-      if (command === "cm" && args[0] === "showselector") {
-        proc.stdout.write(`${repositoryKeyword} "parent-repository@parent-server"\n  path "/"\n    smartbranch "/main"\n`);
-        proc.close(0);
-        return;
-      }
-      if (command === "cm" && args[0] === "xlink") {
-        proc.stderr.write(`'${args.at(-1)}' is not an xlink.`);
-        proc.close(1);
-        return;
-      }
-      if (command === "cm" && args[0] === "cat") {
-        if (args[1] === "revid:43@rep:parent-repository@repserver:parent-server" || args[1] === "revid:43") {
-          const destination = args.find((arg) => arg.startsWith("--file="))!.slice("--file=".length);
-          await writeFile(destination, "");
-          proc.stderr.write("Historical data is unavailable because the item was loaded with --nodata.");
-          proc.close(1);
-          return;
-        }
-        const destination = args.find((arg) => arg.startsWith("--file="))!.slice("--file=".length);
-        await writeFile(destination, `base for ${args[1]}\n`);
-        proc.close(0);
-        return;
-      }
-      if (args[0] === "-u") {
-        const [left, right] = await Promise.all([readFile(args[1]), readFile(args[2])]);
-        if (left.equals(right)) {
-          proc.close(0);
-          return;
-        }
-        proc.stdout.write("--- temporary-left\n+++ temporary-right\n@@ -1 +1 @@\n-base\n+workspace\n");
-        proc.close(1);
-        return;
-      }
-      proc.close(0);
-    });
-    return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
-  }) as typeof import("node:child_process").spawn;
-}
-
-function stressCommands(calls: Call[]) {
-  return ((command: string, args: string[]) => {
-    const proc = new FakeChildProcess();
-    calls.push({ command, args });
-    queueMicrotask(async () => {
-      if (command === "cm" && args[0] === "status") {
-        proc.stdout.write(["stress-1.txt", "stress-2.txt", "stress-3.txt", "stress-4.txt", "stress-5.txt"]
-          .map((name, index) => `CH ${name} False ${index + 1}`)
-          .concat("CH unavailable.txt False 99").join("\n"));
-        proc.close(0);
-        return;
-      }
-      if (command === "cm" && args[0] === "showselector") {
-        proc.stdout.write('repository "parent-repository@parent-server"\n  smartbranch "/main"\n');
-        proc.close(0);
-        return;
-      }
-      if (command === "cm" && args[0] === "xlink") {
-        proc.stderr.write(`'${args.at(-1)}' is not an xlink.`);
-        proc.close(1);
-        return;
-      }
-      if (command === "cm" && args[0] === "cat") {
-        if (args[1] === "revid:99@rep:parent-repository@repserver:parent-server") {
-          proc.stderr.write(`Failure with JSON-sensitive text \\\" \\\\ ${"x".repeat(5_000)}`);
-          proc.close(1);
-          return;
-        }
-        const destination = args.find((arg) => arg.startsWith("--file="))!.slice("--file=".length);
-        await writeFile(destination, "base\n");
-        proc.close(0);
-        return;
-      }
-      if (args[0] === "-u") {
-        proc.stdout.write(`--- left\n+++ right\n@@ -0,0 +1,30000 @@\n${"+\\\"\\\\\n".repeat(30_000)}`);
-        proc.close(1);
-        return;
-      }
-      proc.close(0);
-    });
-    return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
-  }) as typeof import("node:child_process").spawn;
-}
-
-function emptyStatusCommands(calls: Call[]) {
-  return ((command: string, args: string[]) => {
-    const proc = new FakeChildProcess();
-    calls.push({ command, args });
-    queueMicrotask(() => proc.close(0));
-    return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
-  }) as typeof import("node:child_process").spawn;
-}
-
-async function assertNoUnhandledRejection(action: () => Promise<unknown>): Promise<void> {
-  const rejections: unknown[] = [];
-  const onUnhandledRejection = (reason: unknown) => rejections.push(reason);
-  process.on("unhandledRejection", onUnhandledRejection);
-  try {
-    await action();
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    assert.equal(rejections.length, 0, "Lazy ownership discovery must not leave an unhandled rejection.");
-  } finally {
-    process.off("unhandledRejection", onUnhandledRejection);
-  }
-}
-
-function xlinkCollisionCommands(calls: Call[], root: string, ownershipFailure?: "unavailable" | "malformed") {
-  const statuses = [
-    `CH${statusSeparator}${join(root, "parent.txt")}${statusSeparator}False${statusSeparator}77${statusSeparator}NO_MERGES`,
-    `CH${statusSeparator}${join(root, "link-one", "one.txt")}${statusSeparator}False${statusSeparator}77${statusSeparator}NO_MERGES`,
-    `CH${statusSeparator}${join(root, "link-two", "two.txt")}${statusSeparator}False${statusSeparator}77${statusSeparator}NO_MERGES`,
-    `CH${statusSeparator}${join(root, "link-one", "partial", "nested.cs")}${statusSeparator}False${statusSeparator}79${statusSeparator}NO_MERGES`,
-    `MV${statusSeparator}100%${statusSeparator}${join(root, "link-one", "source.cs")}${statusSeparator}${join(root, "link-one", "moved.cs")}${statusSeparator}False${statusSeparator}78${statusSeparator}NO_MERGES`,
-    `DE${statusSeparator}${join(root, "removed-xlink", "gone.txt")}${statusSeparator}False${statusSeparator}88${statusSeparator}NO_MERGES`,
-  ].join("\n");
-  const bases: Record<string, string> = {
-    "revid:77@rep:parent-repository@repserver:parent-server": "PARENT MARKDOWN\n",
-    "revid:77@rep:linked-repository@repserver:linked-server": "XLINK ONE CSHARP\n",
-    "revid:77@rep:linked-repository@repserver:other-server": "XLINK TWO CSHARP\n",
-    "revid:78@rep:linked-repository@repserver:linked-server": "XLINK MOVE CSHARP\n",
-    "revid:79@rep:partial-repository@repserver:cloud@partial-server": "PARTIAL XLINK CSHARP\n",
-  };
-  return ((command: string, args: string[]) => {
-    const proc = new FakeChildProcess();
-    calls.push({ command, args });
-    queueMicrotask(async () => {
-      if (command === "cm" && args[0] === "status") {
-        proc.stdout.write(statuses);
-        proc.close(0);
-        return;
-      }
-      if (command === "cm" && args[0] === "showselector") {
-        proc.stdout.write('repository "parent-repository@parent-server"\n  smartbranch "/main"\n');
-        proc.close(0);
-        return;
-      }
-      if (command === "cm" && args[0] === "xlink") {
-        const candidate = args.at(-1)!;
-        if (resolve(candidate) === resolve(dirname(root))) {
-          proc.stderr.write(`Item path not in workspace: ${dirname(candidate)}.`);
-          proc.close(1);
-          return;
-        }
-        if (candidate.endsWith("link-one") && ownershipFailure) {
-          if (ownershipFailure === "unavailable") proc.stderr.write("Repository ownership lookup unavailable.");
-          else proc.stdout.write("Unrecognized ownership response\n");
-          proc.close(ownershipFailure === "unavailable" ? 1 : 0);
-          return;
-        }
-        const repository = candidate.endsWith("partial") ? "partial-repository@cloud@partial-server"
-          : candidate.endsWith("link-one") ? "linked-repository@linked-server"
-            : candidate.endsWith("link-two") ? "linked-repository@other-server" : null;
-        if (!repository) {
-          proc.stderr.write(`'${candidate}' is not an xlink.`);
-          proc.close(1);
-          return;
-        }
-        proc.stdout.write(`${candidate} --> wxlink:linked:/@77@${repository}\n`);
-        proc.close(0);
-        return;
-      }
-      if (command === "cm" && args[0] === "cat") {
-        const base = bases[args[1]];
-        assert(base, `Unexpected unqualified or incorrect revision spec: ${args[1]}`);
-        await writeFile(args.find((arg) => arg.startsWith("--file="))!.slice("--file=".length), base);
-        proc.close(0);
-        return;
-      }
-      if (args[0] === "-u") {
-        const left = await readFile(args[1], "utf8");
-        proc.stdout.write(`--- left\n+++ right\n@@ -1 +1 @@\n-${left.trim()}\n+workspace\n`);
-        proc.close(1);
-        return;
-      }
-      proc.close(0);
-    });
-    return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
-  }) as typeof import("node:child_process").spawn;
-}
-
-const jsonPayload = (result: unknown): Record<string, unknown> => {
-  const match = String(result).match(/```json\n([\s\S]*)\n```$/);
-  assert(match, "Expected a fenced JSON result.");
-  return JSON.parse(match[1]) as Record<string, unknown>;
-};
-
-const root = await mkdtemp(join(tmpdir(), "pi-plastic-workspace-diff-"));
-const workspaceAlias = `${root}-alias`;
-const noMarkerRoot = await mkdtemp(join(tmpdir(), "pi-plastic-no-marker-"));
-try {
-  await mkdir(join(root, ".plastic"));
-  await writeFile(join(root, ".plastic", "plastic.workspace"), "synthetic workspace marker\n");
-  for (const name of ["changed.txt", "private.txt", "added.txt", "nodata.txt", "moved destination.txt", "über added.txt"]) {
-    await writeFile(join(root, name), `workspace ${name}\n`);
-  }
-  await writeFile(join(root, "added-empty.txt"), "");
-
-  await writeFile(join(noMarkerRoot, "private.txt"), "workspace private.txt\n");
-  await assertNoUnhandledRejection(() => runWithAbortSignal(undefined, () => diffFile.execute({ path: "private.txt", workdir: noMarkerRoot, format: "text" }), { spawn: fakeCommands([]) }));
-  await assertNoUnhandledRejection(() => runWithAbortSignal(undefined, () => workspaceDiff.execute({ allPending: true, workdir: noMarkerRoot, format: "text" }), { spawn: emptyStatusCommands([]) }));
-
-  const privateCalls: Call[] = [];
-  const privateResult = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "private.txt", workdir: root, format: "text" }), { spawn: fakeCommands(privateCalls) });
-  assert.match(String(privateResult), /empty before private\/new file/, "Explicitly selected private files must compare against an empty base with a private/new label.");
-  assert.equal(privateCalls.filter((call) => call.command === "cm" && call.args[0] === "cat").length, 0, "Private/new files must not materialize a historical base.");
-  assert.equal(privateCalls.filter((call) => call.command === "cm" && (call.args[0] === "xlink" || call.args[0] === "showselector")).length, 0, "Private files must skip ownership lookup even when status includes an ID.");
-  const addedCalls: Call[] = [];
-  await runWithAbortSignal(undefined, () => diffFile.execute({ path: "added.txt", workdir: root, format: "text" }), { spawn: fakeCommands(addedCalls) });
-  assert.equal(addedCalls.filter((call) => call.command === "cm" && (call.args[0] === "xlink" || call.args[0] === "showselector" || call.args[0] === "cat")).length, 0, "Added files must skip historical ownership lookup even when status includes an ID.");
-
-  const addedEmptyText = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "added-empty.txt", workdir: root, format: "text" }), { spawn: fakeCommands([]) });
-  assert.match(String(addedEmptyText), /Added file is empty/, "An added empty file must not be rendered as generic unchanged text.");
-  const addedEmptyJson = jsonPayload(await runWithAbortSignal(undefined, () => diffFile.execute({ path: "added-empty.txt", workdir: root, format: "json" }), { spawn: fakeCommands([]) }));
-  assert.equal((addedEmptyJson.data as Record<string, unknown>).status, "added-empty", "Focused JSON must expose added-empty semantics.");
-  assert.equal((addedEmptyJson.data as Record<string, unknown>).comparisonKind, "workspace-added", "Focused JSON must retain the workspace-added comparison kind.");
-
-  const unicodeCalls: Call[] = [];
-  const unicodeResult = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "über added.txt", workdir: root, format: "text" }), { spawn: fakeCommands(unicodeCalls) });
-  assert.match(String(unicodeResult), /--- über added\.txt \(empty before add\)\n\+\+\+ über added\.txt \(workspace\)/, "Normalized headers must retain logical Unicode labels.");
-  const unicodeBackendCall = unicodeCalls.find((call) => call.args[0] === "-u");
-  assert(unicodeBackendCall && unicodeBackendCall.args.every((arg) => /^[\x20-\x7e]*$/.test(arg)), "The diff backend must receive only ASCII-safe materialized operands for a Unicode workspace path.");
-
-  const historicalUnicodeCalls: Call[] = [];
-  const historicalUnicode = await runWithAbortSignal(undefined, () => diffRevisions.execute({ leftRevision: "über file.txt#cs:1", rightRevision: "über file.txt#cs:2", workdir: root, format: "text" }), { spawn: fakeCommands(historicalUnicodeCalls) });
-  assert.match(String(historicalUnicode), /--- über file\.txt@cs:1\n\+\+\+ über file\.txt@cs:2/, "Historical normalized headers must retain logical Unicode labels.");
-  const historicalUnicodeBackendCall = historicalUnicodeCalls.find((call) => call.args[0] === "-u");
-  assert(historicalUnicodeBackendCall && historicalUnicodeBackendCall.args.every((arg) => /^[\x20-\x7e]*$/.test(arg)), "The diff backend must receive only ASCII-safe materialized operands for a Unicode historical path.");
-
-  const collisionRoot = join(root, "collision");
-  await mkdir(join(collisionRoot, "link-one", "partial"), { recursive: true });
-  await mkdir(join(collisionRoot, "link-one", "deep"), { recursive: true });
-  await mkdir(join(collisionRoot, "link-two"), { recursive: true });
-  await Promise.all([
-    writeFile(join(collisionRoot, "parent.txt"), "workspace\n"),
-    writeFile(join(collisionRoot, "link-one", "one.txt"), "workspace\n"),
-    writeFile(join(collisionRoot, "link-one", "partial", "nested.cs"), "workspace\n"),
-    writeFile(join(collisionRoot, "link-one", "moved.cs"), "workspace\n"),
-    writeFile(join(collisionRoot, "link-two", "two.txt"), "workspace\n"),
-  ]);
-  const collisionCalls: Call[] = [];
-  const xlinkFileDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/one.txt", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
-  assert.match(String(xlinkFileDiff), /XLINK ONE CSHARP/, "Focused workspace diffs must materialize the xlink base, not colliding parent bytes.");
-  const subdirectoryDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "../one.txt", workdir: join(collisionRoot, "link-one", "deep"), format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
-  assert.match(String(subdirectoryDiff), /XLINK ONE CSHARP/, "Resolution from beneath an Xlink must inspect the enclosing mount up to the workspace root.");
-  const partialXlinkDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/partial/nested.cs", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
-  assert.match(String(partialXlinkDiff), /PARTIAL XLINK CSHARP/, "Nested partial Xlinks must resolve their nearest owning repository.");
-  const movedXlinkDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/moved.cs", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
-  assert.match(String(movedXlinkDiff), /XLINK MOVE CSHARP/, "Moved Xlink files must resolve the base from their source owner.");
-  const xlinkWorkspaceDiff = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ allPending: true, maxFiles: 3, workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) });
-  assert.match(String(xlinkWorkspaceDiff), /PARENT MARKDOWN/, "Mixed batches must resolve parent-repository files without probing the workspace root as an Xlink.");
-  assert(!collisionCalls.some((call) => call.args[0] === "xlink" && resolve(call.args.at(-1)!) === resolve(root)), "The discovered workspace root must never be queried as an Xlink.");
-  assert.match(String(xlinkWorkspaceDiff), /XLINK ONE CSHARP/);
-  assert.match(String(xlinkWorkspaceDiff), /XLINK TWO CSHARP/);
-  assert(collisionCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:77@rep:linked-repository@repserver:linked-server"), "Xlink bases must use the documented repository-qualified selector.");
-  assert(collisionCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:77@rep:linked-repository@repserver:other-server"), "Same-name repositories on different servers must retain distinct identities.");
-  assert(!collisionCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:77"), "Automatic pending diffs must never materialize a bare revision ID.");
-  await assert.rejects(
-    () => runWithAbortSignal(undefined, () => diffFile.execute({ path: "removed-xlink/gone.txt", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(collisionCalls, collisionRoot) }),
-    /owning repository.*ownership ancestor is missing/i,
-    "A deleted path below a removed Xlink mount must fail unavailable rather than use the parent repository.",
-  );
-  assert(!collisionCalls.some((call) => call.args[0] === "cat" && call.args[1].startsWith("revid:88")), "Ambiguous ownership must not materialize any revision.");
-
-  for (const failure of ["unavailable", "malformed"] as const) {
-    const failureCalls: Call[] = [];
-    await assert.rejects(
-      () => runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/one.txt", workdir: collisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(failureCalls, collisionRoot, failure) }),
-      failure === "unavailable" ? /ownership lookup unavailable/ : /malformed Xlink ownership/,
-      "Unknown descendant ownership must fail rather than falling back to the workspace repository.",
-    );
-    assert(!failureCalls.some((call) => call.args[0] === "cat" || call.args[0] === "showselector"), "Failed descendant ownership must not read a parent-repository base.");
-  }
-
-  // Workspace discovery resolves the alias to its physical root while Plastic status
-  // reports the lexical alias. Containment and ownership lookup must use one identity.
-  await symlink(root, workspaceAlias, process.platform === "win32" ? "junction" : "dir");
-  const aliasCollisionRoot = join(workspaceAlias, "collision");
-  const aliasCalls: Call[] = [];
-  const aliasXlinkDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "link-one/one.txt", workdir: aliasCollisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(aliasCalls, aliasCollisionRoot) });
-  const aliasParentDiff = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "parent.txt", workdir: aliasCollisionRoot, format: "text" }), { spawn: xlinkCollisionCommands(aliasCalls, aliasCollisionRoot) });
-  assert.match(String(aliasParentDiff), /PARENT MARKDOWN/, "The root boundary must also hold when lexical and physical workspace paths differ.");
-  assert(!aliasCalls.some((call) => call.args[0] === "xlink" && resolve(call.args.at(-1)!) === resolve(workspaceAlias)), "Filesystem aliases must not cause a root Xlink probe.");
-  assert.match(String(aliasXlinkDiff), /XLINK ONE CSHARP/, "A real filesystem alias must resolve Xlink ownership rather than rejecting the lexical status path as outside the physical workspace.");
-  assert(aliasCalls.some((call) => call.command === "cm" && call.args[0] === "xlink" && call.args.at(-1)?.startsWith(aliasCollisionRoot.replace(/\\/g, "/"))), "Xlink commands must retain the caller's lexical workspace path.");
-
-  for (const keyword of ["repository", "rep"] as const) {
-    const changedCalls: Call[] = [];
-    await runWithAbortSignal(undefined, () => diffFile.execute({ path: "changed.txt", workdir: root, format: "text" }), { spawn: fakeCommands(changedCalls, keyword) });
-    assert(changedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:41@rep:parent-repository@repserver:parent-server"), `Changed files must bind their base to the owning repository with the ${keyword} selector spelling.`);
-  }
-
-  const deletedCalls: Call[] = [];
-  await runWithAbortSignal(undefined, () => diffFile.execute({ path: "deleted.txt", workdir: root, format: "text" }), { spawn: fakeCommands(deletedCalls) });
-  assert(deletedCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:42@rep:parent-repository@repserver:parent-server"), "Deleted files must bind their status base to the owning repository before comparison.");
-
-  await assert.rejects(
-    () => runWithAbortSignal(undefined, () => diffFile.execute({ path: "nodata.txt", workdir: root, format: "text" }), { spawn: fakeCommands([]) }),
-    /Plastic cannot supply historical\/base bytes.*update\/refresh the workspace or use plastic_diffRevisions/i,
-    "Focused --nodata diffs must explain why the base is unavailable and how to proceed.",
-  );
-  const failedCatOutput = join(root, "package-owned-failed-cat-output.tmp");
-  await assert.rejects(
-    () => runWithAbortSignal(undefined, () => __plasticDiffInternals.materializeRevision("revid:43", failedCatOutput, root), { spawn: fakeCommands([]) }),
-    /Historical data is unavailable/,
-    "Failed cm cat --file retrieval must surface the backend failure after cleanup.",
-  );
-  await assert.rejects(() => readFile(failedCatOutput), /ENOENT/, "Failed cm cat --file retrieval must remove its failure-created package-owned output.");
-
-  await assert.rejects(
-    () => workspaceDiff.execute({ workdir: root, format: "text" }),
-    /requires explicit paths or allPending=true.*plastic_status/i,
-    "Unscoped workspace diff calls must require intentional whole-workspace review.",
-  );
-  await assert.rejects(
-    () => workspaceDiff.execute({ workdir: root, paths: [""], format: "text" }),
-    /non-blank workspace paths/i,
-    "Blank direct-call paths must not resolve to a broad workspace scope.",
-  );
-  await assert.rejects(
-    () => workspaceDiff.execute({ workdir: root, paths: ["."], format: "text" }),
-    /workspace-root path.*allPending=true/i,
-    "Workspace-root selection must require the explicit whole-workspace opt-in.",
-  );
-  await assert.rejects(
-    () => workspaceDiff.execute({ workdir: root, allPending: "false" as unknown as boolean, format: "text" }),
-    /allPending must be a boolean/i,
-    "Stringly typed direct-call opt-ins must not become truthy whole-workspace review.",
-  );
-  await assert.rejects(
-    () => workspaceDiff.execute({ workdir: root, allPending: true, includePrivate: "false" as unknown as boolean, format: "text" }),
-    /includePrivate must be a boolean/i,
-    "Stringly typed direct-call private flags must not include private files.",
-  );
-  await assert.rejects(
-    () => workspaceDiff.execute({ workdir: root, paths: ["changed.txt"], allPending: true, format: "text" }),
-    /either explicit paths or allPending=true/i,
-    "Selected and whole-workspace review scopes must not be combined.",
-  );
-  await assert.rejects(
-    () => workspaceDiff.execute({ workdir: root, paths: ["private.txt"], includePrivate: true, format: "text" }),
-    /includePrivate is only used with allPending=true/i,
-    "Explicit private paths must not need a redundant whole-workspace flag.",
-  );
-
-  const defaultBatch = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, allPending: true, format: "text" }), { spawn: fakeCommands([]) });
-  assert.match(String(defaultBatch), /Files considered: 3/, "Explicit whole-workspace review must keep a small default file count.");
-  assert.match(String(defaultBatch), /Skipped 4 pending item/, "The default whole-workspace bound must report omitted candidates.");
-
-  const batchCalls: Call[] = [];
-  const batchResult = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, allPending: true, maxFiles: 20, format: "text" }), { spawn: fakeCommands(batchCalls) });
-  assert.match(String(batchResult), /changed\.txt \(changed\)/);
-  assert.match(String(batchResult), /nodata\.txt \(changed\)\nUnavailable: Plastic cannot supply historical\/base bytes/);
-  assert.match(String(batchResult), /moved destination\.txt \(moved\)/, "Workspace review must compare a moved destination path.");
-  assert(batchCalls.some((call) => call.args[0] === "cat" && call.args[1] === "revid:44@rep:parent-repository@repserver:parent-server"), "Moved files must bind their status revision to the source owning repository before destination comparison.");
-  assert.doesNotMatch(String(batchResult), /private\.txt \(private\)/, "Batch review must exclude private files by default.");
-  const batchStatusCalls = batchCalls.filter((call) => call.command === "cm" && call.args[0] === "status");
-  assert.match(String(batchResult), /added-empty\.txt \(added\)\nAdded file is empty/, "Workspace text output must expose added-empty semantics.");
-  assert.equal(batchStatusCalls.length, 1, "Workspace review must run status exactly once.");
-  assert.deepEqual(batchStatusCalls[0].args, ["status", "--machinereadable", "--includeRevId", `--fieldseparator=${statusSeparator}`], "Pending-item status must request the explicit separator exactly once.");
-
-  const addedEmptyWorkspaceJson = jsonPayload(await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["added-empty.txt"], format: "json" }), { spawn: fakeCommands([]) }));
-  const addedEmptyOutcome = ((addedEmptyWorkspaceJson.data as Record<string, unknown>).outcomes as Array<Record<string, unknown>>)[0];
-  assert.equal(addedEmptyOutcome.status, "added-empty", "Workspace JSON must expose added-empty semantics.");
-  assert.equal(addedEmptyOutcome.comparisonKind, "workspace-added", "Workspace JSON must retain comparisonKind for an added empty file.");
-
-  const selectedPrivateCalls: Call[] = [];
-  const selectedPrivate = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["private.txt"], format: "text" }), { spawn: fakeCommands(selectedPrivateCalls) });
-  assert.match(String(selectedPrivate), /private\.txt \(private\)/, "Explicit selection must include a private file in workspace review.");
-  assert.equal(selectedPrivateCalls.filter((call) => call.command === "cm" && call.args[0] === "cat").length, 0, "Selected private files still use an empty base.");
-
-  for (const name of ["stress-1.txt", "stress-2.txt", "stress-3.txt", "stress-4.txt", "stress-5.txt"]) {
-    await writeFile(join(root, name), "workspace\n");
-  }
-  const stressPaths = ["stress-1.txt", "stress-2.txt", "stress-3.txt", "stress-4.txt", "stress-5.txt", "unavailable.txt"];
-  const textStress = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: stressPaths, maxChars: 8_000, format: "text" }), { spawn: stressCommands([]) });
-  assert(String(textStress).length <= 20_000, "Text workspace diff must keep the complete response within the context-efficient bound.");
-  assert.match(String(textStress), /Per-file output bound: 8000 characters/, "Workspace diff must report an intentional raised per-file response bound.");
-  assert.match(String(textStress), /outcome\(s\) omitted/, "An exhausted text budget must retain an omission summary.");
-
-  const focusedBound = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["stress-1.txt"], maxChars: 500, format: "text" }), { spawn: stressCommands([]) });
-  assert.match(String(focusedBound), /Per-file output bound: 500 characters/, "Callers must be able to request a smaller focused diff body.");
-  assert(String(focusedBound).length < 2_000, "A one-file focused review with a small bound must remain context efficient.");
-
-  const focusedJson = await runWithAbortSignal(undefined, () => diffFile.execute({ path: "stress-1.txt", workdir: root, maxChars: 20_000, format: "json" }), { spawn: stressCommands([]) });
-  assert(String(focusedJson).length <= 24_000, "Focused file JSON must remain bounded after escape expansion.");
-  const focusedJsonPayload = jsonPayload(focusedJson);
-  assert.equal((focusedJsonPayload.data as Record<string, unknown>).truncated, true, "Post-serialization focused truncation must remain observable.");
-  assert(Array.isArray(focusedJsonPayload.warnings) && (focusedJsonPayload.warnings as string[]).some((warning) => warning.includes("JSON escaping")), "Focused JSON truncation must explain the complete-response bound.");
-
-  const revisionsJson = await runWithAbortSignal(undefined, () => diffRevisions.execute({ leftRevision: "stress-1.txt#cs:1", rightRevision: "stress-1.txt#cs:2", workdir: root, maxChars: 20_000, format: "json" }), { spawn: stressCommands([]) });
-  assert(String(revisionsJson).length <= 24_000, "Revision JSON must remain bounded after escape expansion.");
-  assert.equal((jsonPayload(revisionsJson).data as Record<string, unknown>).truncated, true, "Revision JSON must expose complete-response truncation.");
-
-  const escapedUnmatchedPath = "missing \\\"quoted\\\" \\\\ path";
-  const jsonStress = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: [...stressPaths, escapedUnmatchedPath], maxChars: 8_000, format: "json" }), { spawn: stressCommands([]) });
-  assert(String(jsonStress).length <= 20_000, "JSON workspace diff must bound the complete framed response after JSON escaping.");
-  const parsedStress = jsonPayload(jsonStress);
-  const stressData = parsedStress.data as Record<string, unknown>;
-  assert((stressData.omittedOutcomes as number) > 0, "An exhausted JSON budget must report omitted outcomes without breaking JSON framing.");
-  assert(Array.isArray(parsedStress.warnings) && (parsedStress.warnings as string[]).some((warning) => warning.includes("no pending status record")), "Unmatched path inputs must remain summarized in bounded JSON warnings.");
-
-  const unavailableJson = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["unavailable.txt", escapedUnmatchedPath], format: "json" }), { spawn: stressCommands([]) });
-  assert(String(unavailableJson).length <= 20_000, "Long per-file errors must not exceed the JSON response bound.");
-  const unavailableData = jsonPayload(unavailableJson).data as Record<string, unknown>;
-  const unavailableOutcome = (unavailableData.outcomes as Array<Record<string, unknown>>)[0];
-  assert(String(unavailableOutcome.error).length <= 1_024, "Long per-file errors must be bounded in metadata.");
-
-  const zeroMaxFiles = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: ["stress-1.txt"], maxFiles: 0, format: "text" }), { spawn: stressCommands([]) });
-  assert.match(String(zeroMaxFiles), /Files considered: 1/, "Runtime guards must clamp direct callers that bypass the schema with a zero file bound.");
-  assert(String(zeroMaxFiles).length <= 20_000, "A direct zero-bound caller must still receive a complete bounded response.");
-
-  const oversizedPathInputs = ["x".repeat(5_000), ...Array.from({ length: 20 }, (_value, index) => `missing-${index}`)];
-  const boundedInputs = await runWithAbortSignal(undefined, () => workspaceDiff.execute({ workdir: root, paths: oversizedPathInputs, format: "json" }), { spawn: stressCommands([]) });
-  const boundedInputPayload = jsonPayload(boundedInputs);
-  const boundedInputData = boundedInputPayload.data as Record<string, unknown>;
-  assert(boundedInputData.selectedPathCount === 20, "Runtime path guards must retain no more than the configured path count.");
-  assert(Array.isArray(boundedInputPayload.warnings) && (boundedInputPayload.warnings as string[]).some((warning) => warning.includes("Ignored 1 path input")), "Runtime path guards must summarize excess path inputs.");
-  assert((boundedInputData.unmatchedPaths as string[]).every((path) => path.length <= 256), "Runtime path guards must bound long path metadata.");
-
-  console.log("PASS: plastic workspace diff tests passed");
-} finally {
-  await Promise.all([
-    rm(root, { recursive: true, force: true }),
-    rm(workspaceAlias, { recursive: true, force: true }),
-    rm(noMarkerRoot, { recursive: true, force: true }),
-  ]);
-}
+const root=await mkdtemp(join(tmpdir(),"pi-consolidated-fixture-"));
+const esc=(x:string)=>x.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+const file=join(root,"Tracked 日本-é-😀.txt"), original=Buffer.from("base\n");
+const hash=createHash("md5").update(original).digest("base64");
+let rows:{path:string;code:string;old?:string;directory?:boolean;binary?:boolean}[]=[],calls:string[][]=[];
+let abortComparison:AbortController|undefined;
+let badHash=false,badOwnership=false,catFailure=false,statusFailure=false,deletedRep=false,lookup=file;
+const records=()=>rows.map(r=>`<Change><Type>${r.code}</Type><Path>${esc(r.path)}</Path><OldPath>${esc(r.old??"")}</OldPath><RevisionType>${r.directory?"enDirectory":r.binary?"enBinaryFile":"enTextFile"}</RevisionType></Change>`).join("");
+const status=()=>`<?xml version="1.0" encoding="utf-8"?><StatusOutput><WorkspaceStatus><Status><RepSpec><Server>example-id@cloud</Server><Name>Example Repository</Name></RepSpec><Changeset>7</Changeset></Status></WorkspaceStatus><WkConfigType>Branch</WkConfigType><WkConfigName>/main</WkConfigName><Changes>${records()}</Changes></StatusOutput>`;
+const info=()=>`<?xml version="1.0" encoding="utf-8"?><FileInfos><FileInfo><ClientPath>${esc(lookup)}</ClientPath><ServerPath>/Tracked.txt</ServerPath><RevisionChangeset>3</RevisionChangeset><Status>${deletedRep?"deleted":"controlled"}</Status><Type>txt</Type><Hash>${hash}</Hash><RepSpec>${deletedRep?"":"Example Repository@example@cloud"}</RepSpec></FileInfo></FileInfos>`;
+const ls=()=>`<?xml version="1.0" encoding="utf-8"?><LsResults><LsItems><LsItem><ItemId>9</ItemId><Changeset>3</Changeset><RevId>17</RevId><ParentRevId>16</ParentRevId><Type>txt</Type><Size>5</Size><Hash>${badHash?"AAAAAAAAAAAAAAAAAAAAAA==":hash}</Hash><HashAlgorithm>MD5</HashAlgorithm><CurrentPath>${esc(deletedRep?"/Tracked.txt":lookup)}</CurrentPath><WkPath>${esc(lookup)}</WkPath><Repository>rep:Example Repository@example@cloud</Repository><Server>${badOwnership?"other@cloud":"example@cloud"}</Server></LsItem></LsItems></LsResults>`;
+const spawn=((_exe:string,args:string[])=>{
+ calls.push(args);const c=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill:()=>true});
+ queueMicrotask(async()=>{try{
+  let output="",exit=0;
+  if(args[0]==="status"){output=status();if(statusFailure)exit=1;}
+  else if(args[0]==="fileinfo") {assert.equal(args[1],lookup);output=info();}
+  else if(args[0]==="ls")output=ls();
+  else if(args[0]==="cat"){if(catFailure)exit=1;else await writeFile(args[2].slice(7),original,{flag:"wx"});}
+  else {assert.equal(args[0],"-u");const l=await readFile(args[1]),r=await readFile(args[2]);
+   if(!l.equals(r)){exit=1;const lines=(b:Buffer)=>b.length?b.toString("utf8").replace(/\n$/,"").split("\n"):[];const a=lines(l),b=lines(r);
+    output=`--- ${args[1]}\n+++ ${args[2]}\n@@ -${a.length?1:0},${a.length} +${b.length?1:0},${b.length} @@\n`+a.map(x=>`-${x}\n`).join("")+b.map(x=>`+${x}\n`).join("");}}
+  c.stdout.end(output);c.stderr.end();if(args[0]==="-u")abortComparison?.abort();c.emit("close",exit,null);
+ }catch(e){c.emit("error",e);c.stdout.end();c.stderr.end();c.emit("close",1,null);}});return c;
+}) as any;
+const tool=(await loadRegisteredTools()).get("plastic_diff")!;
+async function invoke(args:Record<string,unknown>,core=false){calls=[];const r:any=await runWithAbortSignal(abortComparison?.signal,()=>core?diff.execute({...args,workdir:root} as any):tool.execute("synthetic",{...args,workdir:root},undefined,undefined,{cwd:root}),{spawn});const p=core?r:r.structuredContent;assert(Check(diffOutputSchema,p));assert(validateDiffOutput(p));if(!core)assert.equal(r.isError,!p.ok);return p;}
+try{
+ await mkdir(join(root,".plastic"));await writeFile(join(root,".plastic","plastic.workspace"),"synthetic workspace marker");await writeFile(file,original);
+ for(const input of [{mode:"file",path:file},{mode:"file",path:file,revision:"revid:17"},{mode:"revisions",leftRevision:"revid:17",rightRevision:"revid:18"},{mode:"workspace",paths:[file]},{mode:"workspace",allPending:true}]){assert(Check(diffInputSchema,input));validateDiffRequest(input);}
+ for(const input of [{},{mode:"workspace"},{mode:"file",path:file,paths:[file]},{mode:"file",path:file,allPending:false},{mode:"revisions",leftRevision:"revid:17",rightRevision:"revid:18",path:file},{mode:"workspace",paths:[]},{mode:"workspace",paths:[file],includePrivate:false},{mode:"workspace",paths:[file],allPending:true},{mode:"workspace",allPending:false},{mode:"workspace",allPending:true,maxFiles:0},{mode:"workspace",allPending:true,maxChars:8001},{mode:"file",path:file,extra:true}]){assert(!Check(diffInputSchema,input));assert.throws(()=>validateDiffRequest(input));calls=[];await assert.rejects(()=>invoke(input,true));assert.equal(calls.length,0);}
+ let p=await invoke({mode:"file",path:file});assert(p.ok);assert.equal(p.data.status,"unchanged");assert.equal(p.data.left.identity.revisionId,"17");assert.equal(p.data.left.identity.server,"example@cloud");assert.equal(p.data.left.selector,"revid:17@rep:Example Repository@repserver:example@cloud");assert(!calls.some(c=>c[0]==="version"));
+ p=await invoke({mode:"file",path:file,revision:"revid:17"});assert(p.ok);assert.equal(p.data.left.identity,null);assert(!calls.some(c=>["status","fileinfo","ls"].includes(c[0])));
+ await writeFile(file,"local\n");rows=[{path:file,code:"CH"}];p=await invoke({mode:"file",path:file});assert(p.ok);assert.equal(p.data.pendingKind,"changed");assert.equal(p.data.status,"changed");assert.match(p.data.excerpt.text,/\+local/);
+ badHash=true;p=await invoke({mode:"file",path:file});assert.equal(p.error.code,"base_changed");assert(!calls.some(c=>c[0]==="cat"));badHash=false;
+ badOwnership=true;p=await invoke({mode:"file",path:file});assert.equal(p.error.code,"base_unavailable");badOwnership=false;
+ catFailure=true;p=await invoke({mode:"file",path:file});assert.equal(p.error.code,"command_failed");assert(!calls.some(c=>c[0]==="-u"));catFailure=false;
+ const moved=join(root,"Moved 日本-😀.txt");await writeFile(moved,original);await rm(file);lookup=moved;rows=[{path:moved,code:"MV",old:file}];p=await invoke({mode:"workspace",paths:[file]});assert(p.ok);assert.equal(p.data.outcomes[0].sourcePath,file);assert.equal(p.data.outcomes[0].comparison.status,"unchanged");
+ lookup=file;rows=[{path:moved,code:"LM",old:file}];p=await invoke({mode:"file",path:moved});assert(p.ok);assert(calls.some(c=>c[0]==="fileinfo"&&c[1]===file));assert.equal(p.data.right.path,moved);await rm(moved);
+ rows=[{path:file,code:"DE"}];deletedRep=true;p=await invoke({mode:"file",path:file});assert(p.ok);assert.equal(p.data.pendingKind,"deleted");assert.equal(p.data.right.origin,"synthetic-empty");assert(calls.some(c=>c[0]==="ls"&&c[1]==="/Tracked.txt"&&c.includes("--tree=cs:7@Example Repository@example-id@cloud")));deletedRep=false;
+ rows=[{path:file,code:"LD"}];p=await invoke({mode:"file",path:file});assert(p.ok);assert(calls.some(c=>c[0]==="ls"&&c[1]===file));
+ await writeFile(file,original);p=await invoke({mode:"file",path:file});assert.equal(p.error.code,"file_changed");
+ rows=[{path:file,code:"AD"}];await writeFile(file,Buffer.alloc(0));p=await invoke({mode:"file",path:file});assert(p.ok);assert.equal(p.data.status,"added-empty");assert(!calls.some(c=>["cat","fileinfo","ls"].includes(c[0])));
+ rows=[{path:file,code:"PR",binary:true}];await writeFile(file,Buffer.from([0,1]));p=await invoke({mode:"workspace",allPending:true});assert(p.ok);assert.equal(p.data.excludedPrivate,1);assert.equal(p.data.counts.selected,0);assert.equal(p.completeness.read,"complete");
+ p=await invoke({mode:"workspace",allPending:true,includePrivate:true});assert(p.ok);assert.equal(p.data.outcomes[0].comparison.status,"binary-different");assert(!calls.some(c=>c[0]==="cat"));
+ p=await invoke({mode:"workspace",paths:[file]});assert(p.ok);assert.equal(p.data.counts.completed,1,"explicit private selection is intentional");
+ const extra=join(root,"Other.txt");await writeFile(extra,"added\n");rows=[{path:file,code:"AD"},{path:extra,code:"AD"}];p=await invoke({mode:"workspace",allPending:true,maxFiles:1});assert(p.ok);assert.equal(p.data.counts.limited,1);assert.equal(p.completeness.read,"incomplete");
+ p=await invoke({mode:"workspace",paths:[file,join(root,"Missing.txt")]});assert(p.ok);assert.deepEqual(p.data.unmatched,[join(root,"Missing.txt")]);assert.equal(p.completeness.read,"incomplete");
+ p=await invoke({mode:"workspace",paths:[join(root,"..","Outside.txt")]});assert.equal(p.error.code,"outside_workspace");
+ rows=[{path:file,code:"AD"},{path:extra,code:"CH"}];lookup=extra;catFailure=true;p=await invoke({mode:"workspace",allPending:true,maxFiles:2});assert(!p.ok);assert.equal(p.error.code,"partial_comparison");assert.equal(p.data.counts.completed,1);assert.equal(p.data.counts.failed,1);catFailure=false;
+ await writeFile(file,"added\n");rows=[{path:file,code:"AD"},{path:extra,code:"AD"}];abortComparison=new AbortController();p=await invoke({mode:"workspace",allPending:true,maxFiles:2});assert(!p.ok);assert.equal(p.error.code,"aborted");assert.equal(p.data.counts.unattempted,1);assert.equal(p.data.outcomes[0].error.code,"aborted");abortComparison=undefined;
+ rows=[{path:file,code:"AD"},{path:extra,code:"CH"}];statusFailure=true;p=await invoke({mode:"workspace",allPending:true});assert.equal(p.error.code,"command_failed");statusFailure=false;
+ const directory=join(root,"Nested");await mkdir(directory);const descendant=join(directory,"New.txt");await writeFile(descendant,"added\n");rows=[{path:directory,code:"AD",directory:true},{path:descendant,code:"AD"}];p=await invoke({mode:"workspace",paths:[directory]});assert(p.ok);assert.equal(p.data.counts.completed,1);assert.equal(p.data.counts.skipped,1);assert.equal(p.completeness.read,"incomplete");
+ assert.equal(parseDiffPending(Buffer.from(status())).items.length,2);
+ assert.throws(()=>parseDiffPending(Buffer.from(status().replace("<Type>AD</Type>","<Type>UNSUPPORTED</Type>"))));
+ assert.throws(()=>parseLoadedFileInfo(Buffer.from(info()+info())));assert.throws(()=>parseLoadedLs(Buffer.from(ls().replace("<RevId>17</RevId>","<RevId>1.7</RevId>"))));
+ for(const parser of [parseLoadedFileInfo,parseLoadedLs,parseDiffPending])assert.throws(()=>parser(Buffer.from([255])));
+ console.log("PASS: unified closed requests, loaded identity/hash ownership, frozen deleted tree, controlled/local moves, empty/binary additions, bounded scoped workspace outcomes and partial failures");
+}finally{await rm(root,{recursive:true,force:true});}

@@ -14,11 +14,7 @@ export type PlasticSearchCatalogEntry = {
   guidance: readonly string[];
 };
 
-/**
- * Package-owned executable capability vocabulary. `plastic_diff` deliberately
- * remains outside this catalog: it is registered for compatibility, but is a
- * disabled alias rather than a safe executable diff capability.
- */
+/** Canonical executable capabilities; there are no compatibility diff tools. */
 export const PLASTIC_SEARCH_CATALOG: readonly PlasticSearchCatalogEntry[] = [
   { name: "plastic_status", aliases: ["status", "pending changes", "working changes", "what changed", "changed files", "list changes"], tags: ["workspace", "inspect", "changes"], guidance: ["Use machineReadable=true to list changed, added, moved, deleted, and private paths without invoking GUI-capable cm diff."] },
   { name: "plastic_update", aliases: ["update", "sync", "pull latest"], tags: ["workspace", "synchronize", "safe"], guidance: ["Review pending changes before updating a workspace."] },
@@ -27,9 +23,7 @@ export const PLASTIC_SEARCH_CATALOG: readonly PlasticSearchCatalogEntry[] = [
   { name: "plastic_undo", aliases: ["undo changes", "revert changes", "discard changes"], tags: ["changes", "mutation", "destructive"], guidance: ["Confirm the exact paths before discarding pending changes."] },
   { name: "plastic_resolveDeleteChangeConflict", aliases: ["resolve delete conflict", "deleted conflict"], tags: ["merge", "conflict", "resolution"], guidance: ["Inspect the conflict and choose whether files should remain on disk before resolving it."] },
   { name: "plastic_patch", aliases: ["patch", "generate patch", "review patch"], tags: ["diff", "patch", "export"], guidance: ["Inspect generated patches before sharing because they can include source, paths, or secrets."] },
-  { name: "plastic_diffFile", aliases: ["diff", "diff file", "file diff", "compare one file", "compare file"], tags: ["diff", "file", "workspace", "inspect"], guidance: ["Use only when change-boundary evidence is needed. Pass one exact workspace path, omit revision for its Plastic base, and keep maxChars small unless more output is intentional."] },
-  { name: "plastic_workspaceDiff", aliases: ["workspace diff", "pending review", "review pending changes", "review workspace changes", "diff pending files"], tags: ["diff", "workspace", "review", "inspect"], guidance: ["Use only for an intentional multi-file content review, not routine validation. Select exact paths or pass allPending=true explicitly; use plastic_status when only changed paths are needed."] },
-  { name: "plastic_diffRevisions", aliases: ["diff revisions", "compare revisions", "revision diff"], tags: ["diff", "revision", "inspect"], guidance: ["Use this only for two explicit file-qualified revision specifications."] },
+  { name: "plastic_diff", aliases: ["diff", "diff file", "compare file", "workspace diff", "pending review", "diff revisions", "compare revisions"], tags: ["diff", "file", "workspace", "revision", "inspect"], guidance: ["Require mode=file, revisions, or workspace. Use explicit paths or allPending=true for pending review; raw GUI cm diff remains blocked."] },
   { name: "plastic_branchCreate", aliases: ["create branch", "new branch"], tags: ["branch", "mutation", "workflow"], guidance: ["Create normal work branches beneath an intended parent, which may differ from the loaded branch. Use allowRootBranch only for intentional top-level branches."] },
   { name: "plastic_switchBranch", aliases: ["switch branch", "checkout branch", "change branch"], tags: ["branch", "workspace", "mutation"], guidance: ["Check pending changes and choose how to handle them before switching branches."] },
   { name: "plastic_merge", aliases: ["merge branch", "merge changes"], tags: ["merge", "conflict", "workflow"], guidance: ["Inspect merge state and resolve conflicts before checkin."] },
@@ -51,9 +45,8 @@ export const PLASTIC_SEARCH_CATALOG: readonly PlasticSearchCatalogEntry[] = [
   { name: "plastic_workspaceList", aliases: ["list workspaces", "find workspace", "workspaces"], tags: ["workspace", "inspect", "query"], guidance: ["Inspect workspace paths and repository identity before using a workspace in a mutation."] },
 ] as const;
 
-export const PLASTIC_COMPATIBILITY_TOOL_NAMES = ["plastic_diff"] as const;
 export const PLASTIC_SEARCHABLE_TOOL_NAMES = new Set(PLASTIC_SEARCH_CATALOG.map((entry) => entry.name));
-export const PLASTIC_TOOL_NAMES = new Set([...PLASTIC_SEARCHABLE_TOOL_NAMES, ...PLASTIC_COMPATIBILITY_TOOL_NAMES]);
+export const PLASTIC_TOOL_NAMES = new Set(PLASTIC_SEARCHABLE_TOOL_NAMES);
 
 export type ToolSourceInfo = {
   path: string;
@@ -168,6 +161,8 @@ function safetyPriority(entry: PlasticSearchCatalogEntry): number {
 /** Search the executable catalog with deterministic scoring and safe bare-domain ordering. */
 export function searchPlasticTools(input: PlasticToolSearchInput, descriptions: ReadonlyMap<string, string> = new Map()): PlasticToolSearchMatch[] {
   const requestedNames = exactRequestedNames(input.toolNames);
+  const exactQuery = typeof input.query === "string" ? input.query.trim().toLowerCase() : "";
+  if (requestedNames.size === 0 && /^plastic_[a-z0-9]+$/.test(exactQuery) && !PLASTIC_SEARCH_CATALOG.some(entry => entry.name.toLowerCase() === exactQuery)) return [];
   const terms = typeof input.query === "string" ? tokenize(input.query) : [];
   const limit = normalizeLimit(input.limit, requestedNames);
   const domainTerms = terms.filter((term) => SEARCH_DOMAIN_TERMS.has(term));
@@ -231,5 +226,5 @@ export function getRestoredPlasticToolNames(branchEntries: readonly unknown[], e
       if (typeof name === "string" && effectiveToolNames.has(name)) restored.add(name);
     }
   }
-  return [...PLASTIC_COMPATIBILITY_TOOL_NAMES, ...PLASTIC_SEARCH_CATALOG.map((entry) => entry.name)].filter((name) => restored.has(name));
+  return PLASTIC_SEARCH_CATALOG.map((entry) => entry.name).filter((name) => restored.has(name));
 }

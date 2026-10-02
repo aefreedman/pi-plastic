@@ -67,12 +67,8 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
   },
   diff: {
     prepareArguments(args) {
-      const input = normalizeArgs(args);
+      const input=normalizeOutputFormatAlias(normalizeArgs(args));
       normalizeWorkdirAliases(input);
-      assignAlias(input, "repositoryPaths", ["repository_paths"]);
-      assignAlias(input, "dateFormat", ["date_format"]);
-      assignAlias(input, "comparisonMethod", ["comparison_method"]);
-      assignAlias(input, "fullPaths", ["full_paths"]);
       return input;
     },
   },
@@ -82,37 +78,6 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       normalizeWorkdirAliases(input);
       assignAlias(input, "output", ["output_file", "outputFile"]);
       assignAlias(input, "toolPath", ["tool_path", "tool"]);
-      return input;
-    },
-  },
-  diffRevisions: {
-    prepareArguments(args) {
-      const input = normalizeArgs(args);
-      normalizeWorkdirAliases(input);
-      assignAlias(input, "leftRevision", ["left_revision"]);
-      assignAlias(input, "rightRevision", ["right_revision"]);
-      assignAlias(input, "maxChars", ["max_chars"]);
-      return input;
-    },
-  },
-  diffFile: {
-    prepareArguments(args) {
-      const input = normalizeArgs(args);
-      normalizeWorkdirAliases(input);
-      assignAlias(input, "maxChars", ["max_chars"]);
-      return input;
-    },
-  },
-  workspaceDiff: {
-    prepareArguments(args) {
-      const input = normalizeOutputFormatAlias(normalizeArgs(args));
-      normalizeWorkdirAliases(input);
-      promoteSinglePath(input);
-      assignAlias(input, "paths", ["items", "files"]);
-      assignAlias(input, "allPending", ["all_pending"]);
-      assignAlias(input, "includePrivate", ["include_private"]);
-      assignAlias(input, "maxFiles", ["max_files"]);
-      assignAlias(input, "maxChars", ["max_chars"]);
       return input;
     },
   },

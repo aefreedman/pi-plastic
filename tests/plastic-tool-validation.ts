@@ -64,8 +64,8 @@ const main = (): void => {
     "buildPatchCommandArgs"
 ]);
   failures += checkRequired(readText(new URL("../src/operations/diff.ts", import.meta.url)), "pi-plastic/src/operations/diff.ts", [
-    "export const diffRevisions = tool({",
-    "plastic_diff is disabled"
+    "export const diff = tool({",
+    "assembleConsolidatedDiff"
 ]);
   failures += checkRequired(readText(new URL("../src/operations/checkin.ts", import.meta.url)), "pi-plastic/src/operations/checkin.ts", [
     "parseMachineReadablePendingItems",
@@ -114,7 +114,7 @@ const main = (): void => {
   const skillText = readText(skillPath);
   failures += checkRequired(skillText, "pi-plastic/skills/using-plastic/SKILL.md", [
     "Never run `cm diff` in Pi.",
-    "plastic_diffRevisions",
+    "plastic_diff",
     "plastic_patch",
     "plastic_merge",
     "plastic_mergeToBranch",
