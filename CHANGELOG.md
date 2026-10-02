@@ -7,6 +7,10 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Fixed
+
+- Consolidated diff now fails closed on permission/I/O errors during deleted-file absence checks and nearest-workspace discovery. Only genuine missing paths allow synthetic deletion sides or continued discovery; observed unsupported/symlink workspace markers cannot select an enclosing workspace. Deterministic fault-injection regressions cover native failures, zero-dispatch discovery and retained partial workspace outcomes.
+
 ### Added
 
 - Consolidated non-GUI `plastic_diff` with required file/revisions/workspace modes, closed input/output, qualified hash-verified loaded bases, bounded stable local snapshots and truthful partial workspace outcomes. Removed specialized diff registrations/core tools without aliases or stale-name redirects; raw GUI diff remains blocked. Text/JSON now present the unified observation without CLI-version decoration.

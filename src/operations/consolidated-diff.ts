@@ -39,9 +39,28 @@ export function validateDiffRequest(input:unknown):asserts input is DiffRequest 
 }
 const key=(p:string)=>{const normalized=resolve(p);return process.platform==="win32"?normalized.toLowerCase():normalized;};
 const contains=(root:string,p:string)=>{const r=relative(root,p);return r!==".."&&!r.startsWith(".."+sep)&&!isAbsolute(r);};
+async function inspectPath(path:string,code:string,stage:string) {
+    try { return await fs.lstat(path); }
+    catch (error) {
+        const errno=(error as NodeJS.ErrnoException)?.code;
+        if(errno==="ENOENT"||errno==="ENOTDIR")return null;
+        return fail(code,stage);
+    }
+}
 async function workspaceRoot(cwd:string):Promise<string>{
-    let p=await fs.realpath(cwd);
-    for(let i=0;i<128;i++){const marker=await fs.lstat(join(p,".plastic")).catch(()=>null),config=await fs.lstat(join(p,".plastic","plastic.workspace")).catch(()=>null);if(marker?.isDirectory()&&!marker.isSymbolicLink()&&config?.isFile()&&!config.isSymbolicLink())return p;const parent=dirname(p);if(parent===p)break;p=parent;}
+    let p=await fs.realpath(cwd).catch(()=>fail("workspace_unavailable","selection"));
+    for(let i=0;i<128;i++){
+        const marker=await inspectPath(join(p,".plastic"),"workspace_unavailable","selection");
+        if(marker){
+            if(!marker.isDirectory()||marker.isSymbolicLink())return fail("workspace_unavailable","selection");
+            const config=await inspectPath(join(p,".plastic","plastic.workspace"),"workspace_unavailable","selection");
+            if(config){
+                if(!config.isFile()||config.isSymbolicLink())return fail("workspace_unavailable","selection");
+                return p;
+            }
+        }
+        const parent=dirname(p);if(parent===p)break;p=parent;
+    }
     return fail("workspace_unavailable","selection");
 }
 async function xmlCommand(args:string[],cwd:string,stage:string):Promise<Buffer>{
@@ -83,7 +102,7 @@ async function fileComparison(args:DiffRequest&{mode:"file"},cwd:string,root:str
         const l=selector?await materializeDiffRevision(selector,join(temp,"base"),"left",cwd):Buffer.alloc(0);
         if(expected&&createHash(expected.algorithm).update(l).digest("base64")!==expected.hash)return fail("base_changed","base");
         const deleted=!args.revision&&item?.kind==="deleted";
-        if(deleted&&await fs.lstat(path).catch(()=>null))return fail("file_changed","right");
+        if(deleted&&await inspectPath(path,"read_failed","right"))return fail("file_changed","right");
         const r=deleted?Buffer.alloc(0):(await snapshotLocalFile(path,root,getActiveAbortSignal())).bytes;
         const left=side(selector?"historical":"synthetic-empty",l,null,selector,identity),right=side(deleted?"synthetic-empty":"local-snapshot",r,path,null);
         const raw=await compareDiffBytes(l,r,selector??args.path+" (empty before add)",args.path+(deleted?" (empty after delete)":" (local snapshot)"));
@@ -102,7 +121,7 @@ export async function assembleConsolidatedDiff(input:unknown){
         const right:DiffSide={origin:"historical",selector:args.rightRevision,path:null,identity:null,bytes:obs.right.bytes,binary:obs.right.binary};
         return {...header,mode:"revisions" as const,ok:true,completeness:d.completeness,data:comparison(obs,left,right,"revision-to-revision",null)};
     }
-    const cwd=await fs.realpath(args.workdir??process.cwd()),root=await workspaceRoot(cwd);
+    const cwd=await fs.realpath(args.workdir??process.cwd()).catch(()=>fail("workspace_unavailable","selection")),root=await workspaceRoot(cwd);
     if(args.mode==="file") {
         const snapshot=args.revision!==undefined?null:await pending(cwd),item=snapshot?.items.find(i=>key(i.path)===key(resolve(cwd,args.path)))??null;
         const data=await fileComparison(args,cwd,root,snapshot,item);

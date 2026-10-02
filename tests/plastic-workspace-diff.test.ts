@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import { promises as fs } from "node:fs";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, basename } from "node:path";
@@ -40,7 +41,12 @@ const spawn=((_exe:string,args:string[])=>{
  }catch(e){c.emit("error",e);c.stdout.end();c.stderr.end();c.emit("close",1,null);}});return c;
 }) as any;
 const tool=(await loadRegisteredTools()).get("plastic_diff")!;
-async function invoke(args:Record<string,unknown>,core=false){calls=[];const r:any=await runWithAbortSignal(abortComparison?.signal,()=>core?diff.execute({...args,workdir:root} as any):tool.execute("synthetic",{...args,workdir:root},undefined,undefined,{cwd:root}),{spawn});const p=core?r:r.structuredContent;assert(Check(diffOutputSchema,p));assert(validateDiffOutput(p));if(!core)assert.equal(r.isError,!p.ok);return p;}
+async function withLstatFault<T>(path:string,code:string,run:()=>Promise<T>):Promise<T>{
+ const originalLstat=fs.lstat;
+ fs.lstat=((candidate:any,...args:any[])=>String(candidate)===path?Promise.reject(Object.assign(new Error("private filesystem diagnostic"),{code})):Reflect.apply(originalLstat,fs,[candidate,...args])) as typeof fs.lstat;
+ try{return await run();}finally{fs.lstat=originalLstat;}
+}
+async function invoke(args:Record<string,unknown>,core=false){calls=[];const r:any=await runWithAbortSignal(abortComparison?.signal,()=>core?diff.execute({workdir:root,...args} as any):tool.execute("synthetic",{workdir:root,...args},undefined,undefined,{cwd:root}),{spawn});const p=core?r:r.structuredContent;assert(Check(diffOutputSchema,p));assert(validateDiffOutput(p));if(!core)assert.equal(r.isError,!p.ok);return p;}
 try{
  await mkdir(join(root,".plastic"));await writeFile(join(root,".plastic","plastic.workspace"),"synthetic workspace marker");await writeFile(file,original);
  for(const input of [{mode:"file",path:file},{mode:"file",path:file,revision:"revid:17"},{mode:"revisions",leftRevision:"revid:17",rightRevision:"revid:18"},{mode:"workspace",paths:[file]},{mode:"workspace",allPending:true}]){assert(Check(diffInputSchema,input));validateDiffRequest(input);}
@@ -55,6 +61,12 @@ try{
  lookup=file;rows=[{path:moved,code:"LM",old:file}];p=await invoke({mode:"file",path:moved});assert(p.ok);assert(calls.some(c=>c[0]==="fileinfo"&&c[1]===file));assert.equal(p.data.right.path,moved);await rm(moved);
  rows=[{path:file,code:"DE"}];deletedRep=true;p=await invoke({mode:"file",path:file});assert(p.ok);assert.equal(p.data.pendingKind,"deleted");assert.equal(p.data.right.origin,"synthetic-empty");assert(calls.some(c=>c[0]==="ls"&&c[1]==="/Tracked.txt"&&c.includes("--tree=cs:7@Example Repository@example-id@cloud")));deletedRep=false;
  rows=[{path:file,code:"LD"}];p=await invoke({mode:"file",path:file});assert(p.ok);assert(calls.some(c=>c[0]==="ls"&&c[1]===file));
+ for(const code of ["EACCES","EPERM","EIO"]){
+  p=await withLstatFault(file,code,()=>invoke({mode:"file",path:file}));assert(!p.ok);assert.equal(p.error.code,"read_failed");assert.equal(p.error.stage,"right");assert(!calls.some(c=>c[0]==="-u"));assert.doesNotMatch(JSON.stringify(p),/private filesystem diagnostic/);
+  const retained=join(root,"Retained.txt");await writeFile(retained,"added\n");rows=[{path:retained,code:"AD"},{path:file,code:"LD"}];
+  p=await withLstatFault(file,code,()=>invoke({mode:"workspace",paths:[retained,file]}));assert(!p.ok);assert.equal(p.error.code,"partial_comparison");assert.equal(p.data.counts.completed,1);assert.equal(p.data.counts.failed,1);assert.equal(p.data.outcomes[1].error.code,"read_failed");assert.equal(calls.filter(c=>c[0]==="-u").length,1);rows=[{path:file,code:"LD"}];
+ }
+ for(const code of ["ENOENT","ENOTDIR"]){p=await withLstatFault(file,code,()=>invoke({mode:"file",path:file}));assert(p.ok);assert.equal(p.data.right.origin,"synthetic-empty");}
  await writeFile(file,original);p=await invoke({mode:"file",path:file});assert.equal(p.error.code,"file_changed");
  rows=[{path:file,code:"AD"}];await writeFile(file,Buffer.alloc(0));p=await invoke({mode:"file",path:file});assert(p.ok);assert.equal(p.data.status,"added-empty");assert(!calls.some(c=>["cat","fileinfo","ls"].includes(c[0])));
  rows=[{path:file,code:"PR",binary:true}];await writeFile(file,Buffer.from([0,1]));p=await invoke({mode:"workspace",allPending:true});assert(p.ok);assert.equal(p.data.excludedPrivate,1);assert.equal(p.data.counts.selected,0);assert.equal(p.completeness.read,"complete");
@@ -66,10 +78,23 @@ try{
  rows=[{path:file,code:"AD"},{path:extra,code:"CH"}];lookup=extra;catFailure=true;p=await invoke({mode:"workspace",allPending:true,maxFiles:2});assert(!p.ok);assert.equal(p.error.code,"partial_comparison");assert.equal(p.data.counts.completed,1);assert.equal(p.data.counts.failed,1);catFailure=false;
  await writeFile(file,"added\n");rows=[{path:file,code:"AD"},{path:extra,code:"AD"}];abortComparison=new AbortController();p=await invoke({mode:"workspace",allPending:true,maxFiles:2});assert(!p.ok);assert.equal(p.error.code,"aborted");assert.equal(p.data.counts.unattempted,1);assert.equal(p.data.outcomes[0].error.code,"aborted");abortComparison=undefined;
  rows=[{path:file,code:"AD"},{path:extra,code:"CH"}];statusFailure=true;p=await invoke({mode:"workspace",allPending:true});assert.equal(p.error.code,"command_failed");statusFailure=false;
+ const inner=join(root,"Inner");await mkdir(join(inner,".plastic"),{recursive:true});const innerConfig=join(inner,".plastic","plastic.workspace");await writeFile(innerConfig,"synthetic inner marker");const innerFile=join(inner,"Added.txt");await writeFile(innerFile,"added\n");rows=[{path:innerFile,code:"AD"}];
+ for(const target of [join(inner,".plastic"),innerConfig])for(const code of ["EACCES","EPERM","EIO"]){
+  for(const args of [{mode:"workspace",paths:["."]},{mode:"file",path:innerFile},{mode:"file",path:file,revision:"revid:17"}]){
+   p=await withLstatFault(target,code,()=>invoke({...args,workdir:inner}));assert(!p.ok);assert.equal(p.error.code,"workspace_unavailable");assert.equal(p.error.stage,"selection");assert.equal(calls.length,0);assert.doesNotMatch(JSON.stringify(p),/private filesystem diagnostic/);
+  }
+ }
+ p=await invoke({mode:"workspace",workdir:inner,paths:["."]});assert(!p.ok);assert.equal(p.error.code,"invalid_request","readable nearest root cannot be selected as disguised whole workspace");
+ const nativeLstat=fs.lstat;
+ for(const target of [join(inner,".plastic"),innerConfig]){
+  fs.lstat=(async(candidate:any,...args:any[])=>{const stat=await Reflect.apply(nativeLstat,fs,[candidate,...args]);if(String(candidate)===target)stat.isSymbolicLink=()=>true;return stat;}) as typeof fs.lstat;
+  try{p=await invoke({mode:"file",workdir:inner,path:innerFile});assert(!p.ok);assert.equal(p.error.code,"workspace_unavailable");assert.equal(calls.length,0);}finally{fs.lstat=nativeLstat;}
+ }
+ await rm(innerConfig);await mkdir(innerConfig);p=await invoke({mode:"file",workdir:inner,path:innerFile});assert(!p.ok);assert.equal(p.error.code,"workspace_unavailable");assert.equal(calls.length,0);await rm(innerConfig,{recursive:true});await rm(join(inner,".plastic"),{recursive:true});await writeFile(join(inner,".plastic"),"unsupported marker");p=await invoke({mode:"file",workdir:inner,path:innerFile});assert(!p.ok);assert.equal(p.error.code,"workspace_unavailable");assert.equal(calls.length,0);
  const directory=join(root,"Nested");await mkdir(directory);const descendant=join(directory,"New.txt");await writeFile(descendant,"added\n");rows=[{path:directory,code:"AD",directory:true},{path:descendant,code:"AD"}];p=await invoke({mode:"workspace",paths:[directory]});assert(p.ok);assert.equal(p.data.counts.completed,1);assert.equal(p.data.counts.skipped,1);assert.equal(p.completeness.read,"incomplete");
  assert.equal(parseDiffPending(Buffer.from(status())).items.length,2);
  assert.throws(()=>parseDiffPending(Buffer.from(status().replace("<Type>AD</Type>","<Type>UNSUPPORTED</Type>"))));
  assert.throws(()=>parseLoadedFileInfo(Buffer.from(info()+info())));assert.throws(()=>parseLoadedLs(Buffer.from(ls().replace("<RevId>17</RevId>","<RevId>1.7</RevId>"))));
  for(const parser of [parseLoadedFileInfo,parseLoadedLs,parseDiffPending])assert.throws(()=>parser(Buffer.from([255])));
- console.log("PASS: unified closed requests, loaded identity/hash ownership, frozen deleted tree, controlled/local moves, empty/binary additions, bounded scoped workspace outcomes and partial failures");
+ console.log("PASS: unified requests, loaded identities, moves/deletions/additions, scoped partial outcomes and fail-closed filesystem faults (deletion presence, nearest workspace, unsupported/symlink markers)");
 }finally{await rm(root,{recursive:true,force:true});}
