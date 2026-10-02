@@ -9,6 +9,9 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Code-review-find closed native/ids/error output with a single bounded UTF-8 numeric-ID source, exact decimal strings, query/projection counts and duplicate diagnostics. Preserves all filters, ordering, CLI limits/templates/aliases and native text/fenced JSON with existing version caching; no review mutation or metadata recovery.
+- Code-review schema/core/transport/ordering/precision regressions, file-loaded Pi host consumer checks and read-only live empty-query/native JSON acceptance. Populated live review IDs remain unverified; no reviews were created for fixtures.
+
 - Shelveset-list closed native/ids/error structured output with one explicit UTF-8 numeric-ID observation, exact decimal-string IDs and workspace-scoped unqualified selectors, bounded projection/counts/duplicate diagnostics, preserved native custom templates and independent text/JSON presentation. No metadata query or mutation.
 - Shelveset-list schema/core/transport regressions and real file-loaded Pi host consumers; read-only live empty-query acceptance. Populated live identities remain unverified because the sandbox has no shelvesets; no fixtures were created.
 

@@ -118,6 +118,25 @@ text(dto.ok && dto.data.mode === "ids" ? dto.data.rows.map(r => r.shelveset) : d
 
 The installed Windows cm 11.0.16.10371 help documents `shelveid`, workspace-repository default scope, templates and UTF-8 encoding. Read-only registered live checks verified clean empty queries, one query per call and unchanged selector/status; the test sandbox currently contains no shelvesets. **Populated live source/original equality has not been verified.** Positive rows, precision, grammar, projection, schema and transport are covered by deterministic tests and actual file-loaded Pi 1.0.0 host consumers without provider/network charges. No shelvesets were created/applied/deleted for validation.
 
+## Code-review-find structured output
+
+`plastic_codeReviewFind` is the seventh schema-bearing tool, with closed versioned `action:"code-review-find"` native/ids/error output. Additive `source:"native"|"ids"` defaults to native, and `maxItems` defaults to 100/max 500. Existing status/assignee/owner/target/target-type/title predicates and escaping, ordering (date/modifieddate/status, ascending/descending), CLI limit, aliases, native templates and `output:"text"|"json"` remain intact. Descending without an order field retains its ignored legacy meaning.
+
+IDs uses one `find review … --nototal --format={id} --encoding=utf-8` response. Rows contain only the observed canonical nonnegative decimal `id` **string**, bounded to 20 digits without JS numeric precision loss. The CLI documents these as numeric review identifiers; use only in the same workspace-repository context. No invented prefix, repository/server qualification, GUID, target identity, title, status, owner or assignee is recovered (`scope="workspace_repository"`, `qualifierVerified:false`). Query fields describe requested filters/order, not returned review metadata or proof of sort correctness. Numeric output implies no general Unicode metadata rendering guarantee.
+
+Meaningful custom `format`/`dateFormat` conflicts with IDs before dispatch; empty strings preserve ignored legacy behavior. Native/default/custom text and fenced legacy JSON (`toolVersion`, cached `cliVersion`, command/rawOutput/presentation-only resultCount) stay unchanged. Its existing first-version lookup/cache is retained only for native JSON, not canonical IDs. Native producer DTO rows/counts are null and read/capture unknown; the legacy JSON's line count is not canonical identity/count evidence. Canonical JSON instead presents the same normalized DTO supplied to direct/codemode/nested consumers.
+
+All captured rows are validated before projection, including omitted ones. Exact repeats remain in order with full-response duplicate diagnostics. Counts describe observed query records, not unique reviews or repository totals/exhaustion; CLI limit and projection are independent. Clean empty queries yield []/0; failed/malformed/oversized sources return native `isError:true` plus `ok:false`, never partial reusable IDs or a false clean-empty response. No hidden fallback, metadata recovery or review mutation is performed.
+
+Bounds: query strings/native templates 4096 UTF-16 code units, IDs stdout 1 MiB/stderr 64 KiB/timeout 30 seconds/records 20000, rows 500, compact UTF-8 envelope 131072 bytes, sanitized errors <=256 characters. Strict decimal grammar accepts LF/CRLF and one terminal newline without trimming, rejecting foreign/blank/leading-zero/negative/fractional/overlong/non-ASCII records. Native raw presentation keeps legacy bounds; synchronous bounded parsing has boundary abort checks rather than a hard JavaScript execution deadline. RPC and foreign post-hook enforcement are unclaimed.
+
+```js
+const dto = await tools.plastic_codeReviewFind({source:"ids", assignee:"me", orderBy:"date", descending:true, maxItems:20});
+text(dto.ok && dto.data.mode === "ids" ? dto.data.rows.map(r => r.id) : dto.ok ? {rowsUnavailable:true} : dto.error);
+```
+
+Windows cm 11.0.16.10371 help documents review ID, filters/sort fields, workspace-repository default scope, templates and encoding. Six registered read-only live probes (four IDs/two native JSON) verified genuine empty queries, one list command each, retained native version lookup/cache and unchanged selector/status. **Populated live review IDs/original equality remain unverified:** the sandbox has no reviews; positive identities, bounds and transport/consumer cases are deterministic fixtures. Actual file-loaded Pi 1.0.0 host checks use no provider/network charges. No reviews were created/updated/deleted for testing.
+
 ## Plastic branch footer status
 
 When Pi starts inside a Plastic workspace, this package adds a themed `Plastic <branch>` status to Pi's built-in footer. It discovers the nearest enclosing `.plastic/plastic.workspace` and reads either the selector's `smartbranch` or `br` form as the credential-free branch source. A bounded `cm status` call is used only when the selector has no valid branch. Selector changes and successful same-workspace `plastic_*` tools refresh the status; sibling workspaces are ignored.

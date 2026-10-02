@@ -1379,6 +1379,25 @@
           "type": "string",
           "description": "Filter by title pattern (supports % wildcard)."
         },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "native"
+            },
+            {
+              "type": "string",
+              "const": "ids"
+            }
+          ],
+          "description": "Native output (default) or one canonical review-ID query."
+        },
+        "maxItems": {
+          "type": "integer",
+          "description": "Projected record cap (default 100); separate from CLI limit.",
+          "minimum": 1,
+          "maximum": 500
+        },
         "limit": {
           "type": "integer",
           "description": "Maximum number of reviews to return.",

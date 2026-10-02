@@ -41,7 +41,7 @@ for (const owner of owners) {
   for (const dependency of dependencies) {
     if (!dependency.startsWith(".")) {
       if (layer && allowedLayers[layer]) {
-        const hostImports = layer === "pi" ? ["typebox", "@earendil-works/pi-coding-agent", ...(["src/pi/status-output.ts", "src/pi/branch-output.ts", "src/pi/branch-list-output.ts", "src/pi/workspace-list-output.ts", "src/pi/shelveset-list-output.ts"].includes(owner) ? ["typebox/value"] : [])] : [];
+        const hostImports = layer === "pi" ? ["typebox", "@earendil-works/pi-coding-agent", ...(["src/pi/status-output.ts", "src/pi/branch-output.ts", "src/pi/branch-list-output.ts", "src/pi/workspace-list-output.ts", "src/pi/shelveset-list-output.ts", "src/pi/code-review-find-output.ts"].includes(owner) ? ["typebox/value"] : [])] : [];
         assert(dependency.startsWith("node:") || ["path", "os", ...(owner === "src/domain/status-xml.ts" ? ["@xmldom/xmldom"] : []), ...hostImports].includes(dependency), `${owner} must not import unapproved host packages`);
       }
       continue;
