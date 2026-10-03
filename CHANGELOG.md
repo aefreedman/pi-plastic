@@ -9,6 +9,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Fixed
 
+- Added a direct-core and registered-tool aggregate diff regression: individually complete Unicode excerpts exceed the UTF-8 envelope limit, so whole trailing outcomes are omitted without changing completed counts, retained identities or native success semantics.
 - Consolidated diff now fails closed on permission/I/O errors during deleted-file absence checks and nearest-workspace discovery. Only genuine missing paths allow synthetic deletion sides or continued discovery; observed unsupported/symlink workspace markers cannot select an enclosing workspace. Deterministic fault-injection regressions cover native failures, zero-dispatch discovery and retained partial workspace outcomes.
 
 ### Added

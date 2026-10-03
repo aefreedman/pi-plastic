@@ -93,6 +93,25 @@ try{
  await rm(innerConfig);await mkdir(innerConfig);p=await invoke({mode:"file",workdir:inner,path:innerFile});assert(!p.ok);assert.equal(p.error.code,"workspace_unavailable");assert.equal(calls.length,0);await rm(innerConfig,{recursive:true});await rm(join(inner,".plastic"),{recursive:true});await writeFile(join(inner,".plastic"),"unsupported marker");p=await invoke({mode:"file",workdir:inner,path:innerFile});assert(!p.ok);assert.equal(p.error.code,"workspace_unavailable");assert.equal(calls.length,0);
  const directory=join(root,"Nested");await mkdir(directory);const descendant=join(directory,"New.txt");await writeFile(descendant,"added\n");rows=[{path:directory,code:"AD",directory:true},{path:descendant,code:"AD"}];p=await invoke({mode:"workspace",paths:[directory]});assert(p.ok);assert.equal(p.data.counts.completed,1);assert.equal(p.data.counts.skipped,1);assert.equal(p.completeness.read,"incomplete");
  assert.equal(parseDiffPending(Buffer.from(status())).items.length,2);
+ // Individually complete Unicode excerpts exceed the aggregate UTF-8 byte cap.
+ // This must remove whole trailing outcomes, not clip identities or change read counts.
+ const overflowFiles=Array.from({length:20},(_,i)=>i===0?file:join(root,`Overflow-${i}.txt`));
+ const bodies=overflowFiles.map((_,i)=>`entry-${i}:`+"日本😀".repeat(900)+"\n");
+ for(let i=0;i<overflowFiles.length;i++)await writeFile(overflowFiles[i],bodies[i]);
+ lookup=file;rows=overflowFiles.map((path,i)=>({path,code:i===0?"CH":"AD"}));
+ for(const core of [true,false]){
+  p=await invoke({mode:"workspace",allPending:true,maxFiles:20,maxChars:8000,format:"json"},core);assert(p.ok);
+  const counts=p.data.counts;assert.equal(counts.parsed,20);assert.equal(counts.eligible,20);assert.equal(counts.selected,20);assert.equal(counts.attempted,20);assert.equal(counts.completed,20);
+  for(const name of ["failed","skipped","unattempted","limited"])assert.equal(counts[name],0);
+  assert(counts.omitted>0&&counts.returned>0);assert.equal(counts.returned,p.data.outcomes.length);assert.equal(counts.returned+counts.omitted,20);
+  assert.equal(p.completeness.read,"complete");assert.equal(p.completeness.capture,"complete");assert.equal(p.completeness.projection,false);
+  assert(Buffer.byteLength(JSON.stringify(p),"utf8")<=131072);
+  assert.deepEqual(p.data.outcomes.map((o:any)=>o.path),overflowFiles.slice(0,counts.returned));
+  for(let i=0;i<counts.returned;i++){const o=p.data.outcomes[i];assert.equal(o.status,"compared");assert.equal(o.comparison.right.path,overflowFiles[i]);assert.equal(o.comparison.right.bytes,Buffer.byteLength(bodies[i],"utf8"));assert.equal(o.comparison.excerpt.truncated,false);assert(o.comparison.excerpt.text.includes("+"+bodies[i].trimEnd()));}
+  assert.deepEqual(p.data.outcomes[0].comparison.left.identity,{revisionId:"17",changeset:"3",repository:"Example Repository",server:"example@cloud"});assert.equal(p.data.outcomes[0].comparison.left.selector,"revid:17@rep:Example Repository@repserver:example@cloud");
+  assert.equal(calls.filter(c=>c[0]==="-u").length,20,"projection omits completed observations, not comparisons");
+ }
+ rows=[{path:directory,code:"AD",directory:true},{path:descendant,code:"AD"}];
  assert.throws(()=>parseDiffPending(Buffer.from(status().replace("<Type>AD</Type>","<Type>UNSUPPORTED</Type>"))));
  assert.throws(()=>parseLoadedFileInfo(Buffer.from(info()+info())));assert.throws(()=>parseLoadedLs(Buffer.from(ls().replace("<RevId>17</RevId>","<RevId>1.7</RevId>"))));
  for(const parser of [parseLoadedFileInfo,parseLoadedLs,parseDiffPending])assert.throws(()=>parser(Buffer.from([255])));
