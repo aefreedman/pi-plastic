@@ -147,8 +147,9 @@ try {
   const actual = await serverMerge.execute("preview", { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", message: "Review", preflight: true, format: "json" }, undefined, undefined, { cwd: "C:/Projects/MyGame" } as ExtensionContext);
   const actualText = actual.content.find(entry => entry.type === "text");
   assert(actualText?.type === "text");
-  assert(actualText.text.includes('"outcome": "preflight"'));
-  assert.equal(actual.details.rawResult, actualText.text);
+  assert.equal(JSON.parse(actualText.text).outcome,"preflight");
+  assert.equal(actual.structuredContent?.outcome,"preflight");
+  assert.equal(actual.details.rawResult,undefined);
   assert(!("workdir" in actual.details), "Server merge remains workspace-free.");
   assert.match(render("mergeBranches", actual), /Preview: would run/);
   const rendererContext = { args: { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", preflight: true }, toolCallId: "preview", cwd: "C:/Projects/MyGame", state: {}, lastComponent: undefined, invalidate() {}, executionStarted: true, argsComplete: true, isPartial: false, expanded: true, showImages: false, isError: false };

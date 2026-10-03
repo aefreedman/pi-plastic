@@ -1,4 +1,5 @@
 import { normalizeFindOutputLines } from "../execution/cm";
+import { splitServerBranch, type ServerChangeset } from "./server-merge-contract";
 
 export type MergeStatusSummary = {
     hasPendingMergeLinks: boolean;
@@ -205,7 +206,7 @@ export type ServerMergeParse = {
     records: ServerMergeRecord[];
     malformed: boolean;
     unknownOperations: string[];
-    changesets: Array<{ id: string; branch: string; repository: string; mount: string }>;
+    changesets: ServerChangeset[];
     isAlreadyConnected: boolean;
     hasConflict: boolean;
 };
@@ -222,14 +223,14 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
         const start = output.indexOf(separators.start, cursor);
         if (start < 0)
         {
-            if (output.slice(cursor).includes(separators.end) || output.slice(cursor).includes(separators.field))
+            if (output.slice(cursor).trim() !== "")
             {
                 malformed = true;
             }
             break;
         }
         const prefix = output.slice(cursor, start);
-        if (prefix.includes(separators.end) || prefix.includes(separators.field))
+        if (prefix.trim() !== "")
         {
             malformed = true;
         }
@@ -248,6 +249,7 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
         else
         {
             const fields = payload.split(separators.field);
+            if (records.length >= 500) { malformed = true; break; }
             const operation = fields[0] ?? "";
             if (!operation || fields.some((field) => field.length === 0))
             {
@@ -266,7 +268,9 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
         cursor = end + separators.end.length;
     }
 
-    const changesets: Array<{ id: string; branch: string; repository: string; mount: string }> = [];
+    const changesets: ServerChangeset[] = [];
+    const decimal = (s: string) => /^(0|[1-9][0-9]{0,19})$/.test(s);
+    const safe = (s: string) => s.length <= 4096 && !/[\u0000-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(s);
     let isAlreadyConnected = false;
     let hasConflict = false;
     for (const record of records)
@@ -274,7 +278,7 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
         switch (record.operation)
         {
             case "FILE_SRC":
-                if (record.fields.length !== 5 || !record.fields[1]?.startsWith("/") || !record.fields.slice(2).every((field) => /^\d+$/.test(field)))
+                if (record.fields.length !== 5 || !record.fields[1]?.startsWith("/") || !record.fields.slice(2).every(decimal) || !safe(record.fields[1]!))
                 {
                     malformed = true;
                 }
@@ -286,17 +290,17 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
                     malformed = true;
                     break;
                 }
-                const match = record.fields[1]?.match(/^cs:(\d+)@(?<branch>\/[^@]+)@(?<repository>[^@]+) \(mount:'(?<mount>[^']+)'\)$/);
-                if (!match?.groups)
+                const match = record.fields[1]?.match(/^cs:([^@]+)@(.+) \(mount:'([^']+)'\)$/);
+                const identity = match ? splitServerBranch("br:" + match[2]) : null;
+                if (!match || !identity || !decimal(match[1]!) || !safe(record.fields[1]!) || !safe(match[3]!))
                 {
                     malformed = true;
                     break;
                 }
                 changesets.push({
                     id: match[1]!,
-                    branch: match.groups.branch!,
-                    repository: match.groups.repository!,
-                    mount: match.groups.mount!,
+                    ...identity,
+                    mount: match[3]!,
                 });
                 break;
             }
@@ -308,7 +312,7 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
                 isAlreadyConnected = true;
                 break;
             case "FILE_CONFLICT":
-                if (record.fields.length !== 6 || !record.fields[1]?.startsWith("/") || !record.fields.slice(2).every((field) => /^\d+$/.test(field)))
+                if (record.fields.length !== 6 || !record.fields[1]?.startsWith("/") || !record.fields.slice(2).every(decimal) || !safe(record.fields[1]!))
                 {
                     malformed = true;
                 }

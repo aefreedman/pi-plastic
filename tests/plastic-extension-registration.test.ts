@@ -6,6 +6,7 @@ import { PLASTIC_TOOL_NAMES } from "../src/plastic-tool-loading.ts";
 import { getActiveAbortSignal } from "../src/execution/context.ts";
 import { statusOutputSchema } from "../src/pi/status-output.ts";
 import { diffOutputSchema } from "../src/pi/diff-output";
+import { serverMergeOutputSchema } from "../src/pi/server-merge-output";
 import { codeReviewFindOutputSchema } from "../src/pi/code-review-find-output";
 import { shelvesetListOutputSchema } from "../src/pi/shelveset-list-output";
 import { workspaceListOutputSchema } from "../src/pi/workspace-list-output";
@@ -15,7 +16,7 @@ import { currentBranchOutputSchema, branchExistsOutputSchema } from "../src/pi/b
 async function main(): Promise<void> {
   const tools = await loadRegisteredTools();
   for (const tool of tools.values()) {
-    assert.deepEqual(tool.outputSchema, tool.name === "plastic_status" ? statusOutputSchema : tool.name === "plastic_currentBranch" ? currentBranchOutputSchema : tool.name === "plastic_branchExists" ? branchExistsOutputSchema : tool.name === "plastic_branchList" ? branchListOutputSchema : tool.name === "plastic_workspaceList" ? workspaceListOutputSchema : tool.name === "plastic_shelvesetList" ? shelvesetListOutputSchema : tool.name === "plastic_codeReviewFind" ? codeReviewFindOutputSchema : tool.name === "plastic_diff" ? diffOutputSchema : undefined, "Exactly eight read tools own structured output schemas");
+    assert.deepEqual(tool.outputSchema, tool.name === "plastic_status" ? statusOutputSchema : tool.name === "plastic_currentBranch" ? currentBranchOutputSchema : tool.name === "plastic_branchExists" ? branchExistsOutputSchema : tool.name === "plastic_branchList" ? branchListOutputSchema : tool.name === "plastic_workspaceList" ? workspaceListOutputSchema : tool.name === "plastic_shelvesetList" ? shelvesetListOutputSchema : tool.name === "plastic_codeReviewFind" ? codeReviewFindOutputSchema : tool.name === "plastic_diff" ? diffOutputSchema : tool.name === "plastic_mergeBranches" ? serverMergeOutputSchema : undefined, "Exactly nine selected tools own structured output schemas");
   }
   const shape = [...tools.values()].map(({ name, label, description, parameters, prepareArguments, promptSnippet, promptGuidelines, constrainedSampling }) => ({
     name, label, description, parameters, defaults: prepareArguments?.({}), promptSnippet, promptGuidelines, constrainedSampling,
@@ -74,7 +75,7 @@ async function main(): Promise<void> {
   assert.equal(canonical.maxItems, 7, "Canonical arguments must win over aliases");
 
   // Intercept only the operation boundary: adapter tests must never start cm.
-  for (const exportName of ["update", "mergeBranches"] as const) {
+  for (const exportName of ["update"] as const) {
     const definition = PLASTIC_TOOL_REGISTRY[exportName];
     const originalExecute = definition.execute;
     const signal = new AbortController().signal;
@@ -89,13 +90,13 @@ async function main(): Promise<void> {
       const tool = tools.get(toToolName(exportName))!;
       const params = {};
       const result = await tool.execute("adapter", params, signal, undefined, { cwd: "/session-cwd" });
-      assert.deepEqual(received, exportName === "mergeBranches" ? {} : { workdir: "/session-cwd" }, "Only workspace tools default workdir to ctx.cwd");
+      assert.deepEqual(received, { workdir: "/session-cwd" }, "Only workspace tools default workdir to ctx.cwd");
       assert.equal(receivedSignal, signal, "Adapter must use the sole shared abort context");
       assert.deepEqual(params, {}, "Execution defaulting must not mutate caller params");
       assert.equal(result.content[0].text, "synthetic adapter result");
       assert.equal(result.details.exportName, exportName);
       assert.equal(result.details.rawResult, "synthetic adapter result");
-      assert.equal(result.details.workdir, exportName === "mergeBranches" ? undefined : "/session-cwd");
+      assert.equal(result.details.workdir, "/session-cwd");
       await tool.execute("explicit-workdir", { workdir: "/explicit" }, signal, undefined, { cwd: "/session-cwd" });
       assert.deepEqual(received, { workdir: "/explicit" }, "Explicit workdir must survive even on the server merge adapter");
     } finally {

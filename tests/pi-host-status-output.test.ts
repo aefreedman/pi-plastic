@@ -11,6 +11,7 @@ import { createAgentSessionServices, createAgentSessionFromServices, createCodem
 import { branchListOutputSchema } from "../src/pi/branch-list-output";
 import { currentBranchOutputSchema, branchExistsOutputSchema } from "../src/pi/branch-output";
 import { diffOutputSchema } from "../src/pi/diff-output";
+import { serverMergeOutputSchema } from "../src/pi/server-merge-output";
 import { statusOutputSchema } from "../src/pi/status-output";
 import { xmlStatus, xmlRecord } from "./fixtures/status-xml";
 
@@ -22,9 +23,10 @@ const aiUrl = (() => { try { return import.meta.resolve("@earendil-works/pi-ai")
 const ai = await import(aiUrl);
 const extensionPath = fileURLToPath(new URL("../index.ts", import.meta.url));
 const modifierPath = join(fixture, "modifier.ts");
-const previous = { executable: process.env.PI_PLASTIC_CM_EXECUTABLE, mode: process.env.PI_PLASTIC_TOOL_LOADING_MODE };
+const previous = { executable: process.env.PI_PLASTIC_CM_EXECUTABLE, mode: process.env.PI_PLASTIC_TOOL_LOADING_MODE, cwd: process.cwd() };
 process.env.PI_PLASTIC_CM_EXECUTABLE = process.execPath;
 process.env.PI_PLASTIC_TOOL_LOADING_MODE = "all-active";
+process.chdir(fixture); // Workspace-free commands inherit process cwd; fake executable scripts are owned here.
 const state = { scenario: "", nested: undefined as any };
 (globalThis as any).__plasticHostFixture = state;
 const commandFixture = `const fs = require("node:fs");
@@ -41,6 +43,8 @@ let session: any;
 const originalFetch = globalThis.fetch;
 globalThis.fetch = (() => { throw Error("No network transport is allowed in this host test"); }) as any;
 try {
+await writeFile(join(fixture, "help"), 'require("node:fs").appendFileSync("calls.jsonl",JSON.stringify(process.argv.slice(1))+"\\n"); console.log("--to --merge --nointeractiveresolution --machinereadable --startlineseparator --endlineseparator --fieldseparator");', {flag:"wx"});
+await writeFile(join(fixture,"merge"), `const fs=require("node:fs");fs.appendFileSync("calls.jsonl",JSON.stringify(process.argv.slice(1))+"\\n");const d=JSON.parse(fs.readFileSync("scenario.json","utf8"));const sep=n=>process.argv.find(a=>a.startsWith(n+"=")).slice(n.length+1);const rec=(op,fields)=>sep("--startlineseparator")+[op,...fields].join(sep("--fieldseparator"))+sep("--endlineseparator")+"\\n";if(d.fail){process.stderr.write("private fixture failure");process.exit(1);}let output=d.output==="no-op"?rec("STATUS",["ALREADY_CONNECTED","No merges detected"]):d.output==="conflict"?rec("FILE_CONFLICT",["/日本😀.txt","1","2","3","4"]):rec("CHANGESET",["cs:42@/target-😀@Example Repository@example-org@unity (mount:'/')"]);if(d.output==="uncertain")output+=rec("OTHER",["unsupported"]);process.stdout.write(output);if(d.output==="conflict")process.exitCode=1;`,{flag:"wx"});
 await writeFile(join(fixture, "status"), commandFixture, { flag: "wx" });
 await writeFile(join(fixture, "find"), commandFixture, { flag: "wx" });
 await writeFile(join(fixture, "workspace"), commandFixture, { flag: "wx" });
@@ -49,9 +53,9 @@ await writeFile(join(fixture, "scenario.json"), "{}", { flag: "wx" });
 await writeFile(join(fixture, "calls.jsonl"), "", { flag: "wx" });
 await writeFile(join(fixture, "version"), `require("node:fs").appendFileSync("calls.jsonl", "version\\n"); console.log("fixture-version");`, { flag: "wx" });
 await writeFile(modifierPath, `export default function(pi) {
-  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
+  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
   pi.on("tool_result", e => {
-    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff"].includes(e.toolName)) return;
+    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches"].includes(e.toolName)) return;
     if (globalThis.__plasticHostFixture.scenario === "content-only") return { content: [{ type: "text", text: "foreign replacement" }] };
   });
 }`, { flag: "wx" });
@@ -79,14 +83,14 @@ await writeFile(modifierPath, `export default function(pi) {
       pi.registerTool({ name: "fixture_throw", label: "Throw", description: "Fixture", parameters: Type.Object({}), async execute() { throw Error("fixture thrown"); } });
       pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Union([Type.Literal("xml"), Type.Literal("names"), Type.Literal("fields"), Type.Literal("ids"), Type.Literal("native")])) }), async execute(_id, params, _signal, _update, ctx) {
         const controller = new AbortController(); if (params.abort) controller.abort();
-        state.nested = await ctx.executeTool(params.child ?? "plastic_status", params.child === "plastic_diff" ? { mode:"revisions", leftRevision:"Assets/Fictional.txt#cs:1", rightRevision:"Assets/Fictional.txt#cs:2" } : ["plastic_shelvesetList", "plastic_codeReviewFind"].includes(params.child ?? "") ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
+        state.nested = await ctx.executeTool(params.child ?? "plastic_status", params.child === "plastic_mergeBranches" ? {source:"br:/source@Example Repository@example-org@cloud",target:"br:/target-😀@Example Repository@example-org@cloud",message:"Fixture Unicode résumé 日本語 😀"} : params.child === "plastic_diff" ? { mode:"revisions", leftRevision:"Assets/Fictional.txt#cs:1", rightRevision:"Assets/Fictional.txt#cs:2" } : ["plastic_shelvesetList", "plastic_codeReviewFind"].includes(params.child ?? "") ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
         return { content: [{ type: "text", text: "nested result inspected outside transcript" }], details: { childIsError: state.nested.isError } };
       } });
     }], noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true, systemPrompt: "Run only the local scripted action." },
   });
   assert.deepEqual(services.diagnostics.filter(d => d.type === "error"), []);
   assert.deepEqual(services.resourceLoader.getExtensions().errors, []);
-  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "codemode", "fixture_throw", "fixture_nested"] }));
+  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "codemode", "fixture_throw", "fixture_nested"] }));
   await session.bindExtensions({});
   assert.deepEqual(session.getToolDefinition("plastic_status").outputSchema, statusOutputSchema);
   assert.equal(resolve(session.getAllTools().find((tool: any) => tool.name === "plastic_status").sourceInfo.path), resolve(extensionPath));
@@ -98,7 +102,7 @@ await writeFile(modifierPath, `export default function(pi) {
     const start = records.length;
     await session.prompt(scenario);
     const parent = session.messages.filter((m: any) => m.role === "toolResult").at(-1);
-    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
+    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
   };
   const script = (args: object) => ({ code: `const dto = await tools.plastic_status(${JSON.stringify(args)}); if (typeof dto !== "object") throw Error("unexpected fallback"); text(dto);` });
   const text = (result: any) => result.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
@@ -377,8 +381,23 @@ await writeFile(modifierPath, `export default function(pi) {
     const rejected=await run("invalid-diff-shape","plastic_diff",args,addedXml);assert.equal(rejected.calls.length,0);assert(rejected.parent.isError);
   }
   for(const retired of ["plastic_diffFile","plastic_diffRevisions","plastic_workspaceDiff"])assert(!session.getAllTools().some((t:any)=>t.name===retired));
+  const mergeRequest={source:"br:/source@Example Repository@example-org@cloud",target:"br:/target-😀@Example Repository@example-org@cloud",message:"Fixture Unicode résumé 日本語 😀"};
+  assert.deepEqual(session.getToolDefinition("plastic_mergeBranches").outputSchema,serverMergeOutputSchema);
+  const normalizeMerge=(d:any)=>{const copy=structuredClone(d);copy.data.command=copy.data.command?.map((a:string)=>/^--(?:startlineseparator|endlineseparator|fieldseparator)=/.test(a)?a.replace(/[a-f0-9]{32}/,"nonce"):a);return copy;};
+  const mergeDirect=await run("merge-direct","plastic_mergeBranches",mergeRequest,"completed"),mergeDto=mergeDirect.children[0].result.structuredContent;
+  assert(mergeDto.ok,JSON.stringify(mergeDto));assert.equal(mergeDto.data.createdChangeset.server,"example-org@unity");assert.equal(mergeDto.data.requestedIdentity.server,"example-org@cloud");assert.equal(mergeDirect.calls.length,2);assert.equal(mergeDirect.parent.structuredContent,undefined);
+  for(const format of ["text","json"]){const r=await run("merge-code-"+format,"codemode",{code:"text(await tools.plastic_mergeBranches("+JSON.stringify({...mergeRequest,format})+"));"},"completed");assert.deepEqual(normalizeMerge(r.children[0].result.structuredContent),normalizeMerge(mergeDto));assert.equal(r.parent.details.calls[0].status,"ok");assert.equal(r.calls.length,2);assert.deepEqual(JSON.parse(JSON.stringify(r.children[0])),r.children[0]);}
+  await run("merge-nested","fixture_nested",{child:"plastic_mergeBranches"},"completed");assert.deepEqual(normalizeMerge(state.nested.result.structuredContent),normalizeMerge(mergeDto));
+  for(const outcome of ["no-op","conflict","uncertain"]){const r=await run("merge-"+outcome,"codemode",{code:"text(await tools.plastic_mergeBranches("+JSON.stringify(mergeRequest)+"));"} ,outcome);assert.equal(r.children[0].result.structuredContent.outcome,outcome);assert.equal(r.parent.details.calls[0].status,outcome==="no-op"?"ok":"error");assert.equal(r.calls.length,2);}
+  for(const format of ["text","json"]){const r=await run("merge-preflight-"+format,"plastic_mergeBranches",{...mergeRequest,preflight:true,format},"completed");assert(r.children[0].result.structuredContent.ok);assert.equal(r.children[0].result.structuredContent.outcome,"preflight");assert.equal(r.calls.length,0);}
+  const mergeSubset=await run("merge-subset","codemode",{code:"const d=await tools.plastic_mergeBranches("+JSON.stringify(mergeRequest)+");text(d.ok&&d.outcome==='completed'?{id:d.data.createdChangeset.id}:d.outcome);"},"completed");assert.match(text(mergeSubset.parent),/42/);assert.doesNotMatch(text(mergeSubset.parent),/schemaVersion|Example Repository/);
+  for(const bad of [{...mergeRequest,workdir:"/forbidden"},{...mergeRequest,extra:true},{...mergeRequest,message:"bad"+String.fromCharCode(0xD800)}]){const r=await run("merge-invalid","plastic_mergeBranches",bad,"completed");assert(r.children[0].result.structuredContent?.ok===false||r.parent.isError);assert.equal(r.calls.length,0);}
+  const mergeAbort=await run("merge-abort","fixture_nested",{child:"plastic_mergeBranches",abort:true},"completed");assert(state.nested.isError);assert.equal(mergeAbort.calls.length,0);
+  const mergeBlocked=await run("blocked","codemode",{code:"try{await tools.plastic_mergeBranches("+JSON.stringify(mergeRequest)+");throw Error('must reject');}catch(e){text(String(e));}"},"completed");assert.equal(mergeBlocked.calls.length,0);assert.equal(mergeBlocked.children[0].result.structuredContent,undefined);
+  const mergeReplaced=await run("content-only","codemode",{code:"text(await tools.plastic_mergeBranches("+JSON.stringify(mergeRequest)+"));"},"completed");assert.equal(mergeReplaced.children[0].result.structuredContent,undefined);assert.match(text(mergeReplaced.parent),/foreign replacement/);
   console.log(`PASS: real Pi host, ${turns} local scripted turns; finalizer/codemode/nested consumers, SDK JSON events, native errors, selective context and foreign-hook fallback; zero network`);
 } finally {
+  process.chdir(previous.cwd);
   session?.dispose(); globalThis.fetch = originalFetch; delete (globalThis as any).__plasticHostFixture;
   if (previous.executable === undefined) delete process.env.PI_PLASTIC_CM_EXECUTABLE; else process.env.PI_PLASTIC_CM_EXECUTABLE = previous.executable;
   if (previous.mode === undefined) delete process.env.PI_PLASTIC_TOOL_LOADING_MODE; else process.env.PI_PLASTIC_TOOL_LOADING_MODE = previous.mode;

@@ -1,3 +1,4 @@
+import { executeServerMergeOutput, serverMergeOutputSchema } from "./server-merge-output";
 import { executeDiffOutput, diffInputSchema, diffOutputSchema } from "./diff-output";
 import { executeCodeReviewFindOutput, codeReviewFindOutputSchema } from "./code-review-find-output";
 import { executeShelvesetListOutput, shelvesetListOutputSchema } from "./shelveset-list-output";
@@ -46,7 +47,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
       label: toToolName(exportName),
       description: coreTool.description ?? toToolName(exportName),
       parameters: exportName === "diff" ? diffInputSchema : buildParameters(coreTool.args),
-      ...(exportName === "status" ? { outputSchema: statusOutputSchema } : exportName === "currentBranch" ? { outputSchema: currentBranchOutputSchema } : exportName === "branchExists" ? { outputSchema: branchExistsOutputSchema } : exportName === "branchList" ? { outputSchema: branchListOutputSchema } : exportName === "workspaceList" ? { outputSchema: workspaceListOutputSchema } : exportName === "shelvesetList" ? { outputSchema: shelvesetListOutputSchema } : exportName === "codeReviewFind" ? { outputSchema: codeReviewFindOutputSchema } : exportName === "diff" ? { outputSchema: diffOutputSchema } : {}),
+      ...(exportName === "status" ? { outputSchema: statusOutputSchema } : exportName === "currentBranch" ? { outputSchema: currentBranchOutputSchema } : exportName === "branchExists" ? { outputSchema: branchExistsOutputSchema } : exportName === "branchList" ? { outputSchema: branchListOutputSchema } : exportName === "workspaceList" ? { outputSchema: workspaceListOutputSchema } : exportName === "shelvesetList" ? { outputSchema: shelvesetListOutputSchema } : exportName === "codeReviewFind" ? { outputSchema: codeReviewFindOutputSchema } : exportName === "diff" ? { outputSchema: diffOutputSchema } : exportName === "mergeBranches" ? { outputSchema: serverMergeOutputSchema } : {}),
       prepareArguments: config.prepareArguments,
       renderCall(args, theme, context) {
         return renderPlasticCall(exportName, args ?? {}, theme, context);
@@ -59,6 +60,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
         if (exportName !== "mergeBranches" && normalizedParams.workdir === undefined && ctx?.cwd) {
           normalizedParams.workdir = ctx.cwd;
         }
+        if (exportName === "mergeBranches") return runWithAbortSignal(signal, () => executeServerMergeOutput(normalizedParams));
         if (exportName === "diff") return runWithAbortSignal(signal, () => executeDiffOutput(normalizedParams));
         if (exportName === "codeReviewFind") return runWithAbortSignal(signal, () => executeCodeReviewFindOutput(normalizedParams));
         if (exportName === "shelvesetList") return runWithAbortSignal(signal, () => executeShelvesetListOutput(normalizedParams));

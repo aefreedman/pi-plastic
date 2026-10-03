@@ -83,7 +83,7 @@ export function renderPlasticCall(name: string, input: unknown, theme: RenderThe
 
 function payload(result: Result, raw: string): Record<string, unknown> {
   const structured = record((result as Result & {structuredContent?:unknown}).structuredContent);
-  if (structured.action === "diff") return structured;
+  if (structured.action === "diff" || structured.action === "merge-branches") return structured;
   const rawResult = record(result.details).rawResult;
   if (rawResult !== null && typeof rawResult === "object") return record(rawResult);
   // Only decode the package's whole JSON envelope, never a JSON fragment in CLI or diff output.
@@ -112,7 +112,7 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
   const summary: Summary = { label: "Result returned", tone: "toolOutput", notices, rows: [] };
   const textLines = raw.split(/\r?\n/).filter(line => line.trim());
   const preview = record(context?.args).preflight === true || action.endsWith("-preflight") || envelope.outcome === "preflight";
-  if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes))) {
+  if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes)) && !(name === "mergeBranches" && action === "merge-branches")) {
     summary.label = "Failed";
     summary.tone = "error";
     summary.rows = textLines.slice(0, 3);
@@ -125,13 +125,14 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
     summary.rows = action ? [scalar(data.reason) || scalar(data.errorCode), scalar(data.strategy)].filter(Boolean) : textLines.filter(line => /^- (?:Reason|Strategy|Command):/.test(line));
   } else if (name === "mergeBranches" && typeof envelope.outcome === "string") {
     summary.label = `Server merge: ${envelope.outcome}`;
-    summary.tone = envelope.outcome === "completed" ? "success" : "warning";
+    summary.tone = envelope.ok === false ? "error" : envelope.outcome === "completed" ? "success" : "warning";
     const changeset = scalar(record(data.createdChangeset).id);
     if (changeset) summary.label += `${separator}cs:${changeset}`;
     if (data.mergeLinkIdentity === "unverified" || data.xlinkEffects === "unverified") notices.push("Merge-link identity and Xlink effects remain unverified.");
     if (data.effect === "uncertain" || data.effect === "not-proven") notices.unshift("Effects not proven; inspect server state before any retry.");
-    if (data.timedOut === true) notices.unshift("Command timed out; effects uncertain.");
-    if (data.aborted === true) notices.unshift("Command cancelled; effects uncertain.");
+    if (data.serverAliasEquivalence === "unverified") notices.push("Requested and emitted server names remain separate; alias equivalence is unverified.");
+    if (data.timedOut === true || record(data.attempt).timedOut === true) notices.unshift("Command timed out; effects uncertain.");
+    if (data.aborted === true || record(data.attempt).aborted === true) notices.unshift("Command cancelled; effects uncertain.");
   } else if (data.checkedIn === false || record(data.switchOutcome).kind === "canceled" || data.kind === "canceled" || data.strategy === "cancel-with-pending") {
     summary.label = data.checkedIn === false ? "Checkin not performed" : "Switch cancelled";
     summary.tone = "warning";

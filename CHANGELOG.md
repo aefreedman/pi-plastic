@@ -9,10 +9,14 @@ and this project follows semantic versioning for public package releases.
 
 ### Fixed
 
+- Server-merge selected-tool parsing now preserves full @cloud/@unity qualifiers and genuine emitted server tails rather than moving repository text into branch names or rejecting qualified changeset records. Requested versus reported aliases remain separate and unverified.
 - Added a direct-core and registered-tool aggregate diff regression: individually complete Unicode excerpts exceed the UTF-8 envelope limit, so whole trailing outcomes are omitted without changing completed counts, retained identities or native success semantics.
 - Consolidated diff now fails closed on permission/I/O errors during deleted-file absence checks and nearest-workspace discovery. Only genuine missing paths allow synthetic deletion sides or continued discovery; observed unsupported/symlink workspace markers cannot select an enclosing workspace. Deterministic fault-injection regressions cover native failures, zero-dispatch discovery and retained partial workspace outcomes.
 
 ### Added
+
+- Closed producer-owned `plastic_mergeBranches` receipts for command-only preflight, completion, no-op, unsupported syntax, conflict and uncertain/nonstart failures; native structuredContent/isError, typed narrowing, bounded reference projection and capture/effect evidence shared with core presentation.
+- Selected server-merge strict byte/start/terminal/UTF-8/timeout/cancellation safeguards, no duplicate/version/postflight commands or retries, independent server alias facts, sanitized diagnostics and focused source/host/lifecycle regressions. Other mutation adapters and shared process collectors are unchanged.
 
 - Consolidated non-GUI `plastic_diff` with required file/revisions/workspace modes, closed input/output, qualified hash-verified loaded bases, bounded stable local snapshots and truthful partial workspace outcomes. Removed specialized diff registrations/core tools without aliases or stale-name redirects; raw GUI diff remains blocked. Text/JSON now present the unified observation without CLI-version decoration.
 

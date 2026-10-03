@@ -661,7 +661,7 @@
   {
     "name": "plastic_mergeBranches",
     "label": "plastic_mergeBranches",
-    "description": "Perform one bounded workspace-free server-side merge between explicitly qualified branches; merge-link and xlink effects remain unverified.",
+    "description": "One bounded workspace-free server merge receipt; server aliases, merge links and Xlink effects remain unverified.",
     "parameters": {
       "type": "object",
       "required": [
@@ -672,22 +672,22 @@
       "properties": {
         "source": {
           "type": "string",
-          "description": "Fully qualified source branch: br:/<branch>@<repository>@<server>.",
+          "description": "Fully qualified source branch; branch/repository may not contain @; full server tail retained.",
           "minimum": 1
         },
         "target": {
           "type": "string",
-          "description": "Fully qualified target branch in the same repository/server as source.",
+          "description": "Fully qualified distinct target in the same exact requested repository/server.",
           "minimum": 1
         },
         "message": {
           "type": "string",
-          "description": "Non-empty changeset comment; no editor fallback is allowed.",
+          "description": "Required bounded nonempty comment; no editor fallback.",
           "minimum": 1
         },
         "preflight": {
           "type": "boolean",
-          "description": "Render the exact command only; does not contact Plastic or analyze remote conflicts."
+          "description": "Render intent only, zero commands; does not analyze remote conflicts."
         },
         "format": {
           "anyOf": [
