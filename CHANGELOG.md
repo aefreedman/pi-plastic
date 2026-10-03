@@ -7,6 +7,10 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Added
+
+- Closed producer-owned switchBranch receipts with ordered bounded reads/shelve/switch outcomes, preserved pending policies, native cancellation/errors and retained earlier-effect uncertainty. Direct loaded status and strict full pending evidence replace selected unsafe owner/empty-recovery inference; full target qualifiers are preserved without guessed alias equivalence. Core rejection prevents compound continuation after unsuccessful switching.
+
 ### Fixed
 
 - Reject every failed non-preflight core checkin so legacy closeout cannot report a successful checkin after native failure; registered native receipts remain unchanged.

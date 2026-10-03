@@ -139,16 +139,17 @@ for (const scenario of ["failed-switch", "wrong-target"] as const) {
         const child = new EventEmitter() as any;
         const isSwitch = args[0] === "switch";
         const fails = scenario === "failed-switch" && isSwitch;
-        child.stdout = Readable.from([args.includes("--machinereadable") ? "" : "Branch: /source\n"]);
-        child.stderr = Readable.from(fails ? ["fixture switch failure"] : []);
+        child.stdout = Readable.from([Buffer.from(isSwitch ? "" : args.includes("--machinereadable") ? "STATUS\x1f123\x1fExample Repository\x1fexample@unity\r\n" : "/source@Example Repository@example@unity (cs:123 - head)\r\n")]);
+        child.stderr = Readable.from(fails ? [Buffer.from("fixture switch failure")] : []);
         child.stdin = undefined;
         child.kill = () => true;
-        process.nextTick(() => child.emit("close", fails ? 1 : 0));
+        process.nextTick(() => { child.emit("spawn"); child.emit("close", fails ? 1 : 0); });
         return child;
       }) as any,
     }),
-    scenario === "failed-switch" ? /fixture switch failure/ : /branch mismatch after cm switch/,
+    scenario === "failed-switch" ? /Switch evidence is unavailable/ : /requested target identity/,
   );
+  assert.equal(calls.filter((call) => call.args[0] === "switch").length, 1, `${scenario} reaches exactly one actual child switch`);
   assert.equal(calls.filter((call) => call.args[0] === "update").length, 0, `${scenario} must stop before target update`);
   assert.equal(calls.filter((call) => ["merge", "checkin"].includes(call.args[0] ?? "")).length, 0, `${scenario} must stop before merge/checkin`);
 }

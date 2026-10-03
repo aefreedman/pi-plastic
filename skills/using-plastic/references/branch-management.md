@@ -47,6 +47,8 @@ Pending-change behavior in unattended runs:
 - `pendingChanges="bring"` is only blocked when tracked pending changes exist (Plastic requires interactive prompts).
 - If pending changes are private-only, `plastic_switchBranch` performs a direct non-interactive switch and keeps private files local.
 - `pendingChanges="shelve"` shelves tracked changes; for private-only pending changes, shelve is skipped and switch proceeds.
+- Defaulted cancel permits private-only direct switching; explicit cancel blocks switching with any pending items. Native cancellation is not a successful switch; core non-preflight cancellation rejects to stop compound callers.
+- Inspect native switch outcome, step effects and target verification. A shelve or switch command completing does not prove preservation, reusable shelveset identity, alias equivalence or rollback. Failed/malformed pending or recovery observations stop; compact changeset ownership is not the loaded branch. Qualification-ambiguous same-name requests are not skipped as already loaded; unverified post-qualification returns an error after retaining possible effects. Preflight is sequential local inspection only, not server-verified switchability.
 
 ## Merge Branches (Non-Interactive)
 

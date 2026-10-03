@@ -92,7 +92,7 @@ const main = (): void => {
     "assertWorkspaceOnBranch",
     "isSwitchBringBlockedForUnattended",
     "canSwitchDirectWithPrivateOnlyPending",
-    "direct-switch-private-only"
+    "assembleSwitchReceipt"
 ]);
   failures += checkRequired(readText(new URL("../src/operations/workspace.ts", import.meta.url)), "pi-plastic/src/operations/workspace.ts", [
     "export const resolveDeleteChangeConflict = tool({",
