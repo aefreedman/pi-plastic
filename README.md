@@ -203,6 +203,10 @@ Pending policy is preserved: tracked bring is blocked; private-only defaulted ca
 
 Preflight performs two sequential local reads, not server switchability/conflict proof. Direct application uses four commands; shelving five, eligible recovery at most six. Observations are not atomic. Pending capture caps at1 MiB stdout/64 KiB stderr and20000 records; other source commands64 KiB/16 KiB; six step records and131072-byte compact DTO. Identities cap4096 UTF-16 units and are never clipped; standard header admits only the observed head grammar. Each selected command has the same finite30+5+5-second nominal retirement budget as checkin/branch-create; forced retirement is not process-stop or rollback proof. Other collectors/platforms/configurations remain unchanged/unclaimed.
 
+## Update command receipts
+
+`plastic_update` accepts only `workdir` and preserves `cm update --dontmerge --noinput`. It dispatches at most one command, with no hidden status/version/verification read or retry. Complete exit0 capture—including valid stderr warnings—proves command completion only, not changed files, a no-op, branch/head, workspace root, preservation, cleanliness or merge readiness. Those identities/effects remain unverified; opaque progress and diagnostics are not returned as structured facts. Possibly started failures, invalid UTF8, output overflow, abort, missing terminal events or finite retirement remain uncertain and stop core compound continuation. Unsupported preview/options are rejected before dispatch; no preflight is added. Working directory is bounded to4096 code units, stdout64KiB/stderr16KiB; default per-command30s+5s TERM+5s KILL/drain retirement is not process-stop or rollback proof.
+
 ## Checkin and branch-create receipts
 
 `plastic_checkin` and `plastic_branchCreate` are the tenth and eleventh schema-bearing tools (27 core registrations plus loader). Both return closed v1 producer-owned receipts, native `isError`, empty details and bounded presentation from the same observation. Core calls still return strings; text/JSON checkin presentation never adds an observation. No new mode, alias or verification query is introduced.

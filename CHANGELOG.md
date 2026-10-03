@@ -9,6 +9,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Closed producer-owned update command receipts preserving `--dontmerge --noinput` dispatch, one-command bounds, opaque lifecycle completion and uncertain partial effects. No inferred workspace identity/changed-item count, raw progress reconstruction or retry; core errors stop compound closeout before merge/checkin.
 - Closed producer-owned switchBranch receipts with ordered bounded reads/shelve/switch outcomes, preserved pending policies, native cancellation/errors and retained earlier-effect uncertainty. Direct loaded status and strict full pending evidence replace selected unsafe owner/empty-recovery inference; full target qualifiers are preserved without guessed alias equivalence. Core rejection prevents compound continuation after unsuccessful switching.
 
 ### Fixed

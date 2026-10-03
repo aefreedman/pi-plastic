@@ -24,11 +24,11 @@ function makeSpawn(calls: SpawnCall[], exitCode: number, stderr = "") {
   return ((command: string, args: readonly string[], options: { cwd: string }) => {
     calls.push({ command, args: [...args], cwd: options.cwd });
     const child = new EventEmitter() as any;
-    child.stdout = Readable.from(exitCode === 0 ? ["Updated successfully"] : []);
-    child.stderr = Readable.from(stderr ? [stderr] : []);
+    child.stdout = Readable.from(exitCode === 0 ? [Buffer.from("Updated successfully")] : []);
+    child.stderr = Readable.from(stderr ? [Buffer.from(stderr)] : []);
     child.stdin = undefined;
     child.kill = () => true;
-    process.nextTick(() => child.emit("close", exitCode));
+    process.nextTick(() => { child.emit("spawn"); child.emit("close", exitCode); });
     return child;
   }) as any;
 }
@@ -40,7 +40,8 @@ const output = await runWithAbortSignal(
   () => update.execute({ workdir }),
   { spawn: makeSpawn(successfulCalls, 0) },
 );
-assert.equal(output, "Updated successfully");
+assert.match(output, /Update command completed/);
+assert.match(output, /remain unverified/);
 assert.deepEqual(successfulCalls, [{
   command: process.env.PI_PLASTIC_CM_EXECUTABLE?.trim() || "cm",
   args: ["update", "--dontmerge", "--noinput"],
@@ -54,7 +55,7 @@ await assert.rejects(
     () => update.execute({ workdir }),
     { spawn: makeSpawn(failedCalls, 1, "fixture mutation failure") },
   ),
-  /fixture mutation failure/,
+  /Update uncertain/,
 );
 assert.equal(failedCalls.length, 1, "a failed mutation process must not be retried implicitly");
 
@@ -129,6 +130,22 @@ await assert.rejects(
 );
 assert.equal(failedLookupCalls.filter((call) => ["switch", "update", "merge", "checkin", "shelveset"].includes(call.args[0] ?? "")).length, 0,
   "failed parent lookup must not dispatch a closeout mutation");
+
+let switchedForUpdate = false;
+const failedUpdateCalls: SpawnCall[] = [];
+await assert.rejects(runWithAbortSignal(undefined, () => mergeToBranch.execute({source: "/source", target: "/target", workdir}), {
+  spawn: ((_command: string, args: string[]) => {
+    failedUpdateCalls.push({command:_command,args:[...args],cwd:workdir});
+    if (args[0] === "switch") switchedForUpdate = true;
+    const isMutation = ["switch","update"].includes(args[0]);
+    const stdout = isMutation ? "" : args.includes("--machinereadable") ? "STATUS\x1f123\x1fExample Repository\x1fexample@unity\r\n" : `${switchedForUpdate ? "/target" : "/source"}@Example Repository@example@unity (cs:123 - head)\r\n`;
+    const child = Object.assign(new EventEmitter(), {stdout:Readable.from([Buffer.from(stdout)]),stderr:Readable.from(args[0] === "update" ? [Buffer.from("private partial update failure")] : []),kill:()=>true});
+    process.nextTick(()=>{child.emit("spawn");child.emit("close",args[0] === "update" ? 1 : 0,null);});return child;
+  }) as any,
+}), /Update uncertain/);
+assert.equal(failedUpdateCalls.filter(c=>c.args[0] === "switch").length,1);
+assert.equal(failedUpdateCalls.filter(c=>c.args[0] === "update").length,1);
+assert.equal(failedUpdateCalls.filter(c=>["merge","checkin"].includes(c.args[0])).length,0,"Actual selected update failure stops closeout before merge/checkin");
 
 for (const scenario of ["failed-switch", "wrong-target"] as const) {
   const calls: SpawnCall[] = [];

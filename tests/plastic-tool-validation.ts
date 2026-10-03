@@ -96,6 +96,10 @@ const main = (): void => {
 ]);
   failures += checkRequired(readText(new URL("../src/operations/workspace.ts", import.meta.url)), "pi-plastic/src/operations/workspace.ts", [
     "export const resolveDeleteChangeConflict = tool({",
+    "assembleUpdateReceipt",
+    "if (!receipt.ok) throw new Error(text)"
+]);
+  failures += checkRequired(readText(new URL("../src/domain/update-contract.ts", import.meta.url)), "pi-plastic/src/domain/update-contract.ts", [
     "[\"update\", \"--dontmerge\", \"--noinput\"]"
 ]);
   for (const [owner, snippets] of [

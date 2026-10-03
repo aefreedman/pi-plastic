@@ -1,6 +1,7 @@
 import { tool } from "../tool-definition";
 import { assembleWorkspaceListObservation, presentWorkspaceListObservation } from "./workspace-list";
 import { workdirArg } from "./arguments";
+import { assembleUpdateReceipt, presentUpdateReceipt } from "./update-receipt";
 import { runCm, runCmRaw } from "../execution/cm";
 import { outputFormatArg, toStructuredResult, formatPreflightText } from "../presentation/results";
 import { summarizeShortStatus } from "../domain/pending";
@@ -12,7 +13,10 @@ export const update = tool({
     },
     async execute(args)
     {
-        return runCm(["update", "--dontmerge", "--noinput"], args.workdir);
+        const receipt = await assembleUpdateReceipt(args);
+        const text = presentUpdateReceipt(receipt);
+        if (!receipt.ok) throw new Error(text);
+        return text;
     },
 });
 
