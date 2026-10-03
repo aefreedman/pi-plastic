@@ -16,6 +16,9 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Closed checkin and branch-create producer receipts, bringing selected output schemas to eleven without changing the 27-tool core registry plus loader. Checkin retains eligible compound recovery and honest earlier effects, never treating failed/empty recovery reads as successful completion; branch creation rejects ambiguous relative qualification, requires a directly observed loaded parent when omitted, and proves terminal completion only with null created identity.
+- Strict selected-tool bounded byte/UTF-8/lifecycle/source capture, schema narrowing, original Unicode/decimal identity regressions and file-loaded Pi 1.0.1 deterministic host coverage for native errors, command counts, selective consumers and policy/foreign hooks. No registered live or cross-platform acceptance claimed.
+
 - Closed producer-owned `plastic_mergeBranches` receipts for command-only preflight, completion, no-op, unsupported syntax, conflict and uncertain/nonstart failures; native structuredContent/isError, typed narrowing, bounded reference projection and capture/effect evidence shared with core presentation.
 - Selected server-merge strict byte/start/terminal/UTF-8/timeout/cancellation safeguards, no duplicate/version/postflight commands or retries, independent server alias facts, sanitized diagnostics and focused source/host/lifecycle regressions. Other mutation adapters and shared process collectors are unchanged.
 
@@ -48,7 +51,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Changed
 
-- Align existing Pi development pins and eval runtime baseline with latest stable Pi 1.0.0; no package release/version bump.
+- Align exact Pi SDK/tui development pins, lockfile and eval runtime baseline with latest stable Pi 1.0.1 and its required TypeBox 1.3.27 resolution; no package release/version bump.
 - Modularize execution, domain, operations, text diff, presentation and Pi adapters behind the existing explicit core export facade and canonical-root entry wiring; preserve tool behavior, loading, rendering and exposure.
 - Add a typed internal status observation seam and shared single-observation presentation, preserving core string results and renderers; add deterministic runtime import-layer/cycle, shared-owner and registry-parity regression checks.
 

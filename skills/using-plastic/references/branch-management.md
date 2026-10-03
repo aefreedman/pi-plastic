@@ -29,7 +29,9 @@ plastic_branchCreate(
 plastic_switchBranch(branch="<parent-branch>/<new-branch>") # only when work should continue there
 ```
 
-Omitting `parent` for a relative branch name uses the current workspace branch as a convenience. A full hierarchical path is also accepted regardless of the loaded branch. Rare top-level branch creation requires `allowRootBranch=true`; use that override only when the user explicitly intends a new top-level hierarchy.
+Omitting `parent` for a relative name requires directly observed standard-status loaded-branch identity. A changeset owner (including compact cs-only status) is not the loaded parent; provide an explicit parent when it cannot be observed. Qualifier-bearing relative names/parents are rejected rather than stripped; full hierarchical qualified targets stay verbatim. Rare top-level creation requires `allowRootBranch=true` only when explicitly intended.
+
+A successful receipt proves `command-completed` only, with null observed created identity and unverified repository/domain effects, even for empty stdout. It does not switch the workspace or run a hidden verification query. After an uncertain attempt, inspect the receipt and state before retrying; command completion is not independent creation proof.
 
 Manual shell fallback requires constructing the hierarchical path explicitly:
 

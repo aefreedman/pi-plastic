@@ -1,0 +1,10 @@
+{
+  "client": "Windows cm11.0.16.10371 observed source contract; no universal encoding fidelity claim",
+  "pendingArgv": ["status", "--machinereadable", "--includeRevId", "--fieldseparator=\u001f"],
+  "pending": "STATUS\u001f9007199254740993\u001fExample Repository\u001fexample@unity\r\nPR\u001fC:\\Example\\workspace\\résumé-é-日本-😀.txt\u001fFalse\u001f-1\u001fNO_MERGES\r\n",
+  "separators": {"start": "__FIXTURE_START__", "end": "__FIXTURE_END__", "field": "__FIXTURE_FIELD__"},
+  "created": "__FIXTURE_START__CI_START__FIXTURE_END__\r\n__FIXTURE_START__STAGE__FIXTURE_FIELD____FIXTURE_END__\r\n__FIXTURE_START__AD__FIXTURE_FIELD__C:\\Example\\workspace\\résumé-é-日本-😀.txt__FIXTURE_END__\r\n__FIXTURE_START__CHANGESET__FIXTURE_FIELD__cs:9007199254740997@br:/main/café-é-日本-😀@Example Repository@example@unity (mount:'/')__FIXTURE_END__\r\n",
+  "noChanges": "__FIXTURE_START__CI_START__FIXTURE_END__\r\n__FIXTURE_START__STAGE__FIXTURE_FIELD____FIXTURE_END__\r\n",
+  "noChangesStderr": "Error: There are no changes in the workspace C:\\Example\\workspace\r\n",
+  "noChangesExit": 1
+}

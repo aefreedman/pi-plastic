@@ -83,7 +83,7 @@ function parseOptions(argv: string[]): Options {
 }
 
 function validate(config: EvalConfig, cases: EvalCase[], baseline: JsonObject, options: Options): void {
-  if (config.piVersionPrefix !== "1.0.0") fail("config piVersionPrefix must select Pi 1.0.0 exactly");
+  if (config.piVersionPrefix !== "1.0.1") fail("config piVersionPrefix must select Pi 1.0.1 exactly");
   if (config.sandboxCwdEnv !== "PI_PLASTIC_EVAL_SANDBOX") fail("config sandboxCwdEnv must use the dedicated eval environment variable");
   if (config.sandboxMarkerFile !== ".pi-plastic-eval-sandbox" || config.sandboxMarkerContent !== "pi-plastic-eval-sandbox\n") fail("config sandbox marker attestation is invalid");
   if (config.sandboxAuthorizationEnv !== "PI_PLASTIC_EVAL_ALLOW" || config.sandboxAuthorizationValue !== "dedicated-sandbox") fail("config sandbox authorization attestation is invalid");
@@ -337,6 +337,9 @@ async function main(): Promise<void> {
   const piVersion = existsSync(piPackagePath) ? (readJson<{ version?: string }>(piPackagePath).version ?? "unknown") : "missing";
   if (piVersion !== config.piVersionPrefix) fail(`This eval requires Pi ${config.piVersionPrefix} exactly; found ${piVersion}`);
   const piCli = join(PACKAGE_ROOT, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js");
+  const localRuntimeEnv = { ...process.env, PI_PACKAGE_DIR: dirname(piPackagePath) };
+  const versionProbe = await runProcess(process.execPath,[piCli,"--version"],PACKAGE_ROOT,localRuntimeEnv,10000,4096);
+  if (versionProbe.exitCode !== 0 || versionProbe.timedOut || versionProbe.outputLimitExceeded || versionProbe.stderr.trim() || versionProbe.stdout.trim() !== config.piVersionPrefix) fail("Local Pi CLI version attestation failed");
   const baseArgs = ["--mode", "json", "--no-session", "--no-approve", "--no-context-files", "--no-extensions", "-e", join(PACKAGE_ROOT, "index.ts"), "-e", join(HERE, "mutation-guard.ts"), "-e", join(HERE, "provider-capture.ts"), "--no-skills", "--no-prompt-templates", "--no-builtin-tools"];
   if (options.dryRun) {
     console.log(`VALID: ${selectedCases.length} cases × ${options.conditions.length} conditions × ${options.trials} trial(s)`);
@@ -352,7 +355,7 @@ async function main(): Promise<void> {
       for (let trial = 1; trial <= options.trials; trial += 1) {
         const capturePath = join(tmpdir(), `pi-plastic-tool-loading-${process.pid}-${Date.now()}-${condition}-${testCase.id}-${trial}.jsonl`);
         const args = [...baseArgs, "--model", options.model!, testCase.prompt];
-        const result = await runProcess(process.execPath, [piCli, ...args], sandboxCwd, { ...process.env, PI_PLASTIC_TOOL_LOADING_MODE: condition, PI_PLASTIC_EVAL_PROVIDER_CAPTURE: capturePath }, config.timeoutMs, config.maxOutputChars);
+        const result = await runProcess(process.execPath, [piCli, ...args], sandboxCwd, { ...localRuntimeEnv, PI_PLASTIC_TOOL_LOADING_MODE: condition, PI_PLASTIC_EVAL_PROVIDER_CAPTURE: capturePath }, config.timeoutMs, config.maxOutputChars);
         const summary = parseTrial(result.stdout, result.stderr, result, capturePath, condition, testCase, config, options.includeEvents);
         if (options.keep) summary.rawCapturePath = capturePath;
         else rmSync(capturePath, { force: true });

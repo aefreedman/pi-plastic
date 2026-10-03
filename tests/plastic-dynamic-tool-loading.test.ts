@@ -38,7 +38,14 @@ async function main(): Promise<void> {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
     assert.equal(harness.registry.size, 28, "all 27 public Plastic tools plus the loader should be registered");
     assert(harness.registry.has(PLASTIC_TOOL_SEARCH_NAME));
-    assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", PLASTIC_TOOL_SEARCH_NAME, ...BALANCED_ACTIVE_PLASTIC_TOOL_NAMES]));
+    assert.equal([...harness.registry.values()].filter(t => t.outputSchema).length,11);
+    const initialActive = harness.getActiveTools();
+    for (const name of ["plastic_checkin","plastic_branchCreate"]) {
+      const result = await harness.registry.get(PLASTIC_TOOL_SEARCH_NAME)!.execute("receipt-load",{toolNames:[name]});
+      assert.deepEqual(result.details.added,[name]);
+      assert(harness.registry.get(name)!.outputSchema,"Loading preserves dedicated receipt schema");
+    }
+    assert.deepEqual(new Set(initialActive), new Set(["read", "foreign_tool", PLASTIC_TOOL_SEARCH_NAME, ...BALANCED_ACTIVE_PLASTIC_TOOL_NAMES]));
   });
 
   await withMode("loader-only", async () => {
@@ -48,7 +55,7 @@ async function main(): Promise<void> {
 
   await withMode("all-active", async () => {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
-    assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", ...publicToolNames]), "all-active should expose all 30 current Plastic tools without the new loader");
+    assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", ...publicToolNames]), "all-active should expose all 27 current Plastic tools without the new loader");
   });
 
   await withMode("balanced", async () => {

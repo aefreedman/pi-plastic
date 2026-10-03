@@ -73,13 +73,19 @@ const main = (): void => {
     "selectPrivatePathsForAutoAdd",
     "filterPendingItemsByScope",
     "isNoChangesWorkspaceCheckinError",
-    "auto-add-private-retry-success",
     "resolveCheckinPaths",
     "buildFallbackScopePaths",
     "isMergeInProgressCheckinError",
     "buildMergeInProgressCheckinMessage",
-    "updateAfter is disabled for unattended safety"
+    "assembleCheckinReceipt"
 ]);
+  failures += checkRequired(readText(new URL("../src/operations/checkin-receipt.ts", import.meta.url)), "pi-plastic/src/operations/checkin-receipt.ts", [
+    "updateAfter is disabled for unattended safety",
+    'record("private-add"',
+    'attempt("private-retry"',
+    "retryEligible",
+    "pending_recovery_failed",
+  ]);
   failures += checkRequired(readText(new URL("../src/operations/switch.ts", import.meta.url)), "pi-plastic/src/operations/switch.ts", [
     "__plasticSwitchInternals",
     "normalizeBranchSpecForComparison",

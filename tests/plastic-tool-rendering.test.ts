@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import { stripVTControlCharacters } from "node:util";
 import { createRequire } from "node:module";
-import { pathToFileURL } from "node:url";
-import { initTheme, type ExtensionAPI, type ExtensionContext, type Theme, type ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { pathToFileURL, fileURLToPath } from "node:url";
+import type { ExtensionAPI, ExtensionContext, Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Text, visibleWidth } from "@earendil-works/pi-tui";
 import registerPlastic from "../index";
 import { renderPlasticCall, renderPlasticResult, renderPlasticSearchResult } from "../src/plastic-renderers";
 
+const sdkUrl = import.meta.resolve("@earendil-works/pi-coding-agent");
+const previousPackageDir = process.env.PI_PACKAGE_DIR;
+process.env.PI_PACKAGE_DIR = fileURLToPath(new URL("../",sdkUrl));
+const { initTheme } = await import(sdkUrl);
 initTheme("dark");
 // The host's shrinkwrap may keep a separate TUI copy; keyHint reads that copy's registry.
 const hostRequire = createRequire(import.meta.resolve("@earendil-works/pi-coding-agent"));
@@ -81,6 +85,12 @@ try {
   const noChangesRecovery = render("checkin", structured("checkin", { usedNoChangesRecovery: true, rawOutput: "Checkin completed with clean-workspace recovery" }));
   assert(noChangesRecovery.startsWith("!"));
   assert.match(noChangesRecovery, /clean-workspace recovery/);
+
+  const nativeReceipt = (action: string, outcome: string, data: object, ok = true) => ({ ...textResult("presentation only"), details: {}, structuredContent: { action, outcome, data, ok, ...(!ok ? {error:{message:"Do not retry automatically"}} : {}) } });
+  assert.match(render("checkin", nativeReceipt("checkin", "completed", {createdChangeset:{id:"9007199254740997"},pendingAfter:null,steps:[{name:"private-add",effect:"command-completed"},{name:"private-retry",effect:"changeset-created"}],omittedReferences:3})), /Checkin: completed.*9007199254740997[\s\S]*3 references omitted/);
+  assert.match(render("checkin", nativeReceipt("checkin", "uncertain", {steps:[{name:"private-add",effect:"command-completed"}],pendingAfter:null}, false), false, {isError:true}), /Checkin: uncertain[\s\S]*Do not retry automatically[\s\S]*private-add: command-completed/);
+  assert.match(render("branchCreate", nativeReceipt("branch-create", "command-completed", {observedCreatedIdentity:null})), /Branch create: command-completed[\s\S]*Created identity and repository effects unverified/);
+  assert.match(render("checkin", nativeReceipt("checkin", "preflight", {wouldRun:true})), /Preview: would run/);
 
   const diff = "--- Assets/Player.cs (base)\n+++ Assets/Player.cs (workspace)\n@@ -1 +1 @@\n-old\n+new";
   const workspaceDiff = structured("diff", { outcomes: [
@@ -170,4 +180,5 @@ try {
   }
 } finally {
   setKeybindings(previousBindings);
+  if (previousPackageDir === undefined) delete process.env.PI_PACKAGE_DIR; else process.env.PI_PACKAGE_DIR = previousPackageDir;
 }

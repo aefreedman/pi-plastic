@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "action": "branch-create",
+  "provenance": { "source": "plastic", "producer": "@aefree/pi-plastic", "contentTrust": "external" },
+  "ok": true,
+  "outcome": "command-completed",
+  "completeness": { "capture": "complete", "projection": true },
+  "data": {
+    "requested": { "branch": "br:/main/fixture-é-é-日本-😀@Fictional Repository@fictional-org@cloud", "parent": null, "changeset": "cs:9007199254740993", "label": null, "comment": null, "commentsFile": "fixture-comment.txt", "allowRootBranch": false },
+    "resolvedTarget": "br:/main/fixture-é-é-日本-😀@Fictional Repository@fictional-org@cloud",
+    "parentResolution": { "basis": "not-required", "observedBranch": null, "repositoryVerification": "unverified" },
+    "parentCommands": [],
+    "command": ["branch", "create", "br:/main/fixture-é-é-日本-😀@Fictional Repository@fictional-org@cloud", "--changeset=cs:9007199254740993", "-commentsfile=fixture-comment.txt"],
+    "attempt": { "state": "started", "terminal": "observed", "exitCode": 0, "aborted": false, "timedOut": false },
+    "capture": { "stdoutBytes": 0, "stderrBytes": 0, "stdoutRetainedBytes": 0, "stderrRetainedBytes": 0, "truncated": false, "complete": true, "validUtf8": true },
+    "observedCreatedIdentity": null,
+    "repositoryVerification": "unverified",
+    "workspaceSwitch": "not-requested",
+    "effect": "not-proven"
+  }
+}

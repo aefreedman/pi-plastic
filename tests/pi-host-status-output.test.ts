@@ -1,3 +1,5 @@
+import { checkinOutputSchema, validateCheckinOutput } from "../src/pi/checkin-output";
+import { branchCreateOutputSchema, validateBranchCreateOutput } from "../src/pi/branch-create-output";
 import { codeReviewFindOutputSchema } from "../src/pi/code-review-find-output";
 import { shelvesetListOutputSchema } from "../src/pi/shelveset-list-output";
 import { workspaceListOutputSchema } from "../src/pi/workspace-list-output";
@@ -7,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Type } from "typebox";
-import { createAgentSessionServices, createAgentSessionFromServices, createCodemodeExtension, ModelRuntime, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { execFileSync } from "node:child_process";
 import { branchListOutputSchema } from "../src/pi/branch-list-output";
 import { currentBranchOutputSchema, branchExistsOutputSchema } from "../src/pi/branch-output";
 import { diffOutputSchema } from "../src/pi/diff-output";
@@ -19,6 +21,15 @@ import { xmlStatus, xmlRecord } from "./fixtures/status-xml";
 // Node treats fixture/status and fixture/version as scripts, so this works without shell wrappers.
 const fixture = await mkdtemp(join(tmpdir(), "pi-plastic-status-host-"));
 const sdkUrl = import.meta.resolve("@earendil-works/pi-coding-agent");
+const previousPackageDir = process.env.PI_PACKAGE_DIR;
+const localPackageDir = fileURLToPath(new URL("../",sdkUrl));
+// Pin the local package root before SDK config/assets/version are evaluated.
+process.env.PI_PACKAGE_DIR = localPackageDir;
+const { createAgentSessionServices, createAgentSessionFromServices, createCodemodeExtension, ModelRuntime, SessionManager, SettingsManager } = await import(sdkUrl);
+const runtimeConfig = await import(new URL("./config.js",sdkUrl).href);
+assert.equal(resolve(runtimeConfig.getPackageDir()),resolve(localPackageDir));
+assert.equal(runtimeConfig.VERSION,"1.0.1");
+assert.equal(execFileSync(process.execPath,[fileURLToPath(new URL("./cli.js",sdkUrl)),"--version"],{env:{...process.env,PI_PACKAGE_DIR:localPackageDir},encoding:"utf8"}).trim(),"1.0.1");
 const aiUrl = (() => { try { return import.meta.resolve("@earendil-works/pi-ai"); } catch { return new URL("../node_modules/@earendil-works/pi-ai/dist/index.js", sdkUrl).href; } })();
 const ai = await import(aiUrl);
 const extensionPath = fileURLToPath(new URL("../index.ts", import.meta.url));
@@ -35,6 +46,54 @@ const data = JSON.parse(fs.readFileSync("scenario.json", "utf8"));
 if (data.fail) { process.stderr.write("private fixture error and path"); process.exit(1); }
 process.stdout.write(data.output);
 `;
+// Only synthetic local Node scripts; no real Plastic process is reachable here.
+const receiptCommandFixture = String.raw`const fs = require("node:fs"), path = require("node:path");
+fs.appendFileSync("calls.jsonl", JSON.stringify(process.argv.slice(1)) + "\n");
+const data = JSON.parse(fs.readFileSync("scenario.json", "utf8"));
+let cfg; try { cfg = JSON.parse(data.output); } catch {}
+if (cfg?.kind !== "receipts") {
+  if (data.fail) { process.stderr.write("private fixture error and path"); process.exit(1); }
+  process.stdout.write(data.output); process.exit(0);
+}
+const command = path.basename(process.argv[1]), argv = process.argv.slice(2);
+const lines = fs.readFileSync("calls.jsonl", "utf8").trim().split("\n").map(JSON.parse);
+const count = name => lines.filter(a => path.basename(a[0]) === name).length;
+const pending = "STATUS\x1f9007199254740993\x1fExample Repository\x1fexample@unity\r\n";
+const file = path.join(process.cwd(), "résumé-é-日本-😀.txt");
+const row = code => [code, file, "False", code === "PR" ? "-1" : "9007199254740995", "NO_MERGES"].join("\x1f") + "\r\n";
+if (command === "status") {
+  if (!argv.includes("--machinereadable")) {
+    process.stdout.write(cfg.parent === "owner-only" ? "cs:9007199254740993@rep:Example Repository@repserver:example@unity\r\n" : "/main/fork-é-é-日本-😀@Example Repository@example@unity (cs:9007199254740993 - head)\r\n");
+  } else if (count("status") > 1 && ["after-failed", "recovery-failed", "compound-after-failed"].includes(cfg.mode)) {
+    process.stderr.write("PRIVATE_HOST_DIAGNOSTIC failed pending read"); process.exitCode = 1;
+  } else process.stdout.write(cfg.mode === "pending-unadmitted" ? "UNKNOWN" : pending + (count("status") === 1 ? row(cfg.mode.startsWith("compound") || cfg.mode === "private-ineligible" ? "PR" : cfg.mode === "fallback" ? "LD" : "CH") : ""));
+} else if (command === "add") {
+  process.stdout.write("PRIVATE_HOST_DIAGNOSTIC add completed");
+} else if (command === "branch") {
+  if (cfg.mode === "uncertain") { process.stderr.write("PRIVATE_HOST_DIAGNOSTIC"); process.exitCode = 1; }
+  else if (cfg.mode === "overflow") process.stdout.write("x".repeat(65537));
+  else if (cfg.mode === "invalid-utf8") process.stdout.write(Buffer.from([255]));
+  else process.stdout.write("");
+} else if (command === "checkin") {
+  const sep = n => argv.find(a => a.startsWith(n + "=")).slice(n.length + 1);
+  const rec = (op, fields = []) => sep("--startlineseparator") + [op, ...fields].join(sep("--fieldseparator")) + sep("--endlineseparator") + "\r\n";
+  let output = rec("CI_START") + rec("STAGE", [""]);
+  const first = count("checkin") === 1;
+  if (["no-changes", "recovery-failed", "private-ineligible"].includes(cfg.mode) || cfg.mode.startsWith("compound") && (first || cfg.mode === "compound-retry-failed") || cfg.mode === "fallback" && first) {
+    process.stderr.write(cfg.mode === "fallback" ? "is not changed in current workspace" : "There are no changes in the workspace"); process.exitCode = 1;
+  } else {
+    const payload = "cs:9007199254740997@br:/main/café-é-日本-😀@Example Repository@example@unity (mount:'/')";
+    if (cfg.mode === "projection") for (let i = 0; i < 110; i++) output += rec("AD", [path.join(process.cwd(), i + "-" + path.basename(file))]);
+    else output += rec("CO", [file]);
+    output += rec("CHANGESET", [payload]);
+  }
+  if (cfg.mode === "unknown") output += rec("UNKNOWN", ["unsupported full tail"]);
+  if (cfg.mode === "empty") output = "";
+  if (cfg.mode === "overflow") output = "x".repeat(65537);
+  if (cfg.mode === "invalid-utf8") process.stdout.write(Buffer.from([255]));
+  else process.stdout.write(output);
+} else { throw Error("Unexpected receipt command"); }
+`;
 let action: { name: string; arguments: Record<string, unknown> };
 let turns = 0;
 const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
@@ -45,7 +104,7 @@ globalThis.fetch = (() => { throw Error("No network transport is allowed in this
 try {
 await writeFile(join(fixture, "help"), 'require("node:fs").appendFileSync("calls.jsonl",JSON.stringify(process.argv.slice(1))+"\\n"); console.log("--to --merge --nointeractiveresolution --machinereadable --startlineseparator --endlineseparator --fieldseparator");', {flag:"wx"});
 await writeFile(join(fixture,"merge"), `const fs=require("node:fs");fs.appendFileSync("calls.jsonl",JSON.stringify(process.argv.slice(1))+"\\n");const d=JSON.parse(fs.readFileSync("scenario.json","utf8"));const sep=n=>process.argv.find(a=>a.startsWith(n+"=")).slice(n.length+1);const rec=(op,fields)=>sep("--startlineseparator")+[op,...fields].join(sep("--fieldseparator"))+sep("--endlineseparator")+"\\n";if(d.fail){process.stderr.write("private fixture failure");process.exit(1);}let output=d.output==="no-op"?rec("STATUS",["ALREADY_CONNECTED","No merges detected"]):d.output==="conflict"?rec("FILE_CONFLICT",["/日本😀.txt","1","2","3","4"]):rec("CHANGESET",["cs:42@/target-😀@Example Repository@example-org@unity (mount:'/')"]);if(d.output==="uncertain")output+=rec("OTHER",["unsupported"]);process.stdout.write(output);if(d.output==="conflict")process.exitCode=1;`,{flag:"wx"});
-await writeFile(join(fixture, "status"), commandFixture, { flag: "wx" });
+for (const command of ["status", "checkin", "branch", "add"]) await writeFile(join(fixture, command), receiptCommandFixture, { flag: "wx" });
 await writeFile(join(fixture, "find"), commandFixture, { flag: "wx" });
 await writeFile(join(fixture, "workspace"), commandFixture, { flag: "wx" });
 await writeFile(join(fixture, "cat"), `const fs=require("node:fs");fs.appendFileSync("calls.jsonl",JSON.stringify(process.argv.slice(1))+"\\n");const data=JSON.parse(fs.readFileSync("scenario.json","utf8"));if(data.fail){process.stderr.write("private fixture error");process.exit(1);}const pair=JSON.parse(data.output);const dest=process.argv.find(a=>a.startsWith("--file=")).slice(7);fs.writeFileSync(dest,Buffer.from(process.argv[2].endsWith("#cs:2")?pair.right:pair.left,"base64"),{flag:"wx"});`, {flag:"wx"});
@@ -53,9 +112,9 @@ await writeFile(join(fixture, "scenario.json"), "{}", { flag: "wx" });
 await writeFile(join(fixture, "calls.jsonl"), "", { flag: "wx" });
 await writeFile(join(fixture, "version"), `require("node:fs").appendFileSync("calls.jsonl", "version\\n"); console.log("fixture-version");`, { flag: "wx" });
 await writeFile(modifierPath, `export default function(pi) {
-  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
+  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
   pi.on("tool_result", e => {
-    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches"].includes(e.toolName)) return;
+    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate"].includes(e.toolName)) return;
     if (globalThis.__plasticHostFixture.scenario === "content-only") return { content: [{ type: "text", text: "foreign replacement" }] };
   });
 }`, { flag: "wx" });
@@ -81,16 +140,16 @@ await writeFile(modifierPath, `export default function(pi) {
     settingsManager: SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } }),
     resourceLoaderOptions: { additionalExtensionPaths: [modifierPath, extensionPath], extensionFactories: [createCodemodeExtension({ mode: "on", models: false }), pi => {
       pi.registerTool({ name: "fixture_throw", label: "Throw", description: "Fixture", parameters: Type.Object({}), async execute() { throw Error("fixture thrown"); } });
-      pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Union([Type.Literal("xml"), Type.Literal("names"), Type.Literal("fields"), Type.Literal("ids"), Type.Literal("native")])) }), async execute(_id, params, _signal, _update, ctx) {
+      pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), request: Type.Optional(Type.Any()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Union([Type.Literal("xml"), Type.Literal("names"), Type.Literal("fields"), Type.Literal("ids"), Type.Literal("native")])) }), async execute(_id, params, _signal, _update, ctx) {
         const controller = new AbortController(); if (params.abort) controller.abort();
-        state.nested = await ctx.executeTool(params.child ?? "plastic_status", params.child === "plastic_mergeBranches" ? {source:"br:/source@Example Repository@example-org@cloud",target:"br:/target-😀@Example Repository@example-org@cloud",message:"Fixture Unicode résumé 日本語 😀"} : params.child === "plastic_diff" ? { mode:"revisions", leftRevision:"Assets/Fictional.txt#cs:1", rightRevision:"Assets/Fictional.txt#cs:2" } : ["plastic_shelvesetList", "plastic_codeReviewFind"].includes(params.child ?? "") ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
+        state.nested = await ctx.executeTool(params.child ?? "plastic_status", ["plastic_checkin", "plastic_branchCreate"].includes(params.child ?? "") ? params.request ?? {} : params.child === "plastic_mergeBranches" ? {source:"br:/source@Example Repository@example-org@cloud",target:"br:/target-😀@Example Repository@example-org@cloud",message:"Fixture Unicode résumé 日本語 😀"} : params.child === "plastic_diff" ? { mode:"revisions", leftRevision:"Assets/Fictional.txt#cs:1", rightRevision:"Assets/Fictional.txt#cs:2" } : ["plastic_shelvesetList", "plastic_codeReviewFind"].includes(params.child ?? "") ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
         return { content: [{ type: "text", text: "nested result inspected outside transcript" }], details: { childIsError: state.nested.isError } };
       } });
     }], noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true, systemPrompt: "Run only the local scripted action." },
   });
   assert.deepEqual(services.diagnostics.filter(d => d.type === "error"), []);
   assert.deepEqual(services.resourceLoader.getExtensions().errors, []);
-  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "codemode", "fixture_throw", "fixture_nested"] }));
+  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate", "codemode", "fixture_throw", "fixture_nested"] }));
   await session.bindExtensions({});
   assert.deepEqual(session.getToolDefinition("plastic_status").outputSchema, statusOutputSchema);
   assert.equal(resolve(session.getAllTools().find((tool: any) => tool.name === "plastic_status").sourceInfo.path), resolve(extensionPath));
@@ -102,7 +161,7 @@ await writeFile(modifierPath, `export default function(pi) {
     const start = records.length;
     await session.prompt(scenario);
     const parent = session.messages.filter((m: any) => m.role === "toolResult").at(-1);
-    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
+    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
   };
   const script = (args: object) => ({ code: `const dto = await tools.plastic_status(${JSON.stringify(args)}); if (typeof dto !== "object") throw Error("unexpected fallback"); text(dto);` });
   const text = (result: any) => result.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
@@ -395,9 +454,97 @@ await writeFile(modifierPath, `export default function(pi) {
   const mergeAbort=await run("merge-abort","fixture_nested",{child:"plastic_mergeBranches",abort:true},"completed");assert(state.nested.isError);assert.equal(mergeAbort.calls.length,0);
   const mergeBlocked=await run("blocked","codemode",{code:"try{await tools.plastic_mergeBranches("+JSON.stringify(mergeRequest)+");throw Error('must reject');}catch(e){text(String(e));}"},"completed");assert.equal(mergeBlocked.calls.length,0);assert.equal(mergeBlocked.children[0].result.structuredContent,undefined);
   const mergeReplaced=await run("content-only","codemode",{code:"text(await tools.plastic_mergeBranches("+JSON.stringify(mergeRequest)+"));"},"completed");assert.equal(mergeReplaced.children[0].result.structuredContent,undefined);assert.match(text(mergeReplaced.parent),/foreign replacement/);
+  // Selected mutation receipts use the file-loaded adapter/finalizer, not direct executors.
+  const runtimeVersion = JSON.parse(await readFile(new URL("../package.json", sdkUrl), "utf8")).version;
+  const tuiVersion = JSON.parse(await readFile(new URL("../package.json", import.meta.resolve("@earendil-works/pi-tui")), "utf8")).version;
+  assert.equal(runtimeVersion, "1.0.1"); assert.equal(tuiVersion, "1.0.1");
+  const receiptRun = (scenario: string, name: string, args: Record<string, unknown>, mode = "completed", parent = "loaded") => run(scenario, name, args, JSON.stringify({kind:"receipts",mode,parent}));
+  const checkinRequest = {message:"Fixture résumé é 日本語 😀",paths:["résumé-é-日本-😀.txt"]};
+  const branchRequest = {branch:"br:/main/task-é-é-日本-😀@Example Repository@example@unity",comment:"Fixture branch"};
+  const normalizedCheckin = (dto: any) => { const d = structuredClone(dto); d.data.command = d.data.command?.map((a: string) => /^--(?:startlineseparator|endlineseparator|fieldseparator)=/.test(a) ? a.replace(/[a-f0-9]{32}/, "nonce") : a); return d; };
+  const names = (r: any) => r.calls.map((c: string) => JSON.parse(c)[0].split(/[\\/]/).at(-1));
+  for (const [tool, schema, request, validate, normalize, sequence] of [
+    ["plastic_checkin",checkinOutputSchema,checkinRequest,validateCheckinOutput,normalizedCheckin,["status","checkin","status"]],
+    ["plastic_branchCreate",branchCreateOutputSchema,branchRequest,validateBranchCreateOutput,(d: any) => d,["branch"]],
+  ] as const) {
+    assert.deepEqual(session.getToolDefinition(tool).outputSchema, schema);
+    assert.equal(resolve(session.getAllTools().find((t: any) => t.name === tool).sourceInfo.path), resolve(extensionPath));
+    const direct = await receiptRun("receipt-direct",tool,request), dto = direct.children[0].result.structuredContent;
+    assert(validate(dto)); assert(dto.ok); assert.deepEqual(names(direct),sequence); assert.deepEqual(direct.children[0].result.details,{});
+    assert.equal(direct.parent.isError,false); assert.equal(direct.parent.structuredContent,undefined);
+    assert.deepEqual(JSON.parse(JSON.stringify(direct.children[0])),direct.children[0]);
+    if (tool === "plastic_branchCreate") { assert.equal(dto.data.observedCreatedIdentity,null); assert.equal(dto.data.effect,"not-proven"); }
+    else { assert.equal(dto.data.createdChangeset.id,"9007199254740997"); assert.equal(dto.data.createdChangeset.server,"example@unity"); }
+    for (const format of ["text","json"]) {
+      const input = tool === "plastic_checkin" ? {...request,format} : request;
+      const result = await receiptRun("receipt-code-"+format,"codemode",{code:`text(await tools.${tool}(${JSON.stringify(input)}));`});
+      assert.deepEqual(normalize(result.children[0].result.structuredContent),normalize(dto));
+      assert.equal(result.parent.details.calls[0].status,"ok"); assert.deepEqual(names(result),sequence);
+    }
+    const nested = await receiptRun("receipt-nested","fixture_nested",{child:tool,request});
+    assert.deepEqual(normalize(state.nested.result.structuredContent),normalize(dto)); assert.deepEqual(names(nested),sequence);
+    const abort = await receiptRun("receipt-abort","fixture_nested",{child:tool,request,abort:true});
+    assert(state.nested.isError); assert.equal(abort.calls.length,0);
+    assert.equal(state.nested.result.structuredContent,undefined,"Host preabort short-circuits before the producer; no fabricated receipt");
+    const subset = await receiptRun("receipt-selective","codemode",{code:`const d=await tools.${tool}(${JSON.stringify(request)});text({outcome:d.outcome});`});
+    assert.match(text(subset.parent),tool === "plastic_checkin" ? /completed/ : /command-completed/);
+    assert.doesNotMatch(text(subset.parent),/schemaVersion|Example Repository/); assert.deepEqual(names(subset),sequence);
+    const blocked = await receiptRun("blocked","codemode",{code:`try{await tools.${tool}(${JSON.stringify(request)});throw Error('must reject');}catch(e){text(String(e));}`});
+    assert.equal(blocked.calls.length,0); assert.equal(blocked.children[0].result.structuredContent,undefined);
+    const replaced = await receiptRun("content-only","codemode",{code:`text(await tools.${tool}(${JSON.stringify(request)}));`});
+    assert.equal(replaced.children[0].result.structuredContent,undefined); assert.match(text(replaced.parent),/foreign replacement/); assert.deepEqual(names(replaced),sequence);
+    for (const mode of tool === "plastic_checkin" ? ["unknown","empty","overflow","invalid-utf8","no-changes","recovery-failed"] : ["uncertain","overflow","invalid-utf8"]) {
+      const error = await receiptRun("receipt-error","codemode",{code:`text(await tools.${tool}(${JSON.stringify(request)}));`},mode);
+      const failed = error.children[0].result.structuredContent; assert(validate(failed)); assert(!failed.ok); assert.equal(failed.outcome,"uncertain");
+      assert.equal(error.children[0].isError,true); assert.equal(error.parent.details.calls[0].status,"error");
+      assert.doesNotMatch(JSON.stringify(failed),/PRIVATE_HOST_DIAGNOSTIC/); assert.deepEqual(error.children[0].result.details,{});
+      assert(Buffer.byteLength(JSON.stringify(failed)) <= 131072); assert(Buffer.byteLength(text(error.children[0].result)) <= 24000);
+      assert.deepEqual(names(error),tool === "plastic_checkin" ? ["status","checkin",...(["no-changes","recovery-failed"].includes(mode)?["status"]:[])] : ["branch"]);
+      if (tool === "plastic_checkin") { assert.equal(failed.data.createdChangeset,null); assert.equal(failed.data.pendingAfter?.totalPending ?? null,mode === "no-changes"?0:null); }
+      else assert.equal(failed.data.observedCreatedIdentity,null);
+      assert.deepEqual(JSON.parse(JSON.stringify(error.children[0])),error.children[0]);
+    }
+  }
+  for (const format of ["text","json"]) {
+    const preview = await receiptRun("checkin-preflight","plastic_checkin",{...checkinRequest,preflight:true,format});
+    const dto = preview.children[0].result.structuredContent; assert(validateCheckinOutput(dto)); assert.equal(dto.outcome,"preflight");
+    assert.deepEqual(names(preview),["status"]); assert.equal(dto.data.effect,"not-attempted"); assert.equal(dto.data.createdChangeset,null);
+  }
+  const updateBlocked = await receiptRun("checkin-update-blocked","plastic_checkin",{...checkinRequest,updateAfter:true});
+  assert.equal(updateBlocked.calls.length,0); assert.equal(updateBlocked.children[0].result.structuredContent.error.code,"UNATTENDED_UPDATE_AFTER_BLOCKED");
+  const pendingBlocked = await receiptRun("checkin-pending-unadmitted","plastic_checkin",checkinRequest,"pending-unadmitted");
+  assert.deepEqual(names(pendingBlocked),["status"]); assert.equal(pendingBlocked.children[0].result.structuredContent.outcome,"unsupported");
+  for (const mode of ["compound","compound-after-failed","compound-retry-failed","fallback","after-failed","projection"]) {
+    const result = await receiptRun("checkin-effects","plastic_checkin",checkinRequest,mode), dto = result.children[0].result.structuredContent;
+    assert(validateCheckinOutput(dto)); assert.equal(dto.ok,mode !== "compound-retry-failed");
+    assert.deepEqual(names(result),mode.startsWith("compound") ? ["status","checkin","add","checkin",...(mode === "compound-retry-failed"?[]:["status"])] : mode === "fallback" ? ["status","checkin","checkin","status"] : ["status","checkin","status"]);
+    if (mode.startsWith("compound")) { assert.equal(dto.data.steps[2].effect,"command-completed"); assert.equal(dto.data.usedPrivateAutoAddRecovery,true); }
+    if (mode.endsWith("after-failed")) { assert.equal(dto.data.pendingAfter,null); assert.equal(dto.data.effect,"changeset-created"); }
+    if (mode === "compound-retry-failed") { assert.equal(dto.data.effect,"uncertain"); assert.equal(dto.data.createdChangeset,null); }
+    if (mode === "projection") { assert(dto.data.omittedReferences>0); assert.equal(dto.completeness.projection,false); }
+    if (mode === "fallback") assert.equal(dto.data.usedFallbackRetry,true);
+  }
+  const ineligible = await receiptRun("private-ineligible","plastic_checkin",{message:checkinRequest.message},"private-ineligible");
+  assert.deepEqual(names(ineligible),["status","checkin"]); assert.equal(ineligible.children[0].result.structuredContent.error.code,"private_items_ineligible");
+  for (const input of [{branch:"child@repo"},{branch:"child",parent:"/main@repo@server"},{branch:"/root"}]) {
+    const result = await receiptRun("branch-input-blocked","plastic_branchCreate",input); assert.equal(result.calls.length,0); assert(result.parent.isError);
+  }
+  const loaded = await receiptRun("branch-loaded-parent","plastic_branchCreate",{branch:"child"});
+  const loadedDto = loaded.children[0].result.structuredContent; assert(validateBranchCreateOutput(loadedDto));
+  assert.equal(loadedDto.data.resolvedTarget,"/main/fork-é-é-日本-😀/child"); assert.deepEqual(names(loaded),["status","branch"]);
+  const ownerOnly = await receiptRun("branch-owner-only","plastic_branchCreate",{branch:"child"},"completed","owner-only");
+  assert.deepEqual(names(ownerOnly),["status","status"]); assert.equal(ownerOnly.children[0].result.structuredContent.error.code,"parent_unresolved");
+  const explicitParent = await receiptRun("branch-explicit-parent","plastic_branchCreate",{branch:"child",parent:"/release"});
+  assert.deepEqual(names(explicitParent),["branch"]); assert.equal(explicitParent.children[0].result.structuredContent.data.resolvedTarget,"/release/child");
+  const max = await receiptRun("branch-max","plastic_branchCreate",{branch:"/main/"+"日".repeat(4090),comment:"日".repeat(4096)});
+  assert(validateBranchCreateOutput(max.children[0].result.structuredContent)); assert(max.parent.isError === false); assert.deepEqual(names(max),["branch"]);
+  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_")).length,11,"Host session intentionally selects the eleven schema-bearing tools; full registry count is tested separately");
+  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_") && session.getToolDefinition(t.name).outputSchema).length,11);
+  console.log(`PASS: selected checkin/branch-create receipts on SDK/tui ${runtimeVersion}/${tuiVersion}; real file loading, synthetic CLI, exact command counts, preflight/qualification/loaded-parent policy, partial effects, uncertainty/bounds, direct/codemode/nested/native-error/selective/policy/foreign-hook/SDK-event coverage`);
   console.log(`PASS: real Pi host, ${turns} local scripted turns; finalizer/codemode/nested consumers, SDK JSON events, native errors, selective context and foreign-hook fallback; zero network`);
 } finally {
   process.chdir(previous.cwd);
+  if (previousPackageDir === undefined) delete process.env.PI_PACKAGE_DIR; else process.env.PI_PACKAGE_DIR = previousPackageDir;
   session?.dispose(); globalThis.fetch = originalFetch; delete (globalThis as any).__plasticHostFixture;
   if (previous.executable === undefined) delete process.env.PI_PLASTIC_CM_EXECUTABLE; else process.env.PI_PLASTIC_CM_EXECUTABLE = previous.executable;
   if (previous.mode === undefined) delete process.env.PI_PLASTIC_TOOL_LOADING_MODE; else process.env.PI_PLASTIC_TOOL_LOADING_MODE = previous.mode;

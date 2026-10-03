@@ -83,7 +83,7 @@ export function renderPlasticCall(name: string, input: unknown, theme: RenderThe
 
 function payload(result: Result, raw: string): Record<string, unknown> {
   const structured = record((result as Result & {structuredContent?:unknown}).structuredContent);
-  if (structured.action === "diff" || structured.action === "merge-branches") return structured;
+  if (structured.action === "diff" || structured.action === "merge-branches" || structured.action === "checkin" || structured.action === "branch-create") return structured;
   const rawResult = record(result.details).rawResult;
   if (rawResult !== null && typeof rawResult === "object") return record(rawResult);
   // Only decode the package's whole JSON envelope, never a JSON fragment in CLI or diff output.
@@ -112,7 +112,7 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
   const summary: Summary = { label: "Result returned", tone: "toolOutput", notices, rows: [] };
   const textLines = raw.split(/\r?\n/).filter(line => line.trim());
   const preview = record(context?.args).preflight === true || action.endsWith("-preflight") || envelope.outcome === "preflight";
-  if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes)) && !(name === "mergeBranches" && action === "merge-branches")) {
+  if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes)) && !(name === "mergeBranches" && action === "merge-branches") && !["checkin", "branch-create"].includes(action)) {
     summary.label = "Failed";
     summary.tone = "error";
     summary.rows = textLines.slice(0, 3);
@@ -123,6 +123,19 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
     summary.label = wouldRun === false ? "Preview: would not run" : wouldRun === true ? "Preview: would run" : "Preview returned";
     summary.tone = "warning";
     summary.rows = action ? [scalar(data.reason) || scalar(data.errorCode), scalar(data.strategy)].filter(Boolean) : textLines.filter(line => /^- (?:Reason|Strategy|Command):/.test(line));
+  } else if ((name === "checkin" && action === "checkin" || name === "branchCreate" && action === "branch-create") && typeof envelope.outcome === "string") {
+    summary.label = `${name === "checkin" ? "Checkin" : "Branch create"}: ${envelope.outcome}`;
+    summary.tone = envelope.ok === false ? "error" : name === "checkin" ? "success" : "warning";
+    const changeset = scalar(record(data.createdChangeset).id);
+    if (changeset) summary.label += `${separator}cs:${changeset}`;
+    summary.rows = records(data.steps).map(step => `${scalar(step.name)}: ${scalar(step.effect)}`);
+    if (envelope.ok === false) notices.unshift(scalar(record(envelope.error).message));
+    if (name === "branchCreate") notices.push("Created identity and repository effects unverified; no workspace switch requested.");
+    else {
+      notices.push("Scope exhaustion, branch head, alias equivalence, merge links and Xlink effects unverified.");
+      if (data.pendingAfter === null) notices.push("Pending after not verified.");
+      if (count(data.omittedReferences)) notices.unshift(`${count(data.omittedReferences)} references omitted.`);
+    }
   } else if (name === "mergeBranches" && typeof envelope.outcome === "string") {
     summary.label = `Server merge: ${envelope.outcome}`;
     summary.tone = envelope.ok === false ? "error" : envelope.outcome === "completed" ? "success" : "warning";

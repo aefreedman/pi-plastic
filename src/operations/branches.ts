@@ -1,6 +1,8 @@
+import { assembleBranchCreateReceipt } from "./branch-create";
+import { presentBranchCreateReceipt } from "../presentation/branch-create";
 import { assembleBranchListObservation, presentBranchListObservation, branchListPayload } from "./branch-list";
 import { assembleCurrentBranchObservation, assembleBranchExistsObservation, presentCurrentBranchObservation, presentBranchExistsObservation } from "./branch-reads";
-import { getBranchLeafName, resolveBranchCreationTarget, normalizeBranchSpecForComparison, resolveCurrentBranchName } from "../domain/branches";
+import { getBranchLeafName, resolveBranchCreationTarget } from "../domain/branches";
 import { parsePlasticStatusBranch } from "../plastic-workspace";
 import { tool } from "../tool-definition";
 import { workdirArg } from "./arguments";
@@ -31,55 +33,9 @@ export const branchCreate = tool({
     },
     async execute(args)
     {
-        if (args.branch.trim().length === 0)
-        {
-            throw new Error("Branch must be non-empty.");
-        }
-
-        if (args.changeset && args.label)
-        {
-            throw new Error("Provide either changeset or label, not both.");
-        }
-
-        if (args.comment && args.commentsFile)
-        {
-            throw new Error("Provide either comment or commentsFile, not both.");
-        }
-
-        if (args.comment !== undefined && args.comment.trim().length === 0)
-        {
-            throw new Error("Comment must be non-empty when provided.");
-        }
-
-        const normalizedRequested = normalizeBranchSpecForComparison(args.branch);
-        const needsParent = !normalizedRequested.startsWith("/");
-        const parentBranch = needsParent
-            ? args.parent ?? await resolveCurrentBranchName(args.workdir)
-            : args.parent;
-        const targetBranch = resolveBranchCreationTarget(args.branch, parentBranch, args.allowRootBranch);
-        const cmdArgs: string[] = ["branch", "create", targetBranch];
-
-        if (args.changeset)
-        {
-            cmdArgs.push(`--changeset=${args.changeset}`);
-        }
-
-        if (args.label)
-        {
-            cmdArgs.push(`--label=${args.label}`);
-        }
-
-        if (args.comment)
-        {
-            cmdArgs.push(`-c=${args.comment}`);
-        }
-
-        if (args.commentsFile)
-        {
-            cmdArgs.push(`-commentsfile=${args.commentsFile}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
+        const dto = await assembleBranchCreateReceipt(args);
+        if (!dto.ok && dto.error.stage === "input") throw new Error(dto.error.message);
+        return presentBranchCreateReceipt(dto);
     },
 });
 

@@ -64,7 +64,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_update",
@@ -79,7 +80,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_add",
@@ -105,7 +107,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_checkin",
@@ -168,7 +171,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_undo",
@@ -194,7 +198,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_resolveDeleteChangeConflict",
@@ -241,7 +246,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_diff",
@@ -444,7 +450,8 @@
       ],
       "type": "object"
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_patch",
@@ -487,7 +494,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_branchCreate",
@@ -534,7 +542,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_switchBranch",
@@ -591,7 +600,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_merge",
@@ -656,7 +666,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_mergeBranches",
@@ -704,7 +715,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_mergeToBranch",
@@ -777,7 +789,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_finalizeMerge",
@@ -830,7 +843,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_currentBranch",
@@ -858,7 +872,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_branchList",
@@ -944,7 +959,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_branchExists",
@@ -967,7 +983,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_branchDelete",
@@ -994,7 +1011,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_shelvesetCreate",
@@ -1036,7 +1054,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_shelvesetApply",
@@ -1095,7 +1114,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_shelvesetDelete",
@@ -1118,7 +1138,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_shelvesetList",
@@ -1190,7 +1211,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_codeReviewCreate",
@@ -1235,7 +1257,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_codeReviewUpdate",
@@ -1270,7 +1293,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_codeReviewDelete",
@@ -1300,7 +1324,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": false
   },
   {
     "name": "plastic_codeReviewFind",
@@ -1414,7 +1439,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_workspaceList",
@@ -1465,7 +1491,8 @@
         }
       }
     },
-    "defaults": {}
+    "defaults": {},
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_tool_search",
@@ -1498,6 +1525,7 @@
     "promptSnippet": "Use plastic_tool_search to find and enable Plastic SCM capabilities that are not active.",
     "promptGuidelines": [
       "Use plastic_tool_search before a Plastic SCM action when an appropriate plastic_* tool is not active. Inspect exact mutation targets. Do not preflight routinely: use preflight for ambiguous or broad scope, moved/deleted path rewriting, compound operations, or an explicit preview request."
-    ]
+    ],
+    "hasOutputSchema": false
   }
 ]

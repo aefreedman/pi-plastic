@@ -38,8 +38,9 @@ Unattended behavior notes:
   the tool auto-runs `cm add` for safe in-scope private paths, then retries checkin once.
 - Sensitive private paths (for example `.env*`, private key extensions, `.npmrc`, credentials/secrets JSON)
   are excluded from auto-add and reported as warnings/errors for explicit handling.
-- The JSON response includes decision metadata (`decisionPath`, pre/post pending summaries, and auto-add info)
-  so agents can continue unattended without asking for confirmation.
+- The closed receipt includes per-step attempts/capture/effects, pending summaries (null when unverified), and private-add/fallback decisions. Eligibility requires complete admitted native failure, never launch/capture/timeout/abort uncertainty.
+- A failed checkin followed by an empty or failed pending read remains uncertain, not completed. Successful earlier add/checkin effects remain recorded after later failure. Completion requires an admitted root changeset, not exit zero or empty output. Scope exhaustion, branch head, alias equivalence and Xlink/link effects stay unverified.
+- `preflight=true` performs one pending read, no mutation. Text/JSON present the same bounded receipt; registered native errors set `isError`.
 
 Note: avoid `updateAfter=true` in unattended runs because it can trigger interactive update-merge. Use `plastic_update()` followed by `plastic_merge(...)` (default auto strategy) when a merge is required.
 
