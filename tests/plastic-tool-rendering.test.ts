@@ -37,6 +37,17 @@ const render = (name: string, result: Parameters<typeof renderPlasticResult>[1],
 };
 
 try {
+  const { executeUpdateOutput } = await import("../src/pi/update-output");
+  const rejectedUpdatePreview = await executeUpdateOutput({preflight:true});
+  assert(rejectedUpdatePreview.isError);
+  colors.length=0;
+  const rejectedView=render("update",rejectedUpdatePreview,false,{args:{preflight:true},isError:true});
+  assert.match(rejectedView,/Update: failed/);
+  assert.match(rejectedView,/preview and extra options are unsupported/);
+  assert.match(rejectedView,/not-attempted/);
+  assert.doesNotMatch(rejectedView,/Preview returned|Preview: would/);
+  assert(colors.some(c=>c.color==="error"));
+
   const call = renderPlasticCall("mergeBranches", { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", preflight: true }, theme);
   assert.match(plain(call), /Plastic.*Server merge.*server.*preview\n.*task@Game@cloud -> br:\/main@Game@cloud/);
   const workspaceCall = renderPlasticCall("diff", { mode:"workspace", workdir: "C:\\Projects\\MyGame", paths: ["Assets/Player.cs", "Assets/UI.cs", "Assets/Game.cs"] }, theme);

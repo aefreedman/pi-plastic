@@ -111,7 +111,7 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
   const notices = strings(envelope.warnings);
   const summary: Summary = { label: "Result returned", tone: "toolOutput", notices, rows: [] };
   const textLines = raw.split(/\r?\n/).filter(line => line.trim());
-  const preview = record(context?.args).preflight === true || action.endsWith("-preflight") || envelope.outcome === "preflight";
+  const preview = action !== "update" && (record(context?.args).preflight === true || action.endsWith("-preflight") || envelope.outcome === "preflight");
   if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes)) && !(name === "mergeBranches" && action === "merge-branches") && !["checkin", "branch-create", "switch-branch", "update"].includes(action)) {
     summary.label = "Failed";
     summary.tone = "error";
