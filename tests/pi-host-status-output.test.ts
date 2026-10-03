@@ -2,6 +2,7 @@ import { checkinOutputSchema, validateCheckinOutput } from "../src/pi/checkin-ou
 import { branchCreateOutputSchema, validateBranchCreateOutput } from "../src/pi/branch-create-output";
 import { switchOutputSchema, validateSwitchOutput } from "../src/pi/switch-output";
 import { updateOutputSchema, validateUpdateOutput } from "../src/pi/update-output";
+import { addOutputSchema, validateAddOutput } from "../src/pi/add-output";
 import { codeReviewFindOutputSchema } from "../src/pi/code-review-find-output";
 import { shelvesetListOutputSchema } from "../src/pi/shelveset-list-output";
 import { workspaceListOutputSchema } from "../src/pi/workspace-list-output";
@@ -53,6 +54,14 @@ const receiptCommandFixture = String.raw`const fs = require("node:fs"), path = r
 fs.appendFileSync("calls.jsonl", JSON.stringify(process.argv.slice(1)) + "\n");
 const data = JSON.parse(fs.readFileSync("scenario.json", "utf8"));
 let cfg; try { cfg = JSON.parse(data.output); } catch {}
+if (cfg?.kind === "add") {
+ if(path.basename(process.argv[1])!=="add")throw Error("Unexpected add command");
+ if(cfg.mode==="partial"){process.stdout.write("PRIVATE_HOST_DIAGNOSTIC one item added");process.stderr.write("PRIVATE_HOST_DIAGNOSTIC missing operand");process.exitCode=1;}
+ else if(cfg.mode==="invalid-utf8")process.stdout.write(Buffer.from([255]));
+ else if(cfg.mode==="overflow")process.stdout.write("x".repeat(65537));
+ else if(cfg.mode==="warning"){process.stdout.write("Opaque progress é-é-日本-😀");process.stderr.write("warning");}
+ process.exit();
+}
 if (cfg?.kind === "update") {
  if(path.basename(process.argv[1])!=="update")throw Error("Unexpected update command");
  if(cfg.mode==="failed"){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC partial update");process.exitCode=1;}
@@ -144,9 +153,9 @@ await writeFile(join(fixture, "scenario.json"), "{}", { flag: "wx" });
 await writeFile(join(fixture, "calls.jsonl"), "", { flag: "wx" });
 await writeFile(join(fixture, "version"), `require("node:fs").appendFileSync("calls.jsonl", "version\\n"); console.log("fixture-version");`, { flag: "wx" });
 await writeFile(modifierPath, `export default function(pi) {
-  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
+  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
   pi.on("tool_result", e => {
-    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update"].includes(e.toolName)) return;
+    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add"].includes(e.toolName)) return;
     if (globalThis.__plasticHostFixture.scenario === "content-only") return { content: [{ type: "text", text: "foreign replacement" }] };
   });
 }`, { flag: "wx" });
@@ -174,14 +183,14 @@ await writeFile(modifierPath, `export default function(pi) {
       pi.registerTool({ name: "fixture_throw", label: "Throw", description: "Fixture", parameters: Type.Object({}), async execute() { throw Error("fixture thrown"); } });
       pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), request: Type.Optional(Type.Any()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Union([Type.Literal("xml"), Type.Literal("names"), Type.Literal("fields"), Type.Literal("ids"), Type.Literal("native")])) }), async execute(_id, params, _signal, _update, ctx) {
         const controller = new AbortController(); if (params.abort) controller.abort();
-        state.nested = await ctx.executeTool(params.child ?? "plastic_status", ["plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update"].includes(params.child ?? "") ? params.request ?? {} : params.child === "plastic_mergeBranches" ? {source:"br:/source@Example Repository@example-org@cloud",target:"br:/target-😀@Example Repository@example-org@cloud",message:"Fixture Unicode résumé 日本語 😀"} : params.child === "plastic_diff" ? { mode:"revisions", leftRevision:"Assets/Fictional.txt#cs:1", rightRevision:"Assets/Fictional.txt#cs:2" } : ["plastic_shelvesetList", "plastic_codeReviewFind"].includes(params.child ?? "") ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
+        state.nested = await ctx.executeTool(params.child ?? "plastic_status", ["plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add"].includes(params.child ?? "") ? params.request ?? {} : params.child === "plastic_mergeBranches" ? {source:"br:/source@Example Repository@example-org@cloud",target:"br:/target-😀@Example Repository@example-org@cloud",message:"Fixture Unicode résumé 日本語 😀"} : params.child === "plastic_diff" ? { mode:"revisions", leftRevision:"Assets/Fictional.txt#cs:1", rightRevision:"Assets/Fictional.txt#cs:2" } : ["plastic_shelvesetList", "plastic_codeReviewFind"].includes(params.child ?? "") ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
         return { content: [{ type: "text", text: "nested result inspected outside transcript" }], details: { childIsError: state.nested.isError } };
       } });
     }], noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true, systemPrompt: "Run only the local scripted action." },
   });
   assert.deepEqual(services.diagnostics.filter(d => d.type === "error"), []);
   assert.deepEqual(services.resourceLoader.getExtensions().errors, []);
-  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate", "plastic_switchBranch", "plastic_update", "codemode", "fixture_throw", "fixture_nested"] }));
+  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate", "plastic_switchBranch", "plastic_update", "plastic_add", "codemode", "fixture_throw", "fixture_nested"] }));
   await session.bindExtensions({});
   assert.deepEqual(session.getToolDefinition("plastic_status").outputSchema, statusOutputSchema);
   assert.equal(resolve(session.getAllTools().find((tool: any) => tool.name === "plastic_status").sourceInfo.path), resolve(extensionPath));
@@ -193,7 +202,7 @@ await writeFile(modifierPath, `export default function(pi) {
     const start = records.length;
     await session.prompt(scenario);
     const parent = session.messages.filter((m: any) => m.role === "toolResult").at(-1);
-    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
+    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
   };
   const script = (args: object) => ({ code: `const dto = await tools.plastic_status(${JSON.stringify(args)}); if (typeof dto !== "object") throw Error("unexpected fallback"); text(dto);` });
   const text = (result: any) => result.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
@@ -616,8 +625,27 @@ await writeFile(modifierPath, `export default function(pi) {
     const r=await updateRun("update-"+mode,"codemode",{code:"text(await tools.plastic_update({}));"},mode),d=r.children[0].result.structuredContent;
     assert(validateUpdateOutput(d));assert.equal(d.ok,mode==="warning");assert.deepEqual(names(r),["update"]);assert.equal(r.parent.details.calls[0].status,mode==="warning"?"ok":"error");assert.doesNotMatch(JSON.stringify(d),/PRIVATE_HOST_DIAGNOSTIC/);
   }
-  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_")).length,13,"Host session intentionally selects the thirteen schema-bearing tools; full registry count is tested separately");
-  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_") && session.getToolDefinition(t.name).outputSchema).length,13);
+  assert.deepEqual(session.getToolDefinition("plastic_add").outputSchema,addOutputSchema);
+  const addRequest={paths:["space café-é-日本-😀.txt","*.png","./-literal","space café-é-日本-😀.txt"]};
+  const addRun=(scenario:string,name:string,args:Record<string,unknown>,mode="completed")=>run(scenario,name,args,JSON.stringify({kind:"add",mode}));
+  const ad=await addRun("add-direct","plastic_add",addRequest),aDto=ad.children[0].result.structuredContent;
+  assert(validateAddOutput(aDto));assert(aDto.ok);assert.deepEqual(names(ad),["add"]);assert.deepEqual(aDto.data.intendedArgv,["add",...addRequest.paths]);assert.equal(aDto.data.observedAddedItems,null);assert.equal(aDto.data.requestedOperandCount,4);
+  const ac=await addRun("add-code","codemode",{code:`text(await tools.plastic_add(${JSON.stringify(addRequest)}));`});assert.deepEqual(ac.children[0].result.structuredContent,aDto);assert.deepEqual(names(ac),["add"]);
+  const an=await addRun("add-nested","fixture_nested",{child:"plastic_add",request:addRequest});assert.deepEqual(state.nested.result.structuredContent,aDto);assert.deepEqual(names(an),["add"]);
+  const aa=await addRun("add-abort","fixture_nested",{child:"plastic_add",request:addRequest,abort:true});assert.equal(aa.calls.length,0);assert(state.nested.isError);
+  const as=await addRun("add-selective","codemode",{code:`const d=await tools.plastic_add(${JSON.stringify(addRequest)});text({outcome:d.outcome});`});assert.match(text(as.parent),/command-completed/);assert.doesNotMatch(text(as.parent),/schemaVersion|workingDirectory/);
+  const ab=await addRun("blocked","codemode",{code:`text(await tools.plastic_add(${JSON.stringify(addRequest)}));`});assert.equal(ab.calls.length,0);assert.equal(ab.children[0].result.structuredContent,undefined);
+  const ar=await addRun("content-only","codemode",{code:`text(await tools.plastic_add(${JSON.stringify(addRequest)}));`});assert.equal(ar.children[0].result.structuredContent,undefined);assert.match(text(ar.parent),/foreign replacement/);
+  for(const mode of ["partial","invalid-utf8","overflow","warning"]){
+    const r=await addRun("add-"+mode,"codemode",{code:`text(await tools.plastic_add(${JSON.stringify(addRequest)}));`},mode),d=r.children[0].result.structuredContent;
+    assert(validateAddOutput(d));assert.equal(d.ok,mode==="warning");assert.deepEqual(names(r),["add"]);assert.equal(r.parent.details.calls[0].status,mode==="warning"?"ok":"error");assert.doesNotMatch(JSON.stringify(d),/PRIVATE_HOST_DIAGNOSTIC/);
+  }
+  for(const paths of [["--recursive"],["-"],[" --coparent"],[""]]){
+    const r=await addRun("add-rejected","codemode",{code:`text(await tools.plastic_add(${JSON.stringify({paths})}));`}),d=r.children[0].result.structuredContent;
+    assert(validateAddOutput(d));assert.equal(d.outcome,"failed");assert.equal(r.calls.length,0);assert.equal(r.parent.details.calls[0].status,"error");
+  }
+  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_")).length,14,"Host session intentionally selects the fourteen schema-bearing tools; full registry count is tested separately");
+  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_") && session.getToolDefinition(t.name).outputSchema).length,14);
   console.log(`PASS: selected checkin/branch-create receipts on SDK/tui ${runtimeVersion}/${tuiVersion}; real file loading, synthetic CLI, exact command counts, preflight/qualification/loaded-parent policy, partial effects, uncertainty/bounds, direct/codemode/nested/native-error/selective/policy/foreign-hook/SDK-event coverage`);
   console.log(`PASS: real Pi host, ${turns} local scripted turns; finalizer/codemode/nested consumers, SDK JSON events, native errors, selective context and foreign-hook fallback; zero network`);
 } finally {

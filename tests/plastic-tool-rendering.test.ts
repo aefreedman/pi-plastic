@@ -48,6 +48,11 @@ try {
   assert.doesNotMatch(rejectedView,/Preview returned|Preview: would/);
   assert(colors.some(c=>c.color==="error"));
 
+  const {executeAddOutput}=await import("../src/pi/add-output");
+  const rejectedAddPreview=await executeAddOutput({paths:["x"],preflight:true});
+  const addRejectedView=render("add",rejectedAddPreview,false,{args:{preflight:true},isError:true});
+  assert.match(addRejectedView,/Add: failed/);assert.match(addRejectedView,/preview and extra options are unsupported/);assert.doesNotMatch(addRejectedView,/Preview returned/);
+
   const call = renderPlasticCall("mergeBranches", { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", preflight: true }, theme);
   assert.match(plain(call), /Plastic.*Server merge.*server.*preview\n.*task@Game@cloud -> br:\/main@Game@cloud/);
   const workspaceCall = renderPlasticCall("diff", { mode:"workspace", workdir: "C:\\Projects\\MyGame", paths: ["Assets/Player.cs", "Assets/UI.cs", "Assets/Game.cs"] }, theme);
