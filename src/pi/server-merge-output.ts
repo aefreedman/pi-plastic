@@ -46,6 +46,7 @@ export function validateServerMergeOutput(value: unknown): value is MergeReceipt
         if (!s || !t || s.repository !== t.repository || s.server !== t.server || t.branch !== d.requestedIdentity.branch || t.repository !== d.requestedIdentity.repository || t.server !== d.requestedIdentity.server || s.branch === t.branch) return false;
     }
     const c = d.counts;
+    if (c.changesetsReturned + c.conflictsReturned > 100) return false;
     if (c.changesetsReturned !== d.observedChangesets.length || c.conflictsReturned !== d.conflictPaths.length || p && (c.changesetsReturned + c.changesetsOmitted !== p.changesetsObserved || c.conflictsReturned + c.conflictsOmitted !== p.conflictsObserved)) return false;
     if ((c.changesetsOmitted || c.conflictsOmitted) && dto.completeness.projection) return false;
     if (dto.outcome === "completed" && (a.exitCode !== 0 || !d.requestedIdentity || !d.createdChangeset || d.createdChangeset.branch !== d.requestedIdentity.branch || d.createdChangeset.repository !== d.requestedIdentity.repository || d.createdChangeset.mount !== "/" || p?.changesetsObserved !== 1 || p.conflictsObserved !== 0)) return false;

@@ -70,7 +70,8 @@ export async function assembleServerMergeReceipt(input: unknown): Promise<MergeR
         const parsed = parseServerMergeOutput(obs.stdout ?? "", seps);
         const paths = parsed.records.filter(r => r.operation === "FILE_CONFLICT" && r.fields.length === 6 && r.fields[1]!.length <= 4096 && !serverMergeControlPattern.test(r.fields[1]!)).map(r => r.fields[1]!);
         data.parse = { records: parsed.records.length, malformed: parsed.malformed, unknownOperations: parsed.unknownOperations.length, changesetsObserved: parsed.changesets.length, conflictsObserved: paths.length };
-        data.observedChangesets = parsed.changesets.slice(0, 100); data.conflictPaths = paths.slice(0, 100);
+        // One aggregate evidence budget, not one budget per collection.
+        data.observedChangesets = parsed.changesets.slice(0, 100); data.conflictPaths = paths.slice(0, 100 - data.observedChangesets.length);
         data.counts = { changesetsReturned: data.observedChangesets.length, changesetsOmitted: parsed.changesets.length - data.observedChangesets.length, conflictsReturned: data.conflictPaths.length, conflictsOmitted: paths.length - data.conflictPaths.length };
         if (data.counts.changesetsOmitted || data.counts.conflictsOmitted) completeness.projection = false;
         const matching = parsed.changesets.filter(c => c.branch === target.branch && c.repository === target.repository && c.mount === "/");

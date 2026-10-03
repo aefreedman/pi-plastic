@@ -25,6 +25,7 @@ async function invoke(scenario: Scenario = {}, input: any = args) {
             const record = (op: string, fields: string[]) => sep("--startlineseparator") + [op, ...fields].join(sep("--fieldseparator")) + sep("--endlineseparator") + "\r\n";
             const cs = record("CHANGESET", ["cs:9007199254740993@/target 日本-é-😀@Example Repository@example-org@unity (mount:'/')"]);
             let out = scenario.mode === "no-op" ? record("STATUS", ["ALREADY_CONNECTED", "No merges detected"]) : scenario.mode === "conflict" ? record("FILE_CONFLICT", ["/日本😀.txt", "1", "2", "3", "4"]) : cs;
+            if (scenario.mode === "mixed") out = Array.from({length:100},(_,i)=>record("FILE_CONFLICT",["/mixed-"+i+".txt","1","2","3","4"])).join("")+cs;
             if (scenario.mode === "projection") out = Array.from({ length: 101 }, (_, i) => record("FILE_CONFLICT", ["/" + i + "-" + "日本😀".repeat(20), "1", "2", "3", "4"])).join("");
             if (scenario.mode === "tail") out += "foreign trailing text";
             if (scenario.mode === "empty") out = "";
@@ -56,6 +57,8 @@ for (const s of [{ mode: "tail" }, { mode: "empty" }, { mode: "unknown" }, { mod
 ({ dto } = await invoke({ mode: "no-op" })); assert(dto.ok); assert.equal(dto.data.effect, "not-proven");
 ({ dto } = await invoke({ mode: "conflict" })); assert.equal(dto.outcome, "conflict"); assert.deepEqual(dto.data.conflictPaths, ["/日本😀.txt"]);
 ({ dto } = await invoke({ mode: "projection" })); assert.equal(dto.outcome, "conflict"); assert.equal(dto.data.parse.conflictsObserved, 101); assert.equal(dto.data.counts.conflictsReturned, 100); assert.equal(dto.data.counts.conflictsOmitted, 1); assert.equal(dto.completeness.projection, false);
+({dto}=await invoke({mode:"mixed",code:1}));assert.equal(dto.outcome,"uncertain");assert.equal(dto.data.effect,"uncertain");assert.equal(dto.data.parse.conflictsObserved,100);assert.equal(dto.data.parse.changesetsObserved,1);assert.equal(dto.data.counts.changesetsReturned,1);assert.equal(dto.data.counts.conflictsReturned,99);assert.equal(dto.data.counts.conflictsOmitted,1);assert.equal(dto.data.counts.changesetsOmitted,0);assert.equal(dto.completeness.projection,false);assert.equal(dto.data.observedChangesets[0].id,"9007199254740993");assert.equal(dto.data.createdChangeset,null);
+const overBudget=structuredClone(dto);overBudget.data.conflictPaths.push("/extra.txt");overBudget.data.counts.conflictsReturned++;overBudget.data.counts.conflictsOmitted--;overBudget.completeness.projection=true;assert(Check(serverMergeOutputSchema,overBudget));assert(!validateServerMergeOutput(overBudget),"individually valid arrays/counts cannot bypass the aggregate semantic cap");
 const damaged = structuredClone(dto); damaged.data.effect = "not-attempted"; assert(!validateServerMergeOutput(damaged));
 const coreCalls: string[][] = []; const core = await mergeBranches.execute({ ...args, preflight: true, format: "json" }); assert.match(String(core), /"outcome": "preflight"/); assert.equal(coreCalls.length, 0);
 console.log("PASS: closed server receipts, qualified aliases/Unicode/precision, preflight/nonstart/help gates, strict bytes, terminal uncertainty, no retries, lifecycle cleanup and whole-record projection");

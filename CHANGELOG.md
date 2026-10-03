@@ -9,6 +9,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Fixed
 
+- Server receipt evidence now shares one aggregate 100-reference budget across changesets/conflicts, with truthful omission counts and a semantic guard against separately valid over-budget collections. Mixed contradictory output remains uncertain; completed created identities stay intact.
 - Server-merge selected-tool parsing now preserves full @cloud/@unity qualifiers and genuine emitted server tails rather than moving repository text into branch names or rejecting qualified changeset records. Requested versus reported aliases remain separate and unverified.
 - Added a direct-core and registered-tool aggregate diff regression: individually complete Unicode excerpts exceed the UTF-8 envelope limit, so whole trailing outcomes are omitted without changing completed counts, retained identities or native success semantics.
 - Consolidated diff now fails closed on permission/I/O errors during deleted-file absence checks and nearest-workspace discovery. Only genuine missing paths allow synthetic deletion sides or continued discovery; observed unsupported/symlink workspace markers cannot select an enclosing workspace. Deterministic fault-injection regressions cover native failures, zero-dispatch discovery and retained partial workspace outcomes.
