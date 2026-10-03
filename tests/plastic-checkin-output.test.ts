@@ -76,7 +76,7 @@ async function invoke(scenario: Scenario = {}, args: any = input, core = false) 
     assert(Check(checkinOutputSchema, dto)); assert(validateCheckinOutput(dto)); assert.equal(r.isError, !dto.ok); assert.deepEqual(r.details, {});
     assert.doesNotMatch(JSON.stringify(dto), /PRIVATE_PATH/); assert(Buffer.byteLength(r.content[0].text, "utf8") <= 24000); assert(Buffer.byteLength(JSON.stringify(dto)) <= 131072);
     assert.equal(timers.size, 0);
-    for (const c of children) { for (const e of ["spawn", "close", "error"]) assert.equal(c.listenerCount(e), 0); for (const stream of [c.stdout, c.stderr]) for (const e of ["data", "end", "error", "close"]) assert.equal(stream.listenerCount(e), 0); }
+    for (const c of children) { for (const e of ["spawn", "close", "error"]) assert(c.listenerCount(e) === 0 || e === "error" && c.listeners(e).length === 1 && c.listeners(e)[0].name === "ignoreRetiredError"); for (const stream of [c.stdout, c.stderr]) for (const e of ["data", "end", "error", "close"]) assert(stream.listenerCount(e) === 0 || e === "error" && stream.listeners(e).length === 1 && stream.listeners(e)[0].name === "ignoreRetiredError"); }
     return { result, calls, dto };
 }
 if (process.platform !== "win32") {

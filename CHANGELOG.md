@@ -9,6 +9,10 @@ and this project follows semantic versioning for public package releases.
 
 ### Fixed
 
+- Reject every failed non-preflight core checkin so legacy closeout cannot report a successful checkin after native failure; registered native receipts remain unchanged.
+- Bound selected checkin/branch-create collector retirement even without terminal/pipe closure or successful kills: preserve TERM/KILL escalation with an additional same-grace drain, incomplete capture and truthful terminal/effect uncertainty, with state-free late-error guards.
+- Isolate rendering-test SDK configuration before transitive runtime imports and verify the actual local root/version in a fresh stale-override subprocess.
+
 - Server receipt evidence now shares one aggregate 100-reference budget across changesets/conflicts, with truthful omission counts and a semantic guard against separately valid over-budget collections. Mixed contradictory output remains uncertain; completed created identities stay intact.
 - Server-merge selected-tool parsing now preserves full @cloud/@unity qualifiers and genuine emitted server tails rather than moving repository text into branch names or rejecting qualified changeset records. Requested versus reported aliases remain separate and unverified.
 - Added a direct-core and registered-tool aggregate diff regression: individually complete Unicode excerpts exceed the UTF-8 envelope limit, so whole trailing outcomes are omitted without changing completed counts, retained identities or native success semantics.

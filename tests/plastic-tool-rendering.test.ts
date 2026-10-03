@@ -1,16 +1,20 @@
 import assert from "node:assert/strict";
 import { stripVTControlCharacters } from "node:util";
+import { resolve } from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext, Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Text, visibleWidth } from "@earendil-works/pi-tui";
-import registerPlastic from "../index";
-import { renderPlasticCall, renderPlasticResult, renderPlasticSearchResult } from "../src/plastic-renderers";
 
 const sdkUrl = import.meta.resolve("@earendil-works/pi-coding-agent");
 const previousPackageDir = process.env.PI_PACKAGE_DIR;
 process.env.PI_PACKAGE_DIR = fileURLToPath(new URL("../",sdkUrl));
 const { initTheme } = await import(sdkUrl);
+const config = await import(new URL("./config.js",sdkUrl).href);
+assert.equal(config.VERSION,"1.0.1");
+assert.equal(resolve(config.getPackageDir()),resolve(fileURLToPath(new URL("../",sdkUrl))));
+const { default: registerPlastic } = await import("../index");
+const { renderPlasticCall, renderPlasticResult, renderPlasticSearchResult } = await import("../src/plastic-renderers");
 initTheme("dark");
 // The host's shrinkwrap may keep a separate TUI copy; keyHint reads that copy's registry.
 const hostRequire = createRequire(import.meta.resolve("@earendil-works/pi-coding-agent"));

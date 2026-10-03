@@ -96,7 +96,7 @@ export const checkin = tool({
     async execute(args)
     {
         const dto = await assembleCheckinReceipt(args);
-        if (!dto.ok && dto.error.stage === "input" && !args.preflight) throw new Error(dto.error.message);
+        if (!dto.ok && !args.preflight) throw new Error(dto.error.message);
         return presentCheckinReceipt(dto, args.format);
     },
 });

@@ -38,8 +38,8 @@ async function invoke(s: Scenario = {}, args: unknown = input, core = false) {
     }) as any;
     const deps = { spawn, setTimeout: ((cb: () => void, delay: number) => { const t = setTimeout(cb, delay); timers.push(t); if (s.timeout && (delay === 30000 || s.ignoreTerm && delay === 5000)) queueMicrotask(cb); return t; }) as any, clearTimeout: clearTimeout as any };
     const result = await runWithAbortSignal(controller.signal, () => core ? branchCreate.execute(args as any) : executeBranchCreateOutput(args), deps);
-    for (const c of children) for (const event of ["spawn", "close", "error"]) assert.equal(c.listenerCount(event), 0);
-    for (const c of children) for (const stream of [c.stdout, c.stderr]) for (const event of ["data", "end", "error", "close"]) assert.equal(stream.listenerCount(event), 0);
+    for (const c of children) for (const event of ["spawn", "close", "error"]) assert(c.listenerCount(event) === 0 || event === "error" && c.listeners(event).length === 1 && c.listeners(event)[0].name === "ignoreRetiredError");
+    for (const c of children) for (const stream of [c.stdout, c.stderr]) for (const event of ["data", "end", "error", "close"]) assert(stream.listenerCount(event) === 0 || event === "error" && stream.listeners(event).length === 1 && stream.listeners(event)[0].name === "ignoreRetiredError");
     for (const t of timers) assert(t._destroyed, "timers cleaned up");
     if (core) { assert.equal(typeof result, "string"); return { calls, result, dto: undefined as any }; }
     const r = result as Awaited<ReturnType<typeof executeBranchCreateOutput>>;
