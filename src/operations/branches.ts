@@ -102,9 +102,10 @@ export const branchDelete = tool({
     },
     async execute(args)
     {
-        const dto = await assembleBranchDeleteReceipt(args);
+        const request = Object.freeze({ ...args });
+        const dto = await assembleBranchDeleteReceipt(request);
         const result = presentBranchDeleteReceipt(dto);
-        if (!dto.ok && args.preflight !== true) throw new Error(result);
-        return args.format === "json" ? JSON.stringify(dto) : result;
+        if (!dto.ok && request.preflight !== true) throw new Error(result);
+        return request.format === "json" ? JSON.stringify(dto) : result;
     },
 });
