@@ -29,7 +29,7 @@ function validateRead(s:CloseoutStage&{kind:"read"}):boolean {
  if(s.name.startsWith("loaded-")) {if(!same(r.argv,["status"])||r.parentPath||r.summary||r.emptyParentResult||r.admission==="admitted"&&!r.branch)return false;if(r.branch&&(!parseSwitchTarget(`${r.branch.branch}@${r.branch.repository}@${r.branch.server}`)||!safeSwitchValue(r.branch.branch)))return false;}
  else if(s.name==="parent"){if(r.branch||r.summary||r.admission==="admitted"&&!(r.emptyParentResult?!r.parentPath:!!r.parentPath&&!!parseSwitchTarget(r.parentPath)))return false;}
  else if(s.name==="pending-before"||s.name==="pending-final"){if(!same(r.argv,[...switchPendingArgv])||r.branch||r.parentPath||r.emptyParentResult||r.admission==="admitted"&&!r.summary)return false;if(r.summary){const p=r.summary;if(p.tracked!==p.added+p.changed+p.moved+p.deleted||p.totalPending!==p.tracked+p.private+p.other)return false;}}
- else if(s.name==="readiness"){if(!same(r.argv,["status"])||r.branch||r.parentPath||r.summary||r.emptyParentResult||r.admission==="admitted"&&!r.capture?.stdoutBytes)return false;}
+ else if(s.name==="readiness"){if(!(same(r.argv,["status"])||same(r.argv,[...switchPendingArgv]))||r.branch||r.parentPath||r.summary||r.emptyParentResult||r.admission==="admitted"&&!r.capture?.stdoutBytes)return false;}
  else return false;
  return true;
 }
@@ -58,6 +58,7 @@ export function validateCloseoutOutput(value:unknown):value is CloseoutReceipt {
  for(const [index,s] of stages.entries()) {
   if(s.kind==="read") {
    if(!validateRead(s))return false;
+   if(s.name==="readiness"){const merge=stages.slice(0,index).find(x=>x.kind==="merge");if(!merge||merge.kind!=="merge"||!same(s.result.argv,merge.result.data.protocol==="apply-add-copied"?[...switchPendingArgv]:["status"]))return false;}
    if(s.name==="parent"){if(!d.sourceBranch)return false;const src=parseSwitchTarget(d.sourceBranch)!,candidates=src.repository!==null?[src.branch]:[...new Set([d.sourceBranch,src.branch,`br:${src.branch}`])],n=stages.slice(0,index).filter(x=>x.name==="parent").length,clause=src.repository===null?"":` on repository '${(src.repository+"@"+src.server).replace(/'/g,"''")}'`;if(!same(s.result.argv,["find","branch",`where ${cmWhereEquals("name",candidates[n])}${clause}`,"--format={name}|{parent}","--nototal"]))return false;if(index<stages.length-1&&s.result.emptyParentResult&&stages[index+1].name!=="parent"||index<stages.length-1&&s.result.parentPath&&stages[index+1].name!=="pending-before")return false;}
    if(index<stages.length-1&&s.result.admission!=="admitted")return false;
    if(s.name.startsWith("loaded-")&&s.name!=="loaded-before"&&s.result.branch){if(!d.targetBranch)return false;lastVerification=compareSwitchTarget(s.result.branch,d.targetBranch);if(index<stages.length-1&&lastVerification==="unverified")return false;}

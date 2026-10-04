@@ -1,11 +1,13 @@
 import { randomBytes } from "node:crypto";
+import { win32 } from "node:path";
+import { parseCopiedPending, admitCopiedStandardStatus, copiedPendingArgv, copiedPathKey } from "../domain/copied-merge";
 import { captureWorkspaceMergeCommand, emptyWorkspaceMergeAttempt } from "../execution/workspace-merge-command";
 import { admitCleanStandardStatus, admitWorkspaceMergeOutput, buildWorkspaceMergeArgv, safeMergeText, type MergeAction, type MergeStage, type WorkspaceMergeData, type WorkspaceMergeReceipt, type MergeStrategy } from "../domain/workspace-merge-contract";
 export type { WorkspaceMergeReceipt, MergeAction } from "../domain/workspace-merge-contract";
 export { safeMergeText, buildWorkspaceMergeArgv } from "../domain/workspace-merge-contract";
 export { presentWorkspaceMergeReceipt } from "../presentation/workspace-merge-results";
 export const emptyMergeStage = (): MergeStage => ({attempt:emptyWorkspaceMergeAttempt(),capture:null,admission:"not-observed"});
-export function emptyWorkspaceMergeData(): WorkspaceMergeData { return {intendedArgv:["merge"],workingDirectory:null,requestedSource:null,strategy:null,cherrypicking:null,forced:null,previewRequested:null,outputFormatRequested:null,apply:emptyMergeStage(),shortStatus:emptyMergeStage(),fullStatus:emptyMergeStage(),commandCompleted:false,observedWorkspaceIdentity:null,observedSourceIdentity:null,observedFinalizedMetadata:null,observedPreservation:null,observedPendingItems:null,fileConflictCount:null,protocol:"not-observed",checkinReadiness:"unknown",verification:"unverified",effect:"not-attempted"}; }
+export function emptyWorkspaceMergeData(): WorkspaceMergeData { return {intendedArgv:["merge"],workingDirectory:null,requestedSource:null,strategy:null,cherrypicking:null,forced:null,previewRequested:null,outputFormatRequested:null,apply:emptyMergeStage(),shortStatus:emptyMergeStage(),fullStatus:emptyMergeStage(),pendingReadMode:"short",commandCompleted:false,observedWorkspaceIdentity:null,observedSourceIdentity:null,observedFinalizedMetadata:null,observedPreservation:null,observedPendingItems:null,fileConflictCount:null,protocol:"not-observed",checkinReadiness:"unknown",verification:"unverified",effect:"not-attempted"}; }
 function header(action:MergeAction,data:WorkspaceMergeData) {const stages=[data.apply,data.shortStatus,data.fullStatus],observed=stages.filter(s=>s.capture);return {schemaVersion:1 as const,action,provenance:{source:"plastic" as const,producer:"@aefree/pi-plastic" as const,contentTrust:"external" as const},completeness:{capture:!observed.length?"unknown" as const:observed.every(s=>s.capture!.complete)?"complete" as const:"incomplete" as const,projection:true as const},data};}
 export function workspaceMergeFailure(action:MergeAction,data:WorkspaceMergeData,code:WorkspaceMergeReceipt extends infer T ? T extends {error:{code:infer C}} ? C : never : never,message:string):WorkspaceMergeReceipt {return {...header(action,data),ok:false,outcome:data.effect==="not-attempted"?"failed":data.checkinReadiness==="blocked"?"blocked":"uncertain",error:{code,message}};}
 export async function assembleWorkspaceMergeReceipt(action:MergeAction,args:unknown):Promise<WorkspaceMergeReceipt>{
@@ -20,16 +22,21 @@ export async function assembleWorkspaceMergeReceipt(action:MergeAction,args:unkn
   active="apply";const apply=await captureWorkspaceMergeCommand([...data.intendedArgv],cwd);data.apply={attempt:apply.attempt,capture:apply.capture,admission:"unsupported"};active=null;data.effect=["started","unknown"].includes(apply.attempt.state)?"uncertain":"not-attempted";
   if(!apply.capture.complete||apply.failed||apply.attempt.state!=="started")return workspaceMergeFailure(action,data,apply.attempt.aborted?"aborted":data.effect==="not-attempted"?"launch_failed":"uncertain","Merge capture/start/completion is not established; do not retry automatically.");
   data.commandCompleted=apply.attempt.exitCode===0;
-  const parsed=admitWorkspaceMergeOutput(apply.stdout!,token);data.protocol=parsed.protocol;data.fileConflictCount=parsed.fileConflictCount;data.apply.admission=parsed.protocol==="unsupported"?"unsupported":"admitted";
+  const parsed=admitWorkspaceMergeOutput(apply.stdout!,token);data.protocol=parsed.protocol;data.pendingReadMode=parsed.protocol==="apply-add-copied"?"copied-machine":"short";data.fileConflictCount=parsed.fileConflictCount;data.apply.admission=parsed.protocol==="unsupported"?"unsupported":"admitted";
   if(parsed.protocol==="file-conflict"){data.checkinReadiness="blocked";return workspaceMergeFailure(action,data,"conflict","Observed file-conflict records; checkin blocked. Earlier effects are not disproven.");}
   if(!data.commandCompleted)return workspaceMergeFailure(action,data,"uncertain","Merge exited nonzero; workspace effects may already exist.");
   if(parsed.protocol==="unsupported")return workspaceMergeFailure(action,data,"unsupported_readiness","Merge command completed but output is outside the admitted profile; readiness unknown.");
-  active="shortStatus";const short=await captureWorkspaceMergeCommand(["status","--short"],cwd);data.shortStatus={attempt:short.attempt,capture:short.capture,admission:"unsupported"};active=null;
+  const copied=parsed.protocol==="apply-add-copied";data.pendingReadMode=copied?"copied-machine":"short";
+  if(copied&&process.platform!=="win32")return workspaceMergeFailure(action,data,"unsupported_readiness","Copied readiness is sourced only on the observed Windows client.");
+  active="shortStatus";const short=await captureWorkspaceMergeCommand(copied?[...copiedPendingArgv]:["status","--short"],cwd);data.shortStatus={attempt:short.attempt,capture:short.capture,admission:"unsupported"};active=null;
   if(!short.capture.complete||short.failed||short.attempt.exitCode!==0)return workspaceMergeFailure(action,data,"unsupported_readiness","Merge command completed; pending read failed/incomplete. Checkin readiness unknown.");
-  data.shortStatus.admission=short.stdout===""&&short.stderr===""?"admitted":"unsupported";
+  const pending=copied?parseCopiedPending(short.stdout!,cwd):null;
+  const copiedKeys=pending?.paths.map(copiedPathKey)??[];
+  const coherent=!!pending&&parsed.copiedPaths.length===copiedKeys.length&&new Set(parsed.copiedPaths.map(copiedPathKey)).size===copiedKeys.length&&parsed.copiedPaths.every(p=>copiedKeys.includes(copiedPathKey(p)))&&new Set(parsed.addedPaths).size===copiedKeys.length&&parsed.addedPaths.every(p=>p.startsWith("/")&&!p.includes("\\")&&p.slice(1).split("/").every(v=>v!==""&&v!=="."&&v!==".."&&!/[?\uFFFD]/u.test(v))&&copiedKeys.includes(copiedPathKey(win32.join(cwd,p))));
+  data.shortStatus.admission=(copied?coherent:short.stdout==="")&&short.stderr===""?"admitted":"unsupported";
   active="fullStatus";const full=await captureWorkspaceMergeCommand(["status"],cwd);data.fullStatus={attempt:full.attempt,capture:full.capture,admission:"unsupported"};active=null;
   if(!full.capture.complete||full.failed||full.attempt.exitCode!==0)return workspaceMergeFailure(action,data,"unsupported_readiness","Merge command completed; merge-state read failed/incomplete. Checkin readiness unknown.");
-  data.fullStatus.admission=admitCleanStandardStatus(full.stdout!)&&full.stderr===""?"admitted":"unsupported";
+  data.fullStatus.admission=(copied?!!pending&&admitCopiedStandardStatus(full.stdout!,pending,source,cwd):admitCleanStandardStatus(full.stdout!))&&full.stderr===""?"admitted":"unsupported";
   // No warning/unknown stderr can authorize compound checkin.
   if(apply.stderr!==""||data.shortStatus.admission!=="admitted"||data.fullStatus.admission!=="admitted")return workspaceMergeFailure(action,data,"unsupported_readiness","Merge command completed; richer/pending/warning status is outside the admitted readiness profile. Checkin paused.");
   data.effect="not-proven";data.checkinReadiness="supported-no-unresolved-signals";return {...header(action,data),ok:true,outcome:"command-completed"};

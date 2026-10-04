@@ -7,10 +7,12 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+- Admit the sourced Windows copied-add merge profile: framed DO_COPIED/ADD, bounded CP pending records and exact standard pending-link/copied sections. Correlate paths, namespace and merge metadata; preserve opaque volatile display and pause unknown/mixed/conflicting output. Checkin accepts narrow CP selection/events; typed closeout independently rechecks copied readiness without retries, conflict-policy changes or source-link/head/rollback proof.
+
 - Add bounded producer-owned shelveset/code-review deletion command receipts, exact scalar/plural/duplicate and repository operands, additive command-only previews and uncertainty-aware core/native presentation. No inferred deleted objects, exclusive scope or rollback; creator/apply/update adapters remain separate.
 
 - Add producer-owned branch-delete command receipts with exact bounded branch operands, preserved delete-changesets policy, command-only preview and uncertainty-aware core/native output. Completion does not infer deleted identity, history effects, scope or rollback; no hidden reads/retries.
-- Add producer-owned typed merge-to-branch closeout stage receipts, bounded branch-only admission and qualifier-sensitive target gates; preserve observed checkin identity across later read failure and stop on unadmitted readiness without new retries or compensation. Ordinary richer pending-merge readiness remains unsupported; read-only previews are not zero CLI.
+- Add producer-owned typed merge-to-branch closeout stage receipts, bounded branch-only admission and qualifier-sensitive target gates; preserve observed checkin identity across later read failure and stop on unadmitted readiness without new retries or compensation. Other richer pending-merge profiles remain unsupported; read-only previews are not zero CLI.
 
 ### Added
 
