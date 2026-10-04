@@ -14,7 +14,8 @@ export const workspaceMergeOutputSchema=Type.Unsafe<WorkspaceMergeReceipt>(Type.
 export function validateWorkspaceMergeOutput(v:unknown):v is WorkspaceMergeReceipt{
  if(!Check(workspaceMergeOutputSchema,v)||Buffer.byteLength(JSON.stringify(v),"utf8")>131072)return false;
  const dto=v as WorkspaceMergeReceipt,d=dto.data,stages=[d.apply,d.shortStatus,d.fullStatus];
- if(d.requestedSource===null){if(d.intendedArgv.length!==1||d.intendedArgv[0]!=="merge"||[d.workingDirectory,d.strategy,d.cherrypicking,d.forced,d.previewRequested,d.outputFormatRequested].some(x=>x!==null))return false;}
+ if(d.requestedSource===null){if(d.intendedArgv.length!==1||d.intendedArgv[0]!=="merge"||[d.workingDirectory,d.strategy,d.cherrypicking,d.forced,d.previewRequested,d.outputFormatRequested].some(x=>x!==null))return false;
+  if(d.commandCompleted||d.protocol!=="not-observed"||d.fileConflictCount!==null||d.checkinReadiness!=="unknown"||d.apply.capture!==null||d.apply.attempt.terminal!=="not-observed"||d.apply.attempt.exitCode!==null||d.apply.attempt.aborted||d.apply.attempt.timedOut||!["not-attempted","unknown"].includes(d.apply.attempt.state)||d.apply.admission!==(d.apply.attempt.state==="unknown"?"unsupported":"not-observed")||stages.slice(1).some(s=>s.admission!=="not-observed"))return false;}
  else{
   if(!safeMergeText(d.requestedSource)||d.requestedSource.trimStart().startsWith("-")||!safeMergeText(d.workingDirectory)||d.strategy===null||typeof d.cherrypicking!=="boolean"||typeof d.forced!=="boolean"||typeof d.previewRequested!=="boolean"||d.outputFormatRequested===null)return false;
   const match=/^--startlineseparator=(__WM_[a-f0-9]{24}__)S__$/.exec(d.intendedArgv[5]??"");if(!match||JSON.stringify(d.intendedArgv)!==JSON.stringify(buildWorkspaceMergeArgv(d.requestedSource,d.strategy,d.cherrypicking,d.forced,match[1])))return false;

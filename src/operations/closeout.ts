@@ -10,6 +10,7 @@ import { createCanceledSwitchOutcome, toLegacyPendingSummary, switchBranch } fro
 import { runCmRaw } from "../execution/cm";
 import { analyzeMergeStatusOutput } from "../domain/merge-output";
 import { admitCleanStandardStatus } from "../domain/workspace-merge-contract";
+import { captureWorkspaceMergeCommand } from "../execution/workspace-merge-command";
 
 export const mergeToBranch = tool({
     description: "Merge a source branch into a target branch using safe Plastic update, switch, merge, and checkin steps.",
@@ -161,8 +162,9 @@ export const mergeToBranch = tool({
             workdir: args.workdir,
         });
 
-        const fullStatusAfterMerge = await runCmRaw(["status"], args.workdir);
-        if (!admitCleanStandardStatus(fullStatusAfterMerge)) throw new Error("Closeout paused: post-merge status/readiness outside admitted profile; no checkin permitted. Prior effects remain possible.");
+        const postMergeRead = await captureWorkspaceMergeCommand(["status"], args.workdir);
+        if (!postMergeRead.capture.complete || postMergeRead.failed || postMergeRead.attempt.state !== "started" || postMergeRead.attempt.exitCode !== 0 || postMergeRead.stderr !== "" || postMergeRead.stdout === null || !admitCleanStandardStatus(postMergeRead.stdout)) throw new Error("Closeout paused: post-merge status/readiness outside admitted profile; no checkin permitted. Prior effects remain possible.");
+        const fullStatusAfterMerge = postMergeRead.stdout;
         const mergeStateAfterMerge = analyzeMergeStatusOutput(fullStatusAfterMerge);
         if (mergeStateAfterMerge.hasMergeInProgress)
         {
