@@ -115,6 +115,10 @@ try {
   const blocked = render("mergeToBranch", structured("merge-to-branch", { effect:"not-attempted",createdChangeset:null,stages:[],targetVerification:"unverified" }, {ok:false,outcome:"blocked",error:{message:"Pending changes block the switch"}}));
   assert.match(blocked, /Closeout: blocked[\s\S]*Pending changes block/);
   assert(!blocked.startsWith("\u2713"));
+  const branchFailure = render("branchDelete", structured("branch-delete", {effect:"not-attempted",attempt:{state:"not-attempted"}}, {ok:false,outcome:"failed",error:{message:"Invalid branch operand"}}), false, {args:{preflight:true}});
+  assert.match(branchFailure,/Branch deletion: failed[\s\S]*Invalid branch operand/);
+  assert.doesNotMatch(branchFailure,/Preview returned/);
+  assert(!branchFailure.startsWith("\u2713"));
 
   for (const outcome of ["completed", "no-op", "conflict", "uncertain", "unsupported"]) {
     const output = render("mergeBranches", structured("merge-branches", { effect: "not-proven", mergeLinkIdentity: "unverified", xlinkEffects: "unverified" }, { ok: outcome === "completed", outcome }));

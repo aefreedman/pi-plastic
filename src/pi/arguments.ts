@@ -162,9 +162,10 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
   },
   branchDelete: {
     prepareArguments(args) {
-      const input = normalizeArgs(args);
+      const input = normalizeOutputFormatAlias(normalizeArgs(args));
       normalizeWorkdirAliases(input);
       assignAlias(input, "deleteChangesets", ["delete_changesets"]);
+      for (const key of ["cwd", "workingDirectory", "working_directory", "delete_changesets"]) delete input[key];
       return input;
     },
   },

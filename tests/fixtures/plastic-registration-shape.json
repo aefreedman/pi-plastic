@@ -1003,7 +1003,24 @@
         },
         "deleteChangesets": {
           "type": "boolean",
-          "description": "Delete changesets inside the branch when required."
+          "description": "Delete changesets inside the branch when required; completion does not prove history deletion."
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Command-only preview, no CLI or branch/readiness analysis."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
         },
         "workdir": {
           "type": "string",
@@ -1012,7 +1029,7 @@
       }
     },
     "defaults": {},
-    "hasOutputSchema": false
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_shelvesetCreate",

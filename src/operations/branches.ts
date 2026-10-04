@@ -6,7 +6,7 @@ import { getBranchLeafName, resolveBranchCreationTarget } from "../domain/branch
 import { parsePlasticStatusBranch } from "../plastic-workspace";
 import { tool } from "../tool-definition";
 import { workdirArg } from "./arguments";
-import { runCm } from "../execution/cm";
+import { assembleBranchDeleteReceipt, presentBranchDeleteReceipt } from "./branch-delete-receipt";
 import { outputFormatArg } from "../presentation/results";
 
 export const __plasticBranchInternals = {
@@ -95,18 +95,16 @@ export const branchDelete = tool({
     description: "Delete a Plastic SCM branch (cm branch delete).",
     args: {
         branch: tool.schema.string().min(1).describe("Branch spec to delete."),
-        deleteChangesets: tool.schema.boolean().optional().describe("Delete changesets inside the branch when required."),
+        deleteChangesets: tool.schema.boolean().optional().describe("Delete changesets inside the branch when required; completion does not prove history deletion."),
+        preflight: tool.schema.boolean().optional().describe("Command-only preview, no CLI or branch/readiness analysis."),
+        format: outputFormatArg,
         workdir: workdirArg,
     },
     async execute(args)
     {
-        const cmdArgs: string[] = ["branch", "delete", args.branch];
-
-        if (args.deleteChangesets)
-        {
-            cmdArgs.push("--delete-changesets");
-        }
-
-        return runCm(cmdArgs, args.workdir);
+        const dto = await assembleBranchDeleteReceipt(args);
+        const result = presentBranchDeleteReceipt(dto);
+        if (!dto.ok && args.preflight !== true) throw new Error(result);
+        return args.format === "json" ? JSON.stringify(dto) : result;
     },
 });
