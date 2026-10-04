@@ -13,6 +13,7 @@ import { runWithAbortSignal } from "../src/execution/context";
 import { loadRegisteredTools } from "./pi-tool-harness";
 import { validateCheckinOutput } from "../src/pi/checkin-output";
 import { validateBranchCreateOutput } from "../src/pi/branch-create-output";
+import {executeObjectDeleteOutput,validateObjectDeleteOutput} from "../src/pi/object-delete-output";
 
 const modes = ["timeout-false-kill","timeout-thrown-kill","timeout-default-grace","abort-no-terminal","missing-spawn","terminal-open-pipes","capture-overflow","stream-error","repeated-errors"] as const;
 const cwd = "C:\\Example\\workspace";
@@ -77,6 +78,12 @@ for (const capture of [captureCheckinCommand,captureBranchCreateCommand,captureS
   for (const emitter of [normal,normal.stdout,normal.stderr]) for (const event of ["spawn","data","close","end","error"]) assert.equal(emitter.listenerCount(event),0);
 }
 
+for(const action of ["shelveset-delete","code-review-delete"]as const)for(const mode of ["timeout","terminal-open-pipes","abort","throw-kill"]){
+ const controller=new AbortController(),calls:string[][]=[];const child=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill(){if(mode==="throw-kill")throw Error("private kill failure");return false;}});
+ const result=await runWithAbortSignal(controller.signal,()=>executeObjectDeleteOutput(action,{...(action==="shelveset-delete"?{shelveset:"sh:9"}:{ids:["9"]}),workdir:cwd}),{setTimeout:((cb:()=>void,ms:number)=>setTimeout(cb,Math.min(ms,3)))as any,spawn:((_c:string,argv:string[])=>{calls.push(argv);queueMicrotask(()=>{child.emit("spawn");child.stdout.write(Buffer.from("partial"));if(mode==="terminal-open-pipes")child.emit("close",0,null);if(mode==="abort")controller.abort();});return child;})as any});
+ assert(validateObjectDeleteOutput(result.structuredContent));assert(result.isError);assert.equal(result.structuredContent.outcome,"uncertain");assert.equal(calls.length,1);assert.equal(result.structuredContent.data.attempt.terminal,mode==="terminal-open-pipes"?"observed":"not-observed");assert.equal(result.structuredContent.data.attempt.exitCode,mode==="terminal-open-pipes"?0:null);
+ const frozen=JSON.stringify(result);child.emit("error",Error("private late error"));child.stdout.emit("error",Error("private late stream"));child.emit("close",0,null);assert.equal(JSON.stringify(result),frozen);
+}
 if (process.platform === "win32") {
   const tools = await loadRegisteredTools();
   for (const [tool,args,validate] of [

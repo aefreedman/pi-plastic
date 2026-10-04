@@ -3,6 +3,7 @@ import { workdirArg } from "./arguments";
 import { runCm } from "../execution/cm";
 import { outputFormatArg } from "../presentation/results";
 import { executeCodeReviewFind } from "./code-review-find";
+import { assembleObjectDeleteReceipt, presentObjectDeleteReceipt } from "./object-delete-receipt";
 
 export const codeReviewCreate = tool({
     description: "Create a code review (cm codereview).",
@@ -80,18 +81,17 @@ export const codeReviewDelete = tool({
     args: {
         ids: tool.schema.array(tool.schema.string()).min(1).describe("Code review IDs or GUIDs to delete."),
         repository: tool.schema.string().optional().describe("Repository specification when no workspace is used."),
+        preflight: tool.schema.boolean().optional().describe("Command-only zero-CLI preview; no existence/readiness analysis."),
+        format: outputFormatArg,
         workdir: workdirArg,
     },
     async execute(args)
     {
-        const cmdArgs: string[] = ["codereview", "-d", ...args.ids];
-
-        if (args.repository)
-        {
-            cmdArgs.push(`--repository=${args.repository}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
+        const request = Object.freeze({...args});
+        const dto = await assembleObjectDeleteReceipt("code-review-delete",request);
+        const result = presentObjectDeleteReceipt(dto);
+        if (!dto.ok && request.preflight !== true) throw new Error(result);
+        return result;
     },
 });
 

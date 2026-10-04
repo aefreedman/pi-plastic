@@ -2,6 +2,8 @@ import { tool } from "../tool-definition";
 import { workdirArg } from "./arguments";
 import { runCm } from "../execution/cm";
 import { executeShelvesetList } from "./shelveset-list";
+import { assembleObjectDeleteReceipt, presentObjectDeleteReceipt } from "./object-delete-receipt";
+import { outputFormatArg } from "../presentation/results";
 
 export const shelvesetCreate = tool({
     description: "Create a shelveset (cm shelveset create).",
@@ -109,11 +111,17 @@ export const shelvesetDelete = tool({
     description: "Delete a shelveset (cm shelveset delete).",
     args: {
         shelveset: tool.schema.string().min(1).describe("Shelveset spec to delete (for example, sh:3)."),
+        preflight: tool.schema.boolean().optional().describe("Command-only zero-CLI preview; no existence/readiness analysis."),
+        format: outputFormatArg,
         workdir: workdirArg,
     },
     async execute(args)
     {
-        return runCm(["shelveset", "delete", args.shelveset], args.workdir);
+        const request = Object.freeze({...args});
+        const dto = await assembleObjectDeleteReceipt("shelveset-delete",request);
+        const result = presentObjectDeleteReceipt(dto);
+        if (!dto.ok && request.preflight !== true) throw new Error(result);
+        return result;
     },
 });
 

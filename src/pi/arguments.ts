@@ -192,8 +192,9 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
   },
   shelvesetDelete: {
     prepareArguments(args) {
-      const input = normalizeArgs(args);
+      const input = normalizeOutputFormatAlias(normalizeArgs(args));
       normalizeWorkdirAliases(input);
+      for (const key of ["cwd","workingDirectory","working_directory"]) delete input[key];
       return input;
     },
   },
@@ -226,10 +227,11 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
   },
   codeReviewDelete: {
     prepareArguments(args) {
-      const input = normalizeArgs(args);
+      const input = normalizeOutputFormatAlias(normalizeArgs(args));
       normalizeWorkdirAliases(input);
       if (input.id !== undefined && input.ids === undefined) input.ids = [String(input.id)];
       assignAlias(input, "ids", ["review_ids"]);
+      for (const key of ["cwd","workingDirectory","working_directory","id","review_ids"]) delete input[key];
       return input;
     },
   },

@@ -115,6 +115,12 @@ try {
   const blocked = render("mergeToBranch", structured("merge-to-branch", { effect:"not-attempted",createdChangeset:null,stages:[],targetVerification:"unverified" }, {ok:false,outcome:"blocked",error:{message:"Pending changes block the switch"}}));
   assert.match(blocked, /Closeout: blocked[\s\S]*Pending changes block/);
   assert(!blocked.startsWith("\u2713"));
+  for(const [name,action]of [["shelvesetDelete","shelveset-delete"],["codeReviewDelete","code-review-delete"]]){
+    const ok=render(name,structured(action,{effect:"not-proven",attempt:{state:"started"}},{outcome:"command-completed"}),false);
+    assert.match(ok,/Object deletion: command-completed[\s\S]*unverified/);
+    const failed=render(name,structured(action,{effect:"uncertain",attempt:{state:"started"}},{ok:false,outcome:"uncertain",error:{message:"Possible partial deletion"}}),false);
+    assert.match(failed,/Object deletion: uncertain[\s\S]*Possible partial deletion/);
+  }
   const branchFailure = render("branchDelete", structured("branch-delete", {effect:"not-attempted",attempt:{state:"not-attempted"}}, {ok:false,outcome:"failed",error:{message:"Invalid branch operand"}}), false, {args:{preflight:true}});
   assert.match(branchFailure,/Branch deletion: failed[\s\S]*Invalid branch operand/);
   assert.doesNotMatch(branchFailure,/Preview returned/);

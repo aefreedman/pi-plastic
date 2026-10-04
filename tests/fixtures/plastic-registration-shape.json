@@ -1149,6 +1149,23 @@
           "description": "Shelveset spec to delete (for example, sh:3).",
           "minimum": 1
         },
+        "preflight": {
+          "type": "boolean",
+          "description": "Command-only zero-CLI preview; no existence/readiness analysis."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
         "workdir": {
           "type": "string",
           "description": "Working directory for the workspace."
@@ -1156,7 +1173,7 @@
       }
     },
     "defaults": {},
-    "hasOutputSchema": false
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_shelvesetList",
@@ -1335,6 +1352,23 @@
           "type": "string",
           "description": "Repository specification when no workspace is used."
         },
+        "preflight": {
+          "type": "boolean",
+          "description": "Command-only zero-CLI preview; no existence/readiness analysis."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
         "workdir": {
           "type": "string",
           "description": "Working directory for the workspace."
@@ -1342,7 +1376,7 @@
       }
     },
     "defaults": {},
-    "hasOutputSchema": false
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_codeReviewFind",

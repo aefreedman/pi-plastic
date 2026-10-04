@@ -28,7 +28,7 @@ for (const name of MUTATING_PLASTIC_TOOLS) {
 }
 for (const key of ["output", "output_file", "outputFile"]) assert(await dispatch("plastic_patch", { [key]: "review.patch", preflight: true }));
 assert.equal(executions, 0, "blocked calls must never reach fake SCM dispatch");
-const preflightTools = ["plastic_checkin", "plastic_resolveDeleteChangeConflict", "plastic_switchBranch", "plastic_merge", "plastic_mergeBranches", "plastic_mergeToBranch", "plastic_finalizeMerge", "plastic_branchDelete"];
+const preflightTools = ["plastic_checkin", "plastic_resolveDeleteChangeConflict", "plastic_switchBranch", "plastic_merge", "plastic_mergeBranches", "plastic_mergeToBranch", "plastic_finalizeMerge", "plastic_branchDelete", "plastic_shelvesetDelete", "plastic_codeReviewDelete"];
 for (const name of MUTATING_PLASTIC_TOOLS) {
   const schema = harness.registry.get(name)!.parameters as any;
   assert.equal(Object.hasOwn(schema.properties, "preflight"), preflightTools.includes(name), `${name}: actual supported preflight schema`);

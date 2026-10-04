@@ -38,7 +38,7 @@ async function main(): Promise<void> {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
     assert.equal(harness.registry.size, 28, "all 27 public Plastic tools plus the loader should be registered");
     assert(harness.registry.has(PLASTIC_TOOL_SEARCH_NAME));
-    assert.equal([...harness.registry.values()].filter(t => t.outputSchema).length,20);
+    assert.equal([...harness.registry.values()].filter(t => t.outputSchema).length,22);
     const initialActive = harness.getActiveTools();
     for (const name of ["plastic_checkin","plastic_branchCreate"]) {
       const result = await harness.registry.get(PLASTIC_TOOL_SEARCH_NAME)!.execute("receipt-load",{toolNames:[name]});
