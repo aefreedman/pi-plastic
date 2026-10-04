@@ -7,6 +7,8 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+- Add producer-owned typed merge-to-branch closeout stage receipts, bounded branch-only admission and qualifier-sensitive target gates; preserve observed checkin identity across later read failure and stop on unadmitted readiness without new retries or compensation. Ordinary richer pending-merge readiness remains unsupported; read-only previews are not zero CLI.
+
 ### Added
 
 - Producer-owned workspace merge/finalization receipts record applying completion separately from conflict/readiness evidence. Preserve noninteractive strategy defaults and exact bounded source operands; reject source options, record read failures instead of swallowing them, and stop core/closeout checkin on unknown readiness. Initial client profile is explicitly narrow; rich pending/unknown output pauses without implying rollback. No dependency/version change.
@@ -64,7 +66,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Changed
 
-- Align exact Pi SDK/tui development pins, lockfile and eval runtime baseline with latest stable Pi 1.0.1 and its required TypeBox 1.3.27 resolution; no package release/version bump.
+- Align exact Pi SDK/tui development pins, lockfile, host/rendering tests and eval runtime baseline with latest stable Pi1.0.2 patch and TypeBox1.3.27 resolution; no package release/version or global installation change.
 - Modularize execution, domain, operations, text diff, presentation and Pi adapters behind the existing explicit core export facade and canonical-root entry wiring; preserve tool behavior, loading, rendering and exposure.
 - Add a typed internal status observation seam and shared single-observation presentation, preserving core string results and renderers; add deterministic runtime import-layer/cycle, shared-owner and registry-parity regression checks.
 

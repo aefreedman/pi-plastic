@@ -83,7 +83,7 @@ export function renderPlasticCall(name: string, input: unknown, theme: RenderThe
 
 function payload(result: Result, raw: string): Record<string, unknown> {
   const structured = record((result as Result & {structuredContent?:unknown}).structuredContent);
-  if (structured.action === "diff" || structured.action === "merge-branches" || structured.action === "checkin" || structured.action === "branch-create" || structured.action === "switch-branch" || structured.action === "update" || structured.action === "add" || structured.action === "undo" || structured.action === "resolve-delete-change-conflict" || structured.action === "merge" || structured.action === "finalize-merge") return structured;
+  if (structured.action === "diff" || structured.action === "merge-branches" || structured.action === "checkin" || structured.action === "branch-create" || structured.action === "switch-branch" || structured.action === "update" || structured.action === "add" || structured.action === "undo" || structured.action === "resolve-delete-change-conflict" || structured.action === "merge" || structured.action === "finalize-merge" || structured.action === "merge-to-branch") return structured;
   const rawResult = record(result.details).rawResult;
   if (rawResult !== null && typeof rawResult === "object") return record(rawResult);
   // Only decode the package's whole JSON envelope, never a JSON fragment in CLI or diff output.
@@ -111,14 +111,20 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
   const notices = strings(envelope.warnings);
   const summary: Summary = { label: "Result returned", tone: "toolOutput", notices, rows: [] };
   const textLines = raw.split(/\r?\n/).filter(line => line.trim());
-  const preview = !["update", "add", "undo", "resolve-delete-change-conflict", "merge", "finalize-merge"].includes(action) && (record(context?.args).preflight === true || action.endsWith("-preflight") || envelope.outcome === "preflight");
-  if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes)) && !(name === "mergeBranches" && action === "merge-branches") && !["checkin", "branch-create", "switch-branch", "update", "add", "undo", "resolve-delete-change-conflict", "merge", "finalize-merge"].includes(action)) {
+  const preview = !["update", "add", "undo", "resolve-delete-change-conflict", "merge", "finalize-merge", "merge-to-branch"].includes(action) && (record(context?.args).preflight === true || action.endsWith("-preflight") || envelope.outcome === "preflight");
+  if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes)) && !(name === "mergeBranches" && action === "merge-branches") && !["checkin", "branch-create", "switch-branch", "update", "add", "undo", "resolve-delete-change-conflict", "merge", "finalize-merge", "merge-to-branch"].includes(action)) {
     summary.label = "Failed";
     summary.tone = "error";
     summary.rows = textLines.slice(0, 3);
     return summary;
   }
-  if ((name === "merge" || name === "finalizeMerge") && (action === "merge" || action === "finalize-merge")) {
+  if (name === "mergeToBranch" && action === "merge-to-branch") {
+    summary.label = `Closeout: ${scalar(envelope.outcome)}`;
+    summary.tone = envelope.ok === false ? "error" : envelope.outcome === "completed" ? "success" : "warning";
+    summary.rows = [`Effect: ${scalar(data.effect)}`, `Recorded stages: ${records(data.stages).length}`, `Created changeset: ${scalar(record(data.createdChangeset).id) || "unobserved"}`, `Target verification: ${scalar(data.targetVerification)}`];
+    if (envelope.ok === false) notices.unshift(scalar(record(envelope.error).message));
+    notices.push("Earlier child effects remain recorded. Source links, branch head, aliases, exclusive scope and rollback unverified; no automatic replay.");
+  } else if ((name === "merge" || name === "finalizeMerge") && (action === "merge" || action === "finalize-merge")) {
     summary.label = `Workspace merge: ${scalar(envelope.outcome)}`;
     summary.tone = envelope.ok === false ? "error" : "warning";
     summary.rows = [`Applying command completed: ${String(data.commandCompleted)}`, `Checkin readiness: ${scalar(data.checkinReadiness)}`, `Effect: ${scalar(data.effect)}`];

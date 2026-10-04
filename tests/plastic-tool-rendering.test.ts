@@ -11,7 +11,7 @@ const previousPackageDir = process.env.PI_PACKAGE_DIR;
 process.env.PI_PACKAGE_DIR = fileURLToPath(new URL("../",sdkUrl));
 const { initTheme } = await import(sdkUrl);
 const config = await import(new URL("./config.js",sdkUrl).href);
-assert.equal(config.VERSION,"1.0.1");
+assert.equal(config.VERSION,"1.0.2");
 assert.equal(resolve(config.getPackageDir()),resolve(fileURLToPath(new URL("../",sdkUrl))));
 const { default: registerPlastic } = await import("../index");
 const { renderPlasticCall, renderPlasticResult, renderPlasticSearchResult } = await import("../src/plastic-renderers");
@@ -71,6 +71,10 @@ try {
     const valid=await executeWorkspaceMergeOutput(action,{source:"br:/main/source",preflight:true});assert.match(render(name,valid),/Workspace merge: preflight/);
   }
 
+  const {executeCloseoutOutput}=await import("../src/pi/closeout-output");colors.length=0;
+  const invalidCloseout=await executeCloseoutOutput({source:"cs:16",preflight:true});
+  const invalidCloseoutView=render("mergeToBranch",invalidCloseout,false,{args:{preflight:true},isError:true});
+  assert.match(invalidCloseoutView,/Closeout: failed/);assert.doesNotMatch(invalidCloseoutView,/Preview returned|Preview: would/);assert(colors.some(c=>c.color==="error"));
   const call = renderPlasticCall("mergeBranches", { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", preflight: true }, theme);
   assert.match(plain(call), /Plastic.*Server merge.*server.*preview\n.*task@Game@cloud -> br:\/main@Game@cloud/);
   const workspaceCall = renderPlasticCall("diff", { mode:"workspace", workdir: "C:\\Projects\\MyGame", paths: ["Assets/Player.cs", "Assets/UI.cs", "Assets/Game.cs"] }, theme);
@@ -108,8 +112,8 @@ try {
   assert.match(render("checkin", structured("checkin-preflight", { wouldRun: false, errorCode: "NO_PENDING_PATHS" })), /Preview: would not run[\s\S]*NO_PENDING_PATHS/);
   assert.match(render("checkin", textResult("## Checkin Preflight\n\n- Would run: no\n- Reason: no matching pending paths"), false, { args: { preflight: true } }), /Preview: would not run[\s\S]*no matching pending paths/);
   assert.match(render("switchBranch", structured("switch-branch", { strategy: "cancel-with-pending", branchAfter: "/main" })), /Switch cancelled/);
-  const blocked = render("mergeToBranch", structured("merge-to-branch", { checkedIn: false, switchOutcome: { kind: "canceled", reason: "Pending changes block the switch" } }));
-  assert.match(blocked, /Checkin not performed[\s\S]*Pending changes block/);
+  const blocked = render("mergeToBranch", structured("merge-to-branch", { effect:"not-attempted",createdChangeset:null,stages:[],targetVerification:"unverified" }, {ok:false,outcome:"blocked",error:{message:"Pending changes block the switch"}}));
+  assert.match(blocked, /Closeout: blocked[\s\S]*Pending changes block/);
   assert(!blocked.startsWith("\u2713"));
 
   for (const outcome of ["completed", "no-op", "conflict", "uncertain", "unsupported"]) {

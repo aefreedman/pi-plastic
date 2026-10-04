@@ -721,25 +721,25 @@
   {
     "name": "plastic_mergeToBranch",
     "label": "plastic_mergeToBranch",
-    "description": "Merge a source branch into a target branch using safe Plastic update, switch, merge, and checkin steps.",
+    "description": "Merge a source branch into a target branch with a bounded typed stage ledger; unknown target/readiness stops before checkin and earlier effects remain recorded.",
     "parameters": {
       "type": "object",
       "properties": {
         "source": {
           "type": "string",
-          "description": "Source branch to merge. Defaults to the currently loaded branch."
+          "description": "Bounded hierarchical branch selector. Defaults to the directly observed loaded branch."
         },
         "target": {
           "type": "string",
-          "description": "Target branch to merge into. Defaults to the source branch's Plastic parent branch."
+          "description": "Bounded hierarchical branch selector. Defaults to an admitted source-parent read in the observed repository scope."
         },
         "cardRef": {
           "type": "string",
-          "description": "Optional tracker card reference to include in the merge checkin message, for example $4re."
+          "description": "Optional tracker reference in the default checkin message; derived message must meet existing checkin admission."
         },
         "message": {
           "type": "string",
-          "description": "Optional checkin message. Defaults to Merge <source> into <target>."
+          "description": "Optional checkin message. Defaults to Merge <source> into <target>. Existing child text bounds apply."
         },
         "strategy": {
           "anyOf": [
@@ -756,19 +756,19 @@
               "const": "destination"
             }
           ],
-          "description": "Merge conflict strategy. Defaults to auto."
+          "description": "Conflict strategy; defaults to auto."
         },
         "updateTarget": {
           "type": "boolean",
-          "description": "Run plastic_update on the target branch before merging. Defaults to true."
+          "description": "Update target before merge; defaults to true."
         },
         "includePrivate": {
           "type": "boolean",
-          "description": "Include private items in the merge checkin. Defaults to false."
+          "description": "Include private items in merge checkin; defaults to false."
         },
         "preflight": {
           "type": "boolean",
-          "description": "Preview the planned closeout merge steps without executing them."
+          "description": "Read-only discovery/pending preview, not zero CLI or applying readiness proof."
         },
         "format": {
           "anyOf": [
@@ -790,7 +790,7 @@
       }
     },
     "defaults": {},
-    "hasOutputSchema": false
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_finalizeMerge",

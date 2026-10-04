@@ -5,6 +5,7 @@ import { addOutputSchema } from "../src/pi/add-output";
 import { undoOutputSchema } from "../src/pi/undo-output";
 import { removalOutputSchema } from "../src/pi/removal-output";
 import { workspaceMergeOutputSchema } from "../src/pi/workspace-merge-output";
+import { closeoutOutputSchema } from "../src/pi/closeout-output";
 import { branchCreateOutputSchema } from "../src/pi/branch-create-output";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -24,10 +25,10 @@ import { currentBranchOutputSchema, branchExistsOutputSchema } from "../src/pi/b
 async function main(): Promise<void> {
   const tools = await loadRegisteredTools();
   for (const tool of tools.values()) {
-    assert.deepEqual(tool.outputSchema, tool.name === "plastic_status" ? statusOutputSchema : tool.name === "plastic_currentBranch" ? currentBranchOutputSchema : tool.name === "plastic_branchExists" ? branchExistsOutputSchema : tool.name === "plastic_branchList" ? branchListOutputSchema : tool.name === "plastic_workspaceList" ? workspaceListOutputSchema : tool.name === "plastic_shelvesetList" ? shelvesetListOutputSchema : tool.name === "plastic_codeReviewFind" ? codeReviewFindOutputSchema : tool.name === "plastic_diff" ? diffOutputSchema : tool.name === "plastic_mergeBranches" ? serverMergeOutputSchema : tool.name === "plastic_checkin" ? checkinOutputSchema : tool.name === "plastic_branchCreate" ? branchCreateOutputSchema : tool.name === "plastic_switchBranch" ? switchOutputSchema : tool.name === "plastic_update" ? updateOutputSchema : tool.name === "plastic_add" ? addOutputSchema : tool.name === "plastic_undo" ? undoOutputSchema : tool.name === "plastic_resolveDeleteChangeConflict" ? removalOutputSchema : tool.name === "plastic_merge" || tool.name === "plastic_finalizeMerge" ? workspaceMergeOutputSchema : undefined, "Exactly eighteen selected tools own structured output schemas");
+    assert.deepEqual(tool.outputSchema, tool.name === "plastic_status" ? statusOutputSchema : tool.name === "plastic_currentBranch" ? currentBranchOutputSchema : tool.name === "plastic_branchExists" ? branchExistsOutputSchema : tool.name === "plastic_branchList" ? branchListOutputSchema : tool.name === "plastic_workspaceList" ? workspaceListOutputSchema : tool.name === "plastic_shelvesetList" ? shelvesetListOutputSchema : tool.name === "plastic_codeReviewFind" ? codeReviewFindOutputSchema : tool.name === "plastic_diff" ? diffOutputSchema : tool.name === "plastic_mergeBranches" ? serverMergeOutputSchema : tool.name === "plastic_checkin" ? checkinOutputSchema : tool.name === "plastic_branchCreate" ? branchCreateOutputSchema : tool.name === "plastic_switchBranch" ? switchOutputSchema : tool.name === "plastic_update" ? updateOutputSchema : tool.name === "plastic_add" ? addOutputSchema : tool.name === "plastic_undo" ? undoOutputSchema : tool.name === "plastic_resolveDeleteChangeConflict" ? removalOutputSchema : tool.name === "plastic_merge" || tool.name === "plastic_finalizeMerge" ? workspaceMergeOutputSchema : tool.name === "plastic_mergeToBranch" ? closeoutOutputSchema : undefined, "Exactly nineteen selected tools own structured output schemas");
   }
   assert.equal(tools.size, 28, "27 core registrations plus loader");
-  assert.equal([...tools.values()].filter(t => t.outputSchema).length, 18);
+  assert.equal([...tools.values()].filter(t => t.outputSchema).length, 19);
   const shape = [...tools.values()].map(({ name, label, description, parameters, prepareArguments, promptSnippet, promptGuidelines, constrainedSampling, outputSchema }) => ({
     name, label, description, parameters, defaults: prepareArguments?.({}), promptSnippet, promptGuidelines, constrainedSampling, hasOutputSchema: outputSchema !== undefined,
   }));

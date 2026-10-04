@@ -123,6 +123,7 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       assignAlias(input, "cardRef", ["card", "cardCode", "card_code", "codecksCard", "codecks_card"]);
       assignAlias(input, "updateTarget", ["update_target", "update"]);
       assignAlias(input, "includePrivate", ["include_private"]);
+      for (const key of ["cwd", "workingDirectory", "working_directory", "sourceBranch", "source_branch", "branch", "targetBranch", "target_branch", "destination", "destinationBranch", "destination_branch", "card", "cardCode", "card_code", "codecksCard", "codecks_card", "update_target", "update", "include_private"]) delete input[key];
       return input;
     },
   },

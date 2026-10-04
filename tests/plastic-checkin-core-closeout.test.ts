@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { checkin, mergeToBranch, switchBranch, merge, runWithAbortSignal } from "../src/plastic-core";
+import { checkin, mergeToBranch, runWithAbortSignal } from "../src/plastic-core";
 import { loadRegisteredTools } from "./pi-tool-harness";
 const cwd="C:\\Example\\workspace",us="\x1f";
 const header=["STATUS","123","Example Repository","example@unity"].join(us)+"\r\n";
@@ -14,7 +14,9 @@ const deps={spawn:((_:string,argv:string[])=>{
     if(argv[0]==="status") {
       if(argv.includes("--machinereadable")) {reads++;out=mode==="unsupported"?"UNKNOWN":header+(pending?row:"");if(mode==="completed-post-failed"&&reads>1){err="Synthetic post-read failure";code=1;}}
       else out=argv.includes("--short")?"":`${branch}@Example Repository@example@unity (cs:123 - head)\r\n`;
-    } else if(argv[0]==="checkin") {
+    } else if(argv[0]==="switch") {branch="/main/target";}
+    else if(argv[0]==="merge") {pending=true;const sep=(k:string)=>argv.find(a=>a.startsWith(k+"="))!.slice(k.length+1);out=sep("--startlineseparator")+["STATUS","ALREADY_CONNECTED","No merges detected"].join(sep("--fieldseparator"))+sep("--endlineseparator")+"\r\n";}
+    else if(argv[0]==="checkin") {
       const sep=(k:string)=>argv.find(a=>a.startsWith(k+"="))!.slice(k.length+1);
       const frame=(op:string,values:string[]=[])=>sep("--startlineseparator")+[op,...values].join(sep("--fieldseparator"))+sep("--endlineseparator")+"\r\n";
       out=frame("CI_START")+frame("STAGE",[""]);
@@ -46,16 +48,11 @@ if(process.platform==="win32") {
   const native=await runWithAbortSignal(undefined,()=>tools.get("plastic_checkin")!.execute("fixture",request),deps);
   assert(native.isError);assert.equal(native.structuredContent.ok,false);assert.equal(native.structuredContent.outcome,"uncertain");
 
-  // Actual closeout orchestrates actual core checkin. Only earlier mutation phases are synthetic stubs.
-  const originals={switch:switchBranch.execute,merge:merge.execute};
-  try {
-    switchBranch.execute=async()=>{branch="/main/target";return "Synthetic switch";};
-    merge.execute=async()=>{pending=true;return "Synthetic merge";};
-    for(const outcome of ["permission","empty","unsupported"]) {
+  // Actual typed closeout orchestrates actual switch/merge/checkin producers; no child stubs.
+  for(const outcome of ["permission","empty","unsupported"]) {
       mode=outcome;branch="/main/source";pending=false;reads=0;calls.length=0;
       await assert.rejects(()=>runWithAbortSignal(undefined,()=>mergeToBranch.execute({source:"/main/source",target:"/main/target",message:"Fixture",updateTarget:false,format:"json",workdir:cwd}),deps),"Closeout cannot claim checkedIn:true after failed child checkin");
       assert.equal(calls.filter(a=>a[0]==="checkin").length,outcome==="unsupported"?0:1,"Actual child dispatched at most once; no falsely successful later phases");
-    }
-  } finally {switchBranch.execute=originals.switch;merge.execute=originals.merge;}
+  }
 } else await assert.rejects(()=>checkin.execute(request));
-console.log("PASS: actual core failed/uncertain/unsupported rejection, non-mutating preflight strings, completed identity with failed post-read, native DTO preservation and actual closeout failure propagation with only earlier phases stubbed");
+console.log("PASS: actual core failed/uncertain/unsupported rejection, non-mutating preflight strings, completed identity with failed post-read, native DTO preservation and actual typed closeout failure propagation without child stubs");
