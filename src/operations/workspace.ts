@@ -4,9 +4,9 @@ import { workdirArg } from "./arguments";
 import { assembleUpdateReceipt, presentUpdateReceipt } from "./update-receipt";
 import { assembleAddReceipt, presentAddReceipt } from "./add-receipt";
 import { assembleUndoReceipt, presentUndoReceipt } from "./undo-receipt";
-import { runCm, runCmRaw } from "../execution/cm";
-import { outputFormatArg, toStructuredResult, formatPreflightText } from "../presentation/results";
-import { summarizeShortStatus } from "../domain/pending";
+import { runCm } from "../execution/cm";
+import { outputFormatArg } from "../presentation/results";
+import { assembleRemovalReceipt, presentRemovalReceipt } from "./removal-receipt";
 
 export const update = tool({
     description: "Update workspace safely without launching interactive merge (cm update --dontmerge --noinput).",
@@ -53,77 +53,21 @@ export const undo = tool({
 });
 
 export const resolveDeleteChangeConflict = tool({
-    description: "Resolve a Plastic SCM delete/change conflict by accepting the source-side deletion with cm remove.",
+    description: "Request source-side deletion for a Plastic SCM delete/change conflict via cm remove; actual resolution remains unverified.",
     args: {
         paths: tool.schema.array(tool.schema.string()).min(1).describe("Controlled workspace paths to resolve by accepting the source-side deletion."),
-        keepOnDisk: tool.schema.boolean().optional().describe("Keep removed items on disk as private files via --nodisk. Defaults to true."),
+        keepOnDisk: tool.schema.boolean().optional().describe("Request --nodisk to retain items on disk. Defaults to true; preservation remains unverified."),
         preflight: tool.schema.boolean().optional().describe("Preview the resolution command without executing it."),
         format: outputFormatArg,
         workdir: workdirArg,
     },
     async execute(args)
     {
-        const format = args.format ?? "text";
-        const keepOnDisk = args.keepOnDisk ?? true;
-        const preflight = args.preflight ?? false;
-        const cmdArgs = ["remove", ...(keepOnDisk ? ["--nodisk"] : []), ...args.paths];
 
-        if (preflight)
-        {
-            return toStructuredResult(
-                "resolve-delete-change-conflict-preflight",
-                format,
-                formatPreflightText("## Delete/Change Conflict Resolution Preflight", [
-                    "- Would run: yes",
-                    "- Resolution: accept source-side deletion",
-                    `- Keep removed items on disk: ${keepOnDisk ? "yes (--nodisk)" : "no"}`,
-                    `- Command: cm ${cmdArgs.join(" ")}`,
-                ]),
-                {
-                    wouldRun: true,
-                    resolution: "accept-source-deletion",
-                    keepOnDisk,
-                    command: ["cm", ...cmdArgs],
-                    paths: args.paths,
-                },
-                args.workdir,
-            );
-        }
-
-        const output = await runCm(cmdArgs, args.workdir);
-        const shortStatusAfterResolution = await runCmRaw(["status", "--short"], args.workdir).catch(() => "");
-        const pendingSummaryAfterResolution = summarizeShortStatus(shortStatusAfterResolution);
-        const reportLines = [
-            "## Delete/Change Conflict Resolution Result",
-            "",
-            "- Resolution: accepted source-side deletion",
-            `- Keep removed items on disk: ${keepOnDisk ? "yes (--nodisk)" : "no"}`,
-            `- Paths resolved: ${args.paths.length}`,
-            `- Pending items after resolution: ${pendingSummaryAfterResolution.totalPending}`,
-        ];
-
-        if (output.trim().length > 0 && output.trim() !== "(no output)")
-        {
-            reportLines.push("", "Raw command output:", output.trim());
-        }
-
-        return toStructuredResult(
-            "resolve-delete-change-conflict",
-            format,
-            reportLines.join("\n"),
-            {
-                resolution: "accept-source-deletion",
-                keepOnDisk,
-                command: ["cm", ...cmdArgs],
-                paths: args.paths,
-                shortStatusAfterResolution,
-                pendingSummaryAfterResolution,
-                rawOutput: output,
-            },
-            args.workdir,
-            keepOnDisk ? ["Removed items were kept on disk as private files via --nodisk."] : undefined,
-            "Rerun plastic_merge(...) for the original source branch to continue the merge.",
-        );
+        const receipt = await assembleRemovalReceipt(args);
+        const text = presentRemovalReceipt(receipt);
+        if (!receipt.ok) throw new Error(text);
+        return text;
     },
 });
 

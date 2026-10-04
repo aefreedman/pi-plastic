@@ -59,6 +59,13 @@ try {
   const undoRejectedView=render("undo",rejectedUndoPreview,false,{args:{preflight:true},isError:true});
   assert.match(undoRejectedView,/Undo: failed/);assert.match(undoRejectedView,/preview and extra options are unsupported/);assert.doesNotMatch(undoRejectedView,/Preview returned/);assert(colors.some(c=>c.color==="error"));
 
+  const {executeRemovalOutput}=await import("../src/pi/removal-output");
+  colors.length=0;
+  const invalidRemoval=await executeRemovalOutput({paths:["private"],preflight:true});
+  const invalidRemovalView=render("resolveDeleteChangeConflict",invalidRemoval,false,{args:{preflight:true},isError:true});
+  assert.match(invalidRemovalView,/Removal: failed/);assert.match(invalidRemovalView,/bare\s+private\/controlled/);assert.doesNotMatch(invalidRemovalView,/Preview returned|Preview: would/);assert(colors.some(c=>c.color==="error"));
+  const validRemoval=await executeRemovalOutput({paths:["./private"],preflight:true});assert.match(render("resolveDeleteChangeConflict",validRemoval),/Removal: preflight/);
+
   const call = renderPlasticCall("mergeBranches", { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", preflight: true }, theme);
   assert.match(plain(call), /Plastic.*Server merge.*server.*preview\n.*task@Game@cloud -> br:\/main@Game@cloud/);
   const workspaceCall = renderPlasticCall("diff", { mode:"workspace", workdir: "C:\\Projects\\MyGame", paths: ["Assets/Player.cs", "Assets/UI.cs", "Assets/Game.cs"] }, theme);

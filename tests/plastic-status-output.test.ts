@@ -11,7 +11,7 @@ import { loadRegisteredTools } from "./pi-tool-harness";
 const tools = await loadRegisteredTools();
 const status = tools.get("plastic_status")!;
 assert.deepEqual(status.outputSchema, statusOutputSchema);
-for (const tool of tools.values()) if (!["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_diff", "plastic_codeReviewFind", "plastic_shelvesetList", "plastic_workspaceList", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate", "plastic_switchBranch", "plastic_update", "plastic_add", "plastic_undo"].includes(tool.name)) assert.equal(tool.outputSchema, undefined);
+for (const tool of tools.values()) if (!["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_diff", "plastic_codeReviewFind", "plastic_shelvesetList", "plastic_workspaceList", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate", "plastic_switchBranch", "plastic_update", "plastic_add", "plastic_undo", "plastic_resolveDeleteChangeConflict"].includes(tool.name)) assert.equal(tool.outputSchema, undefined);
 const sep = "\x1f";
 const record = (path: string, code = "CH") => [code, path, "False", "0", "NO_MERGES"].join(sep);
 const machine = (output: string) => ({ kind: "machine" as const, output, capture: "complete" as const, cwd: "/fixture", requestedShort: false, ...diagnoseMachineReadablePendingItems(output, "/fixture") });

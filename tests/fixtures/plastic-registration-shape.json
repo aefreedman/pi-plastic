@@ -204,7 +204,7 @@
   {
     "name": "plastic_resolveDeleteChangeConflict",
     "label": "plastic_resolveDeleteChangeConflict",
-    "description": "Resolve a Plastic SCM delete/change conflict by accepting the source-side deletion with cm remove.",
+    "description": "Request source-side deletion for a Plastic SCM delete/change conflict via cm remove; actual resolution remains unverified.",
     "parameters": {
       "type": "object",
       "required": [
@@ -221,7 +221,7 @@
         },
         "keepOnDisk": {
           "type": "boolean",
-          "description": "Keep removed items on disk as private files via --nodisk. Defaults to true."
+          "description": "Request --nodisk to retain items on disk. Defaults to true; preservation remains unverified."
         },
         "preflight": {
           "type": "boolean",
@@ -247,7 +247,7 @@
       }
     },
     "defaults": {},
-    "hasOutputSchema": false
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_diff",

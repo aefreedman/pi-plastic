@@ -3,6 +3,7 @@ import { executeSwitchOutput, switchOutputSchema } from "./switch-output";
 import { executeUpdateOutput, updateOutputSchema } from "./update-output";
 import { executeAddOutput, addOutputSchema } from "./add-output";
 import { executeUndoOutput, undoOutputSchema } from "./undo-output";
+import { executeRemovalOutput, removalOutputSchema } from "./removal-output";
 import { executeBranchCreateOutput, branchCreateOutputSchema } from "./branch-create-output";
 import { executeServerMergeOutput, serverMergeOutputSchema } from "./server-merge-output";
 import { executeDiffOutput, diffInputSchema, diffOutputSchema } from "./diff-output";
@@ -53,7 +54,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
       label: toToolName(exportName),
       description: coreTool.description ?? toToolName(exportName),
       parameters: exportName === "diff" ? diffInputSchema : buildParameters(coreTool.args),
-      ...(exportName === "status" ? { outputSchema: statusOutputSchema } : exportName === "currentBranch" ? { outputSchema: currentBranchOutputSchema } : exportName === "branchExists" ? { outputSchema: branchExistsOutputSchema } : exportName === "branchList" ? { outputSchema: branchListOutputSchema } : exportName === "workspaceList" ? { outputSchema: workspaceListOutputSchema } : exportName === "shelvesetList" ? { outputSchema: shelvesetListOutputSchema } : exportName === "codeReviewFind" ? { outputSchema: codeReviewFindOutputSchema } : exportName === "diff" ? { outputSchema: diffOutputSchema } : exportName === "mergeBranches" ? { outputSchema: serverMergeOutputSchema } : exportName === "checkin" ? { outputSchema: checkinOutputSchema } : exportName === "branchCreate" ? { outputSchema: branchCreateOutputSchema } : exportName === "switchBranch" ? { outputSchema: switchOutputSchema } : exportName === "update" ? { outputSchema: updateOutputSchema } : exportName === "add" ? { outputSchema: addOutputSchema } : exportName === "undo" ? { outputSchema: undoOutputSchema } : {}),
+      ...(exportName === "status" ? { outputSchema: statusOutputSchema } : exportName === "currentBranch" ? { outputSchema: currentBranchOutputSchema } : exportName === "branchExists" ? { outputSchema: branchExistsOutputSchema } : exportName === "branchList" ? { outputSchema: branchListOutputSchema } : exportName === "workspaceList" ? { outputSchema: workspaceListOutputSchema } : exportName === "shelvesetList" ? { outputSchema: shelvesetListOutputSchema } : exportName === "codeReviewFind" ? { outputSchema: codeReviewFindOutputSchema } : exportName === "diff" ? { outputSchema: diffOutputSchema } : exportName === "mergeBranches" ? { outputSchema: serverMergeOutputSchema } : exportName === "checkin" ? { outputSchema: checkinOutputSchema } : exportName === "branchCreate" ? { outputSchema: branchCreateOutputSchema } : exportName === "switchBranch" ? { outputSchema: switchOutputSchema } : exportName === "update" ? { outputSchema: updateOutputSchema } : exportName === "add" ? { outputSchema: addOutputSchema } : exportName === "undo" ? { outputSchema: undoOutputSchema } : exportName === "resolveDeleteChangeConflict" ? { outputSchema: removalOutputSchema } : {}),
       prepareArguments: config.prepareArguments,
       renderCall(args, theme, context) {
         return renderPlasticCall(exportName, args ?? {}, theme, context);
@@ -71,6 +72,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
         if (exportName === "update") return runWithAbortSignal(signal, () => executeUpdateOutput(normalizedParams));
         if (exportName === "add") return runWithAbortSignal(signal, () => executeAddOutput(normalizedParams));
         if (exportName === "undo") return runWithAbortSignal(signal, () => executeUndoOutput(normalizedParams));
+        if (exportName === "resolveDeleteChangeConflict") return runWithAbortSignal(signal, () => executeRemovalOutput(normalizedParams));
         if (exportName === "branchCreate") return runWithAbortSignal(signal, () => executeBranchCreateOutput(normalizedParams));
         if (exportName === "mergeBranches") return runWithAbortSignal(signal, () => executeServerMergeOutput(normalizedParams));
         if (exportName === "diff") return runWithAbortSignal(signal, () => executeDiffOutput(normalizedParams));

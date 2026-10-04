@@ -41,7 +41,7 @@ for (const owner of owners) {
   for (const dependency of dependencies) {
     if (!dependency.startsWith(".")) {
       if (layer && allowedLayers[layer]) {
-        const hostImports = layer === "pi" ? ["typebox", "@earendil-works/pi-coding-agent", ...(["src/pi/status-output.ts", "src/pi/branch-output.ts", "src/pi/branch-list-output.ts", "src/pi/workspace-list-output.ts", "src/pi/shelveset-list-output.ts", "src/pi/code-review-find-output.ts", "src/pi/diff-revisions-output.ts", "src/pi/diff-output.ts", "src/pi/server-merge-output.ts", "src/pi/checkin-output.ts", "src/pi/branch-create-output.ts", "src/pi/switch-output.ts", "src/pi/update-output.ts", "src/pi/add-output.ts", "src/pi/undo-output.ts"].includes(owner) ? ["typebox/value"] : [])] : [];
+        const hostImports = layer === "pi" ? ["typebox", "@earendil-works/pi-coding-agent", ...(["src/pi/status-output.ts", "src/pi/branch-output.ts", "src/pi/branch-list-output.ts", "src/pi/workspace-list-output.ts", "src/pi/shelveset-list-output.ts", "src/pi/code-review-find-output.ts", "src/pi/diff-revisions-output.ts", "src/pi/diff-output.ts", "src/pi/server-merge-output.ts", "src/pi/checkin-output.ts", "src/pi/branch-create-output.ts", "src/pi/switch-output.ts", "src/pi/update-output.ts", "src/pi/add-output.ts", "src/pi/undo-output.ts", "src/pi/removal-output.ts"].includes(owner) ? ["typebox/value"] : [])] : [];
         assert(dependency.startsWith("node:") || ["path", "os", ...(["src/domain/status-xml.ts", "src/domain/diff-base-xml.ts", "src/domain/diff-pending-xml.ts"].includes(owner) ? ["@xmldom/xmldom"] : []), ...hostImports].includes(dependency), `${owner} must not import unapproved host packages`);
       }
       continue;

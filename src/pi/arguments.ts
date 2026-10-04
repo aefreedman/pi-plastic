@@ -64,6 +64,7 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       promoteSinglePath(input);
       assignAlias(input, "paths", ["items", "files"]);
       assignAlias(input, "keepOnDisk", ["keep_on_disk", "keepOnDisk", "nodisk"]);
+      for (const key of ["cwd", "workingDirectory", "working_directory", "path", "file", "items", "files", "keep_on_disk", "nodisk"]) delete input[key];
       return input;
     },
   },
