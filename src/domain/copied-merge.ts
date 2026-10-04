@@ -9,7 +9,7 @@ export const copiedPathKey = (path: string) => win32.normalize(path).toLowerCase
 export type CopiedPending = { changeset: string; repository: string; server: string; mergeChangeset: string; paths: string[] };
 export function parseCopiedPending(text: string, cwd: string): CopiedPending | null {
     const lines = text.split(/\r?\n/); if (lines.at(-1) === "") lines.pop();
-    if (lines.length < 2 || lines.length > 257 || Buffer.byteLength(text, "utf8") > 65536 || !qualifiedPath(cwd)) return null;
+    if (lines.length < 2 || lines.length > 129 || Buffer.byteLength(text, "utf8") > 65536 || !qualifiedPath(cwd)) return null;
     const h = lines[0].split("\x1f");
     if (h.length !== 4 || h[0] !== "STATUS" || !/^(0|[1-9][0-9]{0,19})$/.test(h[1]) || !h.slice(2).every(v => safeSwitchValue(v) && !/[?\uFFFD]/u.test(v))) return null;
     const paths: string[] = []; let mergeChangeset = "";
