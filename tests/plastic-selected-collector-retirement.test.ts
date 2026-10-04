@@ -6,6 +6,7 @@ import { captureBranchCreateCommand } from "../src/execution/branch-create-comma
 import { captureSwitchCommand } from "../src/execution/switch-command";
 import { captureUpdateCommand } from "../src/execution/update-command";
 import { captureAddCommand } from "../src/execution/add-command";
+import { captureUndoCommand } from "../src/execution/undo-command";
 import { runWithAbortSignal } from "../src/execution/context";
 import { loadRegisteredTools } from "./pi-tool-harness";
 import { validateCheckinOutput } from "../src/pi/checkin-output";
@@ -13,7 +14,7 @@ import { validateBranchCreateOutput } from "../src/pi/branch-create-output";
 
 const modes = ["timeout-false-kill","timeout-thrown-kill","timeout-default-grace","abort-no-terminal","missing-spawn","terminal-open-pipes","capture-overflow","stream-error","repeated-errors"] as const;
 const cwd = "C:\\Example\\workspace";
-for (const capture of [captureCheckinCommand,captureBranchCreateCommand,captureSwitchCommand,captureUpdateCommand,captureAddCommand]) {
+for (const capture of [captureCheckinCommand,captureBranchCreateCommand,captureSwitchCommand,captureUpdateCommand,captureAddCommand,captureUndoCommand]) {
   for (const mode of modes) {
     const controller = new AbortController(), timers = new Set<NodeJS.Timeout>(), kills: string[] = [], budgets: number[] = [];
     let dispatches = 0, signalHandlers = 0;
@@ -101,4 +102,4 @@ if (process.platform === "win32") {
     }
   }
 }
-console.log("PASS: both selected collectors finite retirement, truthful missing/genuine terminal facts, false/thrown kills, abort/missing spawn/open pipes/partial overflow/stream errors, immutable late events, inert sinks, complete normal cleanup and native uncertainty/no retry");
+console.log("PASS: six selected collectors finite retirement, truthful missing/genuine terminal facts, false/thrown kills, abort/missing spawn/open pipes/partial overflow/stream errors, immutable late events, inert sinks, complete normal cleanup and native uncertainty/no retry");

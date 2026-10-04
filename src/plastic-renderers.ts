@@ -83,7 +83,7 @@ export function renderPlasticCall(name: string, input: unknown, theme: RenderThe
 
 function payload(result: Result, raw: string): Record<string, unknown> {
   const structured = record((result as Result & {structuredContent?:unknown}).structuredContent);
-  if (structured.action === "diff" || structured.action === "merge-branches" || structured.action === "checkin" || structured.action === "branch-create" || structured.action === "switch-branch" || structured.action === "update" || structured.action === "add") return structured;
+  if (structured.action === "diff" || structured.action === "merge-branches" || structured.action === "checkin" || structured.action === "branch-create" || structured.action === "switch-branch" || structured.action === "update" || structured.action === "add" || structured.action === "undo") return structured;
   const rawResult = record(result.details).rawResult;
   if (rawResult !== null && typeof rawResult === "object") return record(rawResult);
   // Only decode the package's whole JSON envelope, never a JSON fragment in CLI or diff output.
@@ -111,8 +111,8 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
   const notices = strings(envelope.warnings);
   const summary: Summary = { label: "Result returned", tone: "toolOutput", notices, rows: [] };
   const textLines = raw.split(/\r?\n/).filter(line => line.trim());
-  const preview = !["update", "add"].includes(action) && (record(context?.args).preflight === true || action.endsWith("-preflight") || envelope.outcome === "preflight");
-  if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes)) && !(name === "mergeBranches" && action === "merge-branches") && !["checkin", "branch-create", "switch-branch", "update", "add"].includes(action)) {
+  const preview = !["update", "add", "undo"].includes(action) && (record(context?.args).preflight === true || action.endsWith("-preflight") || envelope.outcome === "preflight");
+  if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes)) && !(name === "mergeBranches" && action === "merge-branches") && !["checkin", "branch-create", "switch-branch", "update", "add", "undo"].includes(action)) {
     summary.label = "Failed";
     summary.tone = "error";
     summary.rows = textLines.slice(0, 3);
@@ -123,12 +123,12 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
     summary.label = wouldRun === false ? "Preview: would not run" : wouldRun === true ? "Preview: would run" : "Preview returned";
     summary.tone = "warning";
     summary.rows = action ? [scalar(data.reason) || scalar(data.errorCode), scalar(data.strategy)].filter(Boolean) : textLines.filter(line => /^- (?:Reason|Strategy|Command):/.test(line));
-  } else if ((name === "update" && action === "update" || name === "add" && action === "add") && typeof envelope.outcome === "string") {
-    summary.label = `${name === "update" ? "Update" : "Add"}: ${envelope.outcome}`;
+  } else if ((name === "update" && action === "update" || name === "add" && action === "add" || name === "undo" && action === "undo") && typeof envelope.outcome === "string") {
+    summary.label = `${name === "update" ? "Update" : name === "add" ? "Add" : "Undo"}: ${envelope.outcome}`;
     summary.tone = envelope.ok === false ? "error" : "warning";
     summary.rows = [`Attempt: ${scalar(record(data.attempt).state)}`, `Effect: ${scalar(data.effect)}`];
     if (envelope.ok === false) notices.unshift(scalar(record(envelope.error).message));
-    notices.push(name === "update" ? "Workspace identity, changed items, preservation, cleanliness and merge readiness remain unverified." : "Requested operands are not verified added items. Workspace identity, expanded scope and preservation remain unverified.");
+    notices.push(name === "update" ? "Workspace identity, changed items, preservation, cleanliness and merge readiness remain unverified." : name === "add" ? "Requested operands are not verified added items. Workspace identity, expanded scope and preservation remain unverified." : "Requested operands are not verified undone items. Workspace identity, restored content, expanded scope and preservation remain unverified.");
   } else if (name === "switchBranch" && action === "switch-branch" && typeof envelope.outcome === "string") {
     summary.label = `Switch: ${envelope.outcome}`;
     summary.tone = envelope.ok === false ? "error" : envelope.outcome === "switched" ? "success" : "warning";

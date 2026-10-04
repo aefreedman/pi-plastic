@@ -41,7 +41,7 @@ branchCreate.execute = async () => { throw Error("Core presentation must not exe
 try {
   const harness = new PiToolHarness({activeTools:[]}); await harness.load();
   assert.equal(harness.registry.size,28);
-  assert.equal([...harness.registry.values()].filter(t => t.outputSchema).length,14);
+  assert.equal([...harness.registry.values()].filter(t => t.outputSchema).length,15);
   const registeredCheckin = await runWithAbortSignal(undefined, () => harness.registry.get("plastic_checkin")!.execute("fixture",request),deps);
   const registeredBranch = await runWithAbortSignal(undefined, () => harness.registry.get("plastic_branchCreate")!.execute("fixture",branchRequest),deps);
   assert(validateCheckinOutput(registeredCheckin.structuredContent));

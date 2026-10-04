@@ -3,6 +3,7 @@ import { branchCreateOutputSchema, validateBranchCreateOutput } from "../src/pi/
 import { switchOutputSchema, validateSwitchOutput } from "../src/pi/switch-output";
 import { updateOutputSchema, validateUpdateOutput } from "../src/pi/update-output";
 import { addOutputSchema, validateAddOutput } from "../src/pi/add-output";
+import { undoOutputSchema, validateUndoOutput } from "../src/pi/undo-output";
 import { codeReviewFindOutputSchema } from "../src/pi/code-review-find-output";
 import { shelvesetListOutputSchema } from "../src/pi/shelveset-list-output";
 import { workspaceListOutputSchema } from "../src/pi/workspace-list-output";
@@ -57,6 +58,14 @@ let cfg; try { cfg = JSON.parse(data.output); } catch {}
 if (cfg?.kind === "add") {
  if(path.basename(process.argv[1])!=="add")throw Error("Unexpected add command");
  if(cfg.mode==="partial"){process.stdout.write("PRIVATE_HOST_DIAGNOSTIC one item added");process.stderr.write("PRIVATE_HOST_DIAGNOSTIC missing operand");process.exitCode=1;}
+ else if(cfg.mode==="invalid-utf8")process.stdout.write(Buffer.from([255]));
+ else if(cfg.mode==="overflow")process.stdout.write("x".repeat(65537));
+ else if(cfg.mode==="warning"){process.stdout.write("Opaque progress é-é-日本-😀");process.stderr.write("warning");}
+ process.exit();
+}
+if (cfg?.kind === "undo") {
+ if(path.basename(process.argv[1])!=="undo")throw Error("Unexpected undo command");
+ if(cfg.mode==="partial"){process.stdout.write("PRIVATE_HOST_DIAGNOSTIC one item undone");process.stderr.write("PRIVATE_HOST_DIAGNOSTIC missing operand");process.exitCode=1;}
  else if(cfg.mode==="invalid-utf8")process.stdout.write(Buffer.from([255]));
  else if(cfg.mode==="overflow")process.stdout.write("x".repeat(65537));
  else if(cfg.mode==="warning"){process.stdout.write("Opaque progress é-é-日本-😀");process.stderr.write("warning");}
@@ -145,7 +154,7 @@ globalThis.fetch = (() => { throw Error("No network transport is allowed in this
 try {
 await writeFile(join(fixture, "help"), 'require("node:fs").appendFileSync("calls.jsonl",JSON.stringify(process.argv.slice(1))+"\\n"); console.log("--to --merge --nointeractiveresolution --machinereadable --startlineseparator --endlineseparator --fieldseparator");', {flag:"wx"});
 await writeFile(join(fixture,"merge"), `const fs=require("node:fs");fs.appendFileSync("calls.jsonl",JSON.stringify(process.argv.slice(1))+"\\n");const d=JSON.parse(fs.readFileSync("scenario.json","utf8"));const sep=n=>process.argv.find(a=>a.startsWith(n+"=")).slice(n.length+1);const rec=(op,fields)=>sep("--startlineseparator")+[op,...fields].join(sep("--fieldseparator"))+sep("--endlineseparator")+"\\n";if(d.fail){process.stderr.write("private fixture failure");process.exit(1);}let output=d.output==="no-op"?rec("STATUS",["ALREADY_CONNECTED","No merges detected"]):d.output==="conflict"?rec("FILE_CONFLICT",["/日本😀.txt","1","2","3","4"]):rec("CHANGESET",["cs:42@/target-😀@Example Repository@example-org@unity (mount:'/')"]);if(d.output==="uncertain")output+=rec("OTHER",["unsupported"]);process.stdout.write(output);if(d.output==="conflict")process.exitCode=1;`,{flag:"wx"});
-for (const command of ["status", "checkin", "branch", "add", "switch", "shelveset", "update"]) await writeFile(join(fixture, command), receiptCommandFixture, { flag: "wx" });
+for (const command of ["status", "checkin", "branch", "add", "switch", "shelveset", "update", "undo"]) await writeFile(join(fixture, command), receiptCommandFixture, { flag: "wx" });
 await writeFile(join(fixture, "find"), commandFixture, { flag: "wx" });
 await writeFile(join(fixture, "workspace"), commandFixture, { flag: "wx" });
 await writeFile(join(fixture, "cat"), `const fs=require("node:fs");fs.appendFileSync("calls.jsonl",JSON.stringify(process.argv.slice(1))+"\\n");const data=JSON.parse(fs.readFileSync("scenario.json","utf8"));if(data.fail){process.stderr.write("private fixture error");process.exit(1);}const pair=JSON.parse(data.output);const dest=process.argv.find(a=>a.startsWith("--file=")).slice(7);fs.writeFileSync(dest,Buffer.from(process.argv[2].endsWith("#cs:2")?pair.right:pair.left,"base64"),{flag:"wx"});`, {flag:"wx"});
@@ -153,9 +162,9 @@ await writeFile(join(fixture, "scenario.json"), "{}", { flag: "wx" });
 await writeFile(join(fixture, "calls.jsonl"), "", { flag: "wx" });
 await writeFile(join(fixture, "version"), `require("node:fs").appendFileSync("calls.jsonl", "version\\n"); console.log("fixture-version");`, { flag: "wx" });
 await writeFile(modifierPath, `export default function(pi) {
-  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
+  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
   pi.on("tool_result", e => {
-    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add"].includes(e.toolName)) return;
+    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo"].includes(e.toolName)) return;
     if (globalThis.__plasticHostFixture.scenario === "content-only") return { content: [{ type: "text", text: "foreign replacement" }] };
   });
 }`, { flag: "wx" });
@@ -183,14 +192,14 @@ await writeFile(modifierPath, `export default function(pi) {
       pi.registerTool({ name: "fixture_throw", label: "Throw", description: "Fixture", parameters: Type.Object({}), async execute() { throw Error("fixture thrown"); } });
       pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), request: Type.Optional(Type.Any()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Union([Type.Literal("xml"), Type.Literal("names"), Type.Literal("fields"), Type.Literal("ids"), Type.Literal("native")])) }), async execute(_id, params, _signal, _update, ctx) {
         const controller = new AbortController(); if (params.abort) controller.abort();
-        state.nested = await ctx.executeTool(params.child ?? "plastic_status", ["plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add"].includes(params.child ?? "") ? params.request ?? {} : params.child === "plastic_mergeBranches" ? {source:"br:/source@Example Repository@example-org@cloud",target:"br:/target-😀@Example Repository@example-org@cloud",message:"Fixture Unicode résumé 日本語 😀"} : params.child === "plastic_diff" ? { mode:"revisions", leftRevision:"Assets/Fictional.txt#cs:1", rightRevision:"Assets/Fictional.txt#cs:2" } : ["plastic_shelvesetList", "plastic_codeReviewFind"].includes(params.child ?? "") ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
+        state.nested = await ctx.executeTool(params.child ?? "plastic_status", ["plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo"].includes(params.child ?? "") ? params.request ?? {} : params.child === "plastic_mergeBranches" ? {source:"br:/source@Example Repository@example-org@cloud",target:"br:/target-😀@Example Repository@example-org@cloud",message:"Fixture Unicode résumé 日本語 😀"} : params.child === "plastic_diff" ? { mode:"revisions", leftRevision:"Assets/Fictional.txt#cs:1", rightRevision:"Assets/Fictional.txt#cs:2" } : ["plastic_shelvesetList", "plastic_codeReviewFind"].includes(params.child ?? "") ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
         return { content: [{ type: "text", text: "nested result inspected outside transcript" }], details: { childIsError: state.nested.isError } };
       } });
     }], noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true, systemPrompt: "Run only the local scripted action." },
   });
   assert.deepEqual(services.diagnostics.filter(d => d.type === "error"), []);
   assert.deepEqual(services.resourceLoader.getExtensions().errors, []);
-  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate", "plastic_switchBranch", "plastic_update", "plastic_add", "codemode", "fixture_throw", "fixture_nested"] }));
+  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate", "plastic_switchBranch", "plastic_update", "plastic_add", "plastic_undo", "codemode", "fixture_throw", "fixture_nested"] }));
   await session.bindExtensions({});
   assert.deepEqual(session.getToolDefinition("plastic_status").outputSchema, statusOutputSchema);
   assert.equal(resolve(session.getAllTools().find((tool: any) => tool.name === "plastic_status").sourceInfo.path), resolve(extensionPath));
@@ -202,7 +211,7 @@ await writeFile(modifierPath, `export default function(pi) {
     const start = records.length;
     await session.prompt(scenario);
     const parent = session.messages.filter((m: any) => m.role === "toolResult").at(-1);
-    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
+    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
   };
   const script = (args: object) => ({ code: `const dto = await tools.plastic_status(${JSON.stringify(args)}); if (typeof dto !== "object") throw Error("unexpected fallback"); text(dto);` });
   const text = (result: any) => result.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
@@ -644,8 +653,32 @@ await writeFile(modifierPath, `export default function(pi) {
     const r=await addRun("add-rejected","codemode",{code:`text(await tools.plastic_add(${JSON.stringify({paths})}));`}),d=r.children[0].result.structuredContent;
     assert(validateAddOutput(d));assert.equal(d.outcome,"failed");assert.equal(r.calls.length,0);assert.equal(r.parent.details.calls[0].status,"error");
   }
-  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_")).length,14,"Host session intentionally selects the fourteen schema-bearing tools; full registry count is tested separately");
-  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_") && session.getToolDefinition(t.name).outputSchema).length,14);
+  {
+  assert.deepEqual(session.getToolDefinition("plastic_undo").outputSchema,undoOutputSchema);
+  const undoRequest={paths:["space café-é-日本-😀.txt","*.png","./-literal","space café-é-日本-😀.txt"]};
+  const undoRun=(scenario:string,name:string,args:Record<string,unknown>,mode="completed")=>run(scenario,name,args,JSON.stringify({kind:"undo",mode}));
+  const ad=await undoRun("undo-direct","plastic_undo",undoRequest),aDto=ad.children[0].result.structuredContent;
+  assert(validateUndoOutput(aDto));assert(aDto.ok);assert.deepEqual(names(ad),["undo"]);assert.deepEqual(aDto.data.intendedArgv,["undo",...undoRequest.paths]);assert.equal(aDto.data.observedUndoneItems,null);assert.equal(aDto.data.requestedOperandCount,4);
+  const ac=await undoRun("undo-code","codemode",{code:`text(await tools.plastic_undo(${JSON.stringify(undoRequest)}));`});assert.deepEqual(ac.children[0].result.structuredContent,aDto);assert.deepEqual(names(ac),["undo"]);
+  const an=await undoRun("undo-nested","fixture_nested",{child:"plastic_undo",request:undoRequest});assert.deepEqual(state.nested.result.structuredContent,aDto);assert.deepEqual(names(an),["undo"]);
+  const aa=await undoRun("undo-abort","fixture_nested",{child:"plastic_undo",request:undoRequest,abort:true});assert.equal(aa.calls.length,0);assert(state.nested.isError);
+  const as=await undoRun("undo-selective","codemode",{code:`const d=await tools.plastic_undo(${JSON.stringify(undoRequest)});text({outcome:d.outcome});`});assert.match(text(as.parent),/command-completed/);assert.doesNotMatch(text(as.parent),/schemaVersion|workingDirectory/);
+  const ab=await undoRun("blocked","codemode",{code:`text(await tools.plastic_undo(${JSON.stringify(undoRequest)}));`});assert.equal(ab.calls.length,0);assert.equal(ab.children[0].result.structuredContent,undefined);
+  const ar=await undoRun("content-only","codemode",{code:`text(await tools.plastic_undo(${JSON.stringify(undoRequest)}));`});assert.equal(ar.children[0].result.structuredContent,undefined);assert.match(text(ar.parent),/foreign replacement/);
+  for(const mode of ["partial","invalid-utf8","overflow","warning"]){
+    const r=await undoRun("undo-"+mode,"codemode",{code:`text(await tools.plastic_undo(${JSON.stringify(undoRequest)}));`},mode),d=r.children[0].result.structuredContent;
+    assert(validateUndoOutput(d));assert.equal(d.ok,mode==="warning");assert.deepEqual(names(r),["undo"]);assert.equal(r.parent.details.calls[0].status,mode==="warning"?"ok":"error");assert.doesNotMatch(JSON.stringify(d),/PRIVATE_HOST_DIAGNOSTIC/);
+  }
+  for(const paths of [["--recursive"],["-"],[" --added"],["--unchanged"],["--symlink"],[""]]){
+    const r=await undoRun("undo-rejected","codemode",{code:`text(await tools.plastic_undo(${JSON.stringify({paths})}));`}),d=r.children[0].result.structuredContent;
+    assert(validateUndoOutput(d));assert.equal(d.outcome,"failed");assert.equal(r.calls.length,0);assert.equal(r.parent.details.calls[0].status,"error");
+  }
+  {
+  }
+  const alias=await undoRun("undo-alias","plastic_undo",{file:"alias-😀.txt"});assert(alias.children[0].result.structuredContent.ok);assert.deepEqual(alias.children[0].result.structuredContent.data.intendedArgv,["undo","alias-😀.txt"]);assert.deepEqual(names(alias),["undo"]);
+  }
+  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_")).length,15,"Host session intentionally selects the fifteen schema-bearing tools; full registry count is tested separately");
+  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_") && session.getToolDefinition(t.name).outputSchema).length,15);
   console.log(`PASS: selected checkin/branch-create receipts on SDK/tui ${runtimeVersion}/${tuiVersion}; real file loading, synthetic CLI, exact command counts, preflight/qualification/loaded-parent policy, partial effects, uncertainty/bounds, direct/codemode/nested/native-error/selective/policy/foreign-hook/SDK-event coverage`);
   console.log(`PASS: real Pi host, ${turns} local scripted turns; finalizer/codemode/nested consumers, SDK JSON events, native errors, selective context and foreign-hook fallback; zero network`);
 } finally {

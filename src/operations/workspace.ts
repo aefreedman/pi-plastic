@@ -3,6 +3,7 @@ import { assembleWorkspaceListObservation, presentWorkspaceListObservation } fro
 import { workdirArg } from "./arguments";
 import { assembleUpdateReceipt, presentUpdateReceipt } from "./update-receipt";
 import { assembleAddReceipt, presentAddReceipt } from "./add-receipt";
+import { assembleUndoReceipt, presentUndoReceipt } from "./undo-receipt";
 import { runCm, runCmRaw } from "../execution/cm";
 import { outputFormatArg, toStructuredResult, formatPreflightText } from "../presentation/results";
 import { summarizeShortStatus } from "../domain/pending";
@@ -44,7 +45,10 @@ export const undo = tool({
     },
     async execute(args)
     {
-        return runCm(["undo", ...args.paths], args.workdir);
+        const receipt = await assembleUndoReceipt(args);
+        const text = presentUndoReceipt(receipt);
+        if (!receipt.ok) throw new Error(text);
+        return text;
     },
 });
 

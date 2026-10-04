@@ -52,6 +52,8 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       normalizeWorkdirAliases(input);
       promoteSinglePath(input);
       assignAlias(input, "paths", ["items"]);
+      // Consumed aliases must not become unsupported extra options in the selected producer.
+      for (const key of ["cwd", "workingDirectory", "working_directory", "path", "file", "items"]) delete input[key];
       return input;
     },
   },
