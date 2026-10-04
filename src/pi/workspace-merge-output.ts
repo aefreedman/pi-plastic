@@ -1,0 +1,44 @@
+import { Type } from "typebox";
+import { Check } from "typebox/value";
+import { assembleWorkspaceMergeReceipt, emptyWorkspaceMergeData, workspaceMergeFailure, presentWorkspaceMergeReceipt, buildWorkspaceMergeArgv, safeMergeText, type MergeAction, type WorkspaceMergeReceipt } from "../operations/workspace-merge-receipt";
+const obj=(p:Record<string,any>)=>Type.Object(p,{additionalProperties:false}),enm=(v:string[])=>Type.Union(v.map(x=>Type.Literal(x))),nil=(s:any)=>Type.Union([s,Type.Null()]),uint=(max=Number.MAX_SAFE_INTEGER)=>Type.Integer({minimum:0,maximum:max});
+const attempt=obj({state:enm(["not-attempted","not-started","started","unknown"]),terminal:enm(["not-observed","observed"]),exitCode:nil(uint(2147483647)),aborted:Type.Boolean(),timedOut:Type.Boolean()});
+const capture=obj({stdoutBytes:uint(),stderrBytes:uint(),stdoutRetainedBytes:uint(65536),stderrRetainedBytes:uint(16384),truncated:Type.Boolean(),complete:Type.Boolean(),validUtf8:Type.Boolean()});
+const stage=obj({attempt,capture:nil(capture),admission:enm(["not-observed","unsupported","admitted"])});
+const text=Type.String({minLength:1,maxLength:4096});
+const data=obj({intendedArgv:Type.Array(text,{minItems:1,maxItems:13}),workingDirectory:nil(text),requestedSource:nil(text),strategy:nil(enm(["auto","source","destination"])),cherrypicking:nil(Type.Boolean()),forced:nil(Type.Boolean()),previewRequested:nil(Type.Boolean()),outputFormatRequested:nil(enm(["text","json"])),apply:stage,shortStatus:stage,fullStatus:stage,commandCompleted:Type.Boolean(),observedWorkspaceIdentity:Type.Null(),observedSourceIdentity:Type.Null(),observedFinalizedMetadata:Type.Null(),observedPreservation:Type.Null(),observedPendingItems:Type.Null(),fileConflictCount:nil(uint(256)),protocol:enm(["not-observed","already-connected","file-conflict","apply-add","unsupported"]),checkinReadiness:enm(["unknown","blocked","supported-no-unresolved-signals"]),verification:Type.Literal("unverified"),effect:enm(["not-attempted","not-proven","uncertain"])});
+export const workspaceMergeOutputSchema=Type.Unsafe<WorkspaceMergeReceipt>(Type.Union([
+ obj({schemaVersion:Type.Literal(1),action:enm(["merge","finalize-merge"]),provenance:obj({source:Type.Literal("plastic"),producer:Type.Literal("@aefree/pi-plastic"),contentTrust:Type.Literal("external")}),completeness:obj({capture:enm(["complete","incomplete","unknown"]),projection:Type.Literal(true)}),data,ok:Type.Literal(true),outcome:enm(["preflight","command-completed"])}),
+ obj({schemaVersion:Type.Literal(1),action:enm(["merge","finalize-merge"]),provenance:obj({source:Type.Literal("plastic"),producer:Type.Literal("@aefree/pi-plastic"),contentTrust:Type.Literal("external")}),completeness:obj({capture:enm(["complete","incomplete","unknown"]),projection:Type.Literal(true)}),data,ok:Type.Literal(false),outcome:enm(["failed","uncertain","blocked"]),error:obj({code:enm(["invalid_request","launch_failed","aborted","uncertain","unsupported_readiness","conflict","producer_failed"]),message:Type.String({minLength:1,maxLength:256})})})
+]));
+export function validateWorkspaceMergeOutput(v:unknown):v is WorkspaceMergeReceipt{
+ if(!Check(workspaceMergeOutputSchema,v)||Buffer.byteLength(JSON.stringify(v),"utf8")>131072)return false;
+ const dto=v as WorkspaceMergeReceipt,d=dto.data,stages=[d.apply,d.shortStatus,d.fullStatus];
+ if(d.requestedSource===null){if(d.intendedArgv.length!==1||d.intendedArgv[0]!=="merge"||[d.workingDirectory,d.strategy,d.cherrypicking,d.forced,d.previewRequested,d.outputFormatRequested].some(x=>x!==null))return false;}
+ else{
+  if(!safeMergeText(d.requestedSource)||d.requestedSource.trimStart().startsWith("-")||!safeMergeText(d.workingDirectory)||d.strategy===null||typeof d.cherrypicking!=="boolean"||typeof d.forced!=="boolean"||typeof d.previewRequested!=="boolean"||d.outputFormatRequested===null)return false;
+  const match=/^--startlineseparator=(__WM_[a-f0-9]{24}__)S__$/.exec(d.intendedArgv[5]??"");if(!match||JSON.stringify(d.intendedArgv)!==JSON.stringify(buildWorkspaceMergeArgv(d.requestedSource,d.strategy,d.cherrypicking,d.forced,match[1])))return false;
+  if(dto.action==="finalize-merge"&&(d.strategy==="auto"||d.cherrypicking||d.forced))return false;
+ }
+ for(const s of stages){const a=s.attempt,c=s.capture;
+  if(a.exitCode!==null&&a.terminal!=="observed"||["not-attempted","not-started"].includes(a.state)&&(a.terminal!=="not-observed"||a.exitCode!==null)||a.state==="not-attempted"&&a.timedOut)return false;
+  if(c){if(c.stdoutRetainedBytes>c.stdoutBytes||c.stderrRetainedBytes>c.stderrBytes)return false;if(c.complete&&(!c.validUtf8||c.truncated||c.stdoutBytes!==c.stdoutRetainedBytes||c.stderrBytes!==c.stderrRetainedBytes||a.state!=="started"||a.terminal!=="observed"||a.exitCode===null||a.aborted||a.timedOut))return false;}
+  if(s.admission==="admitted"&&(!c?.complete||a.state!=="started"))return false;
+  if(s.admission==="not-observed"&&(c||a.state!=="not-attempted"||a.aborted||a.timedOut))return false;
+ }
+ const captured=stages.filter(s=>s.capture);if(dto.completeness.capture!==(!captured.length?"unknown":captured.every(s=>s.capture!.complete)?"complete":"incomplete"))return false;
+ if(d.commandCompleted!==Boolean(d.apply.capture?.complete&&d.apply.attempt.state==="started"&&d.apply.attempt.exitCode===0))return false;
+ if(d.shortStatus.admission==="admitted"&&(d.shortStatus.capture?.stdoutBytes!==0||d.shortStatus.capture?.stderrBytes!==0)||d.fullStatus.admission==="admitted"&&(!d.fullStatus.capture?.stdoutBytes||d.fullStatus.capture?.stderrBytes!==0))return false;
+ const later=stages.slice(1).some(s=>s.admission!=="not-observed");if(later&&(!d.commandCompleted||!["already-connected","apply-add"].includes(d.protocol)))return false;
+ if(d.fullStatus.admission!=="not-observed"&&(!d.shortStatus.capture?.complete||d.shortStatus.attempt.exitCode!==0))return false;
+ if(d.protocol==="not-observed"&&(d.apply.admission==="admitted"||d.fileConflictCount!==null)||d.protocol==="unsupported"&&(d.fileConflictCount!==null||d.apply.admission!=="unsupported"))return false;
+ if(["already-connected","apply-add","file-conflict"].includes(d.protocol)&&d.apply.admission!=="admitted")return false;
+ if(d.protocol==="file-conflict"?(d.fileConflictCount===null||d.fileConflictCount===0||d.checkinReadiness!=="blocked"):d.checkinReadiness==="blocked")return false;
+ if(["already-connected","apply-add"].includes(d.protocol)&&d.fileConflictCount!==0)return false;
+ if(d.checkinReadiness==="supported-no-unresolved-signals"&&(!d.commandCompleted||!stages.every(s=>s.admission==="admitted"&&s.capture?.complete&&s.attempt.exitCode===0&&s.capture.stderrBytes===0)))return false;
+ if(d.previewRequested===true&&(!dto.ok||dto.outcome!=="preflight"||stages.some(s=>s.admission!=="not-observed")||d.effect!=="not-attempted"||d.commandCompleted||d.checkinReadiness!=="unknown"))return false;
+ if(dto.ok){if(dto.outcome==="preflight"&&d.previewRequested!==true)return false;if(dto.outcome==="command-completed"&&(d.previewRequested!==false||d.effect!=="not-proven"||d.checkinReadiness!=="supported-no-unresolved-signals"))return false;}
+ else{if(!safeMergeText(dto.error.message))return false;if(dto.outcome==="failed"&&(d.effect!=="not-attempted"||!["not-attempted","not-started"].includes(d.apply.attempt.state)))return false;if(dto.outcome!=="failed"&&(d.effect!=="uncertain"||!["started","unknown"].includes(d.apply.attempt.state)))return false;if(dto.outcome==="blocked"&&d.checkinReadiness!=="blocked"||dto.outcome==="uncertain"&&d.checkinReadiness!=="unknown")return false;if(dto.error.code==="invalid_request"&&(d.requestedSource!==null||stages.some(s=>s.admission!=="not-observed")))return false;}
+ return true;
+}
+export async function executeWorkspaceMergeOutput(action:MergeAction,args:unknown){let dto=await assembleWorkspaceMergeReceipt(action,args);const valid:boolean=validateWorkspaceMergeOutput(dto);if(!valid){const possible=["started","unknown"].includes(dto.data.apply.attempt.state),d=emptyWorkspaceMergeData();if(possible){d.apply.attempt.state="unknown";d.apply.admission="unsupported";d.effect="uncertain";}dto=workspaceMergeFailure(action,d,"producer_failed","Workspace merge receipt validation failed; effects remain possible, no automatic retry.");if(!validateWorkspaceMergeOutput(dto))throw new Error("Safe workspace merge receipt unavailable.");}return {content:[{type:"text" as const,text:presentWorkspaceMergeReceipt(dto)}],details:{},structuredContent:dto,isError:!dto.ok};}

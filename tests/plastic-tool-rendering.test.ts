@@ -65,6 +65,11 @@ try {
   const invalidRemovalView=render("resolveDeleteChangeConflict",invalidRemoval,false,{args:{preflight:true},isError:true});
   assert.match(invalidRemovalView,/Removal: failed/);assert.match(invalidRemovalView,/bare\s+private\/controlled/);assert.doesNotMatch(invalidRemovalView,/Preview returned|Preview: would/);assert(colors.some(c=>c.color==="error"));
   const validRemoval=await executeRemovalOutput({paths:["./private"],preflight:true});assert.match(render("resolveDeleteChangeConflict",validRemoval),/Removal: preflight/);
+  const {executeWorkspaceMergeOutput}=await import("../src/pi/workspace-merge-output");
+  for(const [name,action] of [["merge","merge"],["finalizeMerge","finalize-merge"]] as const){
+    colors.length=0;const invalid=await executeWorkspaceMergeOutput(action,{source:"--to=br:/other",preflight:true});const view=render(name,invalid,false,{args:{preflight:true},isError:true});assert.match(view,/Workspace merge: failed/);assert.doesNotMatch(view,/Preview returned|Preview: would/);assert(colors.some(c=>c.color==="error"));
+    const valid=await executeWorkspaceMergeOutput(action,{source:"br:/main/source",preflight:true});assert.match(render(name,valid),/Workspace merge: preflight/);
+  }
 
   const call = renderPlasticCall("mergeBranches", { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", preflight: true }, theme);
   assert.match(plain(call), /Plastic.*Server merge.*server.*preview\n.*task@Game@cloud -> br:\/main@Game@cloud/);

@@ -8,7 +8,7 @@ import { currentBranch, branchExists } from "../src/operations/branches";
 import { currentBranchOutputSchema, branchExistsOutputSchema, validateBranchOutput, projectBranchOutput, type BranchOutput } from "../src/pi/branch-output";
 import { loadRegisteredTools } from "./pi-tool-harness";
 const tools = await loadRegisteredTools();
-assert.deepEqual([...tools.values()].filter(tool => tool.outputSchema).map(tool => tool.name), ["plastic_status", "plastic_update", "plastic_add", "plastic_checkin", "plastic_undo", "plastic_resolveDeleteChangeConflict", "plastic_diff", "plastic_branchCreate", "plastic_switchBranch", "plastic_mergeBranches", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_workspaceList"]);
+assert.deepEqual([...tools.values()].filter(tool => tool.outputSchema).map(tool => tool.name), ["plastic_status", "plastic_update", "plastic_add", "plastic_checkin", "plastic_undo", "plastic_resolveDeleteChangeConflict", "plastic_diff", "plastic_branchCreate", "plastic_switchBranch", "plastic_merge", "plastic_mergeBranches", "plastic_finalizeMerge", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_workspaceList"]);
 assert.deepEqual(tools.get("plastic_currentBranch")!.outputSchema, currentBranchOutputSchema);
 assert.deepEqual(tools.get("plastic_branchExists")!.outputSchema, branchExistsOutputSchema);
 assert.equal(tools.get("plastic_branchExists")!.parameters.properties.format, undefined);

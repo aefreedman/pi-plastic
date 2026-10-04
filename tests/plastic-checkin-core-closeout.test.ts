@@ -13,7 +13,7 @@ const deps={spawn:((_:string,argv:string[])=>{
   queueMicrotask(()=>{child.emit("spawn");let out="",err="",code=0;
     if(argv[0]==="status") {
       if(argv.includes("--machinereadable")) {reads++;out=mode==="unsupported"?"UNKNOWN":header+(pending?row:"");if(mode==="completed-post-failed"&&reads>1){err="Synthetic post-read failure";code=1;}}
-      else out=argv.includes("--short")?"":`${branch}@Example Repository@example@unity (cs:123)\r\n`;
+      else out=argv.includes("--short")?"":`${branch}@Example Repository@example@unity (cs:123 - head)\r\n`;
     } else if(argv[0]==="checkin") {
       const sep=(k:string)=>argv.find(a=>a.startsWith(k+"="))!.slice(k.length+1);
       const frame=(op:string,values:string[]=[])=>sep("--startlineseparator")+[op,...values].join(sep("--fieldseparator"))+sep("--endlineseparator")+"\r\n";

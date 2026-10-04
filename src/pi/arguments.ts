@@ -105,6 +105,7 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       const input = normalizeOutputFormatAlias(normalizeArgs(args));
       normalizeWorkdirAliases(input);
       assignAlias(input, "cherrypicking", ["cherry_picking", "cherryPicking"]);
+      for (const key of ["cwd", "workingDirectory", "working_directory", "cherry_picking", "cherryPicking"]) delete input[key];
       return input;
     },
   },
@@ -130,6 +131,7 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       const input = normalizeOutputFormatAlias(normalizeArgs(args));
       normalizeWorkdirAliases(input);
       assignAlias(input, "source", ["mergeSource", "merge_source"]);
+      for (const key of ["cwd", "workingDirectory", "working_directory", "mergeSource", "merge_source"]) delete input[key];
       return input;
     },
   },

@@ -606,7 +606,7 @@
   {
     "name": "plastic_merge",
     "label": "plastic_merge",
-    "description": "Merge safely with explicit non-interactive conflict strategy (cm merge --merge --nointeractiveresolution).",
+    "description": "Request one non-interactive workspace merge with an explicit strategy; command completion is not conflict resolution or checkin readiness.",
     "parameters": {
       "type": "object",
       "required": [
@@ -615,7 +615,7 @@
       "properties": {
         "source": {
           "type": "string",
-          "description": "Source branch/changeset/label/shelveset spec to merge from.",
+          "description": "Exact branch/changeset/label/shelveset source operand; not CLI options.",
           "minimum": 1
         },
         "strategy": {
@@ -633,19 +633,19 @@
               "const": "destination"
             }
           ],
-          "description": "Conflict resolution strategy. auto tries non-destructive auto-resolution and aborts if manual conflict remains. source/destination are explicit overrides."
+          "description": "Default auto/try; source/destination explicitly force contributor preference."
         },
         "cherrypicking": {
           "type": "boolean",
-          "description": "Enable cherry-picking mode."
+          "description": "Request cherry-picking mode."
         },
         "forced": {
           "type": "boolean",
-          "description": "Skip connected-branch checks when supported by the merge mode."
+          "description": "Request connected-branch-check override where CM supports it."
         },
         "preflight": {
           "type": "boolean",
-          "description": "Preview command without executing merge."
+          "description": "Zero-command plan only, not conflict/readiness analysis."
         },
         "format": {
           "anyOf": [
@@ -667,7 +667,7 @@
       }
     },
     "defaults": {},
-    "hasOutputSchema": false
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_mergeBranches",
@@ -795,7 +795,7 @@
   {
     "name": "plastic_finalizeMerge",
     "label": "plastic_finalizeMerge",
-    "description": "Finalize Plastic merge metadata after manual conflict resolution using an explicit non-interactive source/destination policy.",
+    "description": "Request non-interactive merge finalization with an explicit contributor policy; not a guarantee of finalized metadata or preserved manual edits.",
     "parameters": {
       "type": "object",
       "required": [
@@ -804,7 +804,7 @@
       "properties": {
         "source": {
           "type": "string",
-          "description": "Original source branch/changeset/label/shelveset spec being merged.",
+          "description": "Exact original merge source operand; not CLI options.",
           "minimum": 1
         },
         "strategy": {
@@ -818,11 +818,11 @@
               "const": "destination"
             }
           ],
-          "description": "Explicit finalization policy. destination preserves destination/manual workspace resolution in typical post-resolution flows; source accepts source where Plastic still needs a policy."
+          "description": "Default destination; contributor preference is not a manual-edit preservation guarantee."
         },
         "preflight": {
           "type": "boolean",
-          "description": "Preview finalization command without executing it."
+          "description": "Zero-command finalization plan only, not readiness analysis."
         },
         "format": {
           "anyOf": [
@@ -844,7 +844,7 @@
       }
     },
     "defaults": {},
-    "hasOutputSchema": false
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_currentBranch",
