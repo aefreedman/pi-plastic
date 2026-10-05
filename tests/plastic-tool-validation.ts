@@ -57,7 +57,7 @@ const main = (): void => {
     "export const mergeToBranch = tool({",
     "assembleCloseoutReceipt",
   ]);
-  failures += checkRequired(readText(new URL("../src/operations/closeout-receipt.ts", import.meta.url)), "closeout receipt", ["--format={name}|{parent}", "captureWorkspaceMergeCommand", "assembleCheckinReceipt", "target_unverified"]);
+  failures += checkRequired(readText(new URL("../src/operations/closeout-receipt.ts", import.meta.url)), "closeout receipt", ["buildCloseoutParentArgv", "captureWorkspaceMergeCommand", "assembleCheckinReceipt", "target_unverified"]);
   failures += checkRequired(readText(new URL("../src/operations/patch.ts", import.meta.url)), "pi-plastic/src/operations/patch.ts", [
     "export const patch = tool({",
     "__plasticPatchInternals",

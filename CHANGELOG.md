@@ -7,6 +7,8 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+- Correct typed closeout parent discovery using one bounded installed-client leaf-name query with emitted full-name/direct-parent validation. Preserve exact repository/server spelling; empty, ambiguous, mismatched or failed observations stop without alternate selector attempts or guessed parents. Explicit targets remain unchanged.
+
 - Admit the sourced Windows copied-add merge profile: framed DO_COPIED/ADD, bounded CP pending records and exact standard pending-link/copied sections. Correlate paths, namespace and merge metadata; preserve opaque volatile display and pause unknown/mixed/conflicting output. Checkin accepts narrow CP selection/events; typed closeout independently rechecks copied readiness without retries, conflict-policy changes or source-link/head/rollback proof.
 
 - Add bounded producer-owned shelveset/code-review deletion command receipts, exact scalar/plural/duplicate and repository operands, additive command-only previews and uncertainty-aware core/native presentation. No inferred deleted objects, exclusive scope or rollback; creator/apply/update adapters remain separate.

@@ -1,3 +1,13 @@
+import { parseSwitchTarget } from "./switch-contract";
+import { cmWhereEquals } from "./branches";
+/** Name is a leaf filter; emitted full name, not the filter, is identity.
+ * Two returned rows are ambiguity, not a reason to choose the first or retry. */
+export function buildCloseoutParentArgv(source: string): string[] {
+ const spec=parseSwitchTarget(source);if(!spec)throw Error("Invalid parent lookup source.");
+ const leaf=spec.branch.slice(spec.branch.lastIndexOf("/")+1);
+ const clause=spec.repository===null?"":` on repository '${(spec.repository+"@"+spec.server).replace(/'/g,"''")}'`;
+ return ["find","branch",`where ${cmWhereEquals("name",leaf)} order by branchname asc limit 2${clause}`,"--format={name}|{parent}","--nototal"];
+}
 import type { WorkspaceMergeAttempt, WorkspaceMergeCapture, MergeStrategy, WorkspaceMergeReceipt } from "./workspace-merge-contract";
 import type { SwitchBranchObservation, SwitchSummary, SwitchReceipt } from "./switch-contract";
 import type { CheckinChangeset, CheckinReceipt } from "./checkin-contract";

@@ -68,7 +68,7 @@ if (cfg?.kind === "closeout") {
   else {process.stdout.write(branch+"@Example Repository@example@unity (cs:16 - head)\r\n\r\n");if(cfg.mode==="initial-fail"&&std===1||cfg.mode==="final-branch-fail"&&std===9){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC loaded read");process.exitCode=1;}if(cfg.mode==="later-warning"&&std===7)process.stderr.write("PRIVATE_HOST_DIAGNOSTIC later warning");if(cfg.mode==="invalid-utf8"&&std===1)process.stdout.write(Buffer.from([255]));if(cfg.mode==="overflow"&&std===1)process.stdout.write("x".repeat(65537));}
  }else if(cmd==="merge"){process.stdout.write(frame("STATUS","ALREADY_CONNECTED","No merges detected"));if(cfg.mode==="partial-merge"){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC partial apply");process.exitCode=1;}}
  else if(cmd==="checkin"){process.stdout.write(frame("CI_START")+frame("STAGE",""));if(cfg.mode==="checkin-fail"){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC permission");process.exitCode=1;}else process.stdout.write(frame("CHANGESET","cs:9007199254740993@br:"+target+"@Example Repository@example@unity (mount:'/')"));}
- else if(cmd==="find"){process.stdout.write("/main/source|/main/target\r\n");if(cfg.mode==="parent-fail"){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC parent");process.exitCode=1;}}
+ else if(cmd==="find"){process.stdout.write("/main/source|/main\r\n");if(cfg.mode==="parent-fail"){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC parent");process.exitCode=1;}}
  else if(cmd==="update"&&cfg.mode==="update-fail"){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC update");process.exitCode=1;}
  else if(!["switch","update"].includes(cmd))throw Error("Unexpected closeout command");
  process.exit();

@@ -4,7 +4,7 @@ import { checkinSafeValue } from "../domain/checkin-contract";
 import { admitCleanStandardStatus } from "../domain/workspace-merge-contract";
 import { parseCopiedPending } from "../domain/copied-merge";
 import { cmWhereEquals } from "../domain/branches";
-import { CLOSEOUT_STAGE_NAMES, closeoutChildEffect, closeoutCaptures, type CloseoutData, type CloseoutReceipt, type CloseoutRequest, type CloseoutStageName, type CloseoutRead, type CloseoutStage } from "../domain/closeout-contract";
+import { buildCloseoutParentArgv, CLOSEOUT_STAGE_NAMES, closeoutChildEffect, closeoutCaptures, type CloseoutData, type CloseoutReceipt, type CloseoutRequest, type CloseoutStageName, type CloseoutRead, type CloseoutStage } from "../domain/closeout-contract";
 import { captureWorkspaceMergeCommand, emptyWorkspaceMergeAttempt } from "../execution/workspace-merge-command";
 import { assembleSwitchReceipt } from "./switch-receipt";
 import { assembleUpdateReceipt } from "./update-receipt";
@@ -16,6 +16,7 @@ export type { CloseoutReceipt, CloseoutStage, CloseoutRead } from "../domain/clo
 export { compareSwitchTarget, parseSwitchTarget, safeSwitchValue, switchPendingArgv } from "../domain/switch-contract";
 export { checkinSafeValue } from "../domain/checkin-contract";
 export { cmWhereEquals } from "../domain/branches";
+export { buildCloseoutParentArgv } from "../domain/closeout-contract";
 export function emptyCloseoutData(): CloseoutData { return {requested:null,sourceBranch:null,targetBranch:null,targetSource:"unresolved",checkinMessage:null,stages:[],unattemptedStages:[...CLOSEOUT_STAGE_NAMES],unobservedChild:null,createdChangeset:null,pendingAfter:null,targetVerification:"unverified",serverAliasEquivalence:"unverified",sourceLink:"unverified",branchHead:"unverified",exclusiveScope:"unverified",rollback:"not-proven",effect:"not-attempted"}; }
 function admitRequest(input:unknown):asserts input is CloseoutRequest { if(!input||typeof input!=="object"||Array.isArray(input))throw Error();const r=input as Record<string,unknown>;if(Object.keys(r).some(k=>!["source","target","message","cardRef","strategy","updateTarget","includePrivate","preflight","format","workdir"].includes(k)))throw Error();for(const k of ["source","target"])if(r[k]!==undefined&&(!safeSwitchValue(r[k])||!parseSwitchTarget(r[k])))throw Error();for(const k of ["message","cardRef"])if(r[k]!==undefined&&!checkinSafeValue(r[k]))throw Error();if(r.workdir!==undefined&&!safeSwitchValue(r.workdir))throw Error();if(r.strategy!==undefined&&!["auto","source","destination"].includes(r.strategy as string)||r.format!==undefined&&!["text","json"].includes(r.format as string))throw Error();for(const k of ["updateTarget","includePrivate","preflight"])if(r[k]!==undefined&&typeof r[k]!=="boolean")throw Error();if(Buffer.byteLength(JSON.stringify(r),"utf8")>32768)throw Error(); }
 export async function assembleCloseoutReceipt(input:unknown):Promise<CloseoutReceipt> {
@@ -38,9 +39,14 @@ export async function assembleCloseoutReceipt(input:unknown):Promise<CloseoutRec
   if(!inScope(data.sourceBranch)||submitted.target!==undefined&&!inScope(submitted.target))return finish("failed","target_unverified","Qualified branch repository/server spelling differs from the observed workspace; alias equivalence is unverified. No target mutation permitted.");
   if(submitted.target!==undefined){data.targetBranch=submitted.target;data.targetSource="explicit";}
   else{
-   const candidates=source.repository!==null?[source.branch]:[...new Set([data.sourceBranch,source.branch,`br:${source.branch}`])];let resolved=false;
-   for(const candidate of candidates){const clause=source.repository===null?"":` on repository '${(source.repository+"@"+source.server).replace(/'/g,"''")}'`;const {s,o,success}=await read("parent",["find","branch",`where ${cmWhereEquals("name",candidate)}${clause}`,"--format={name}|{parent}","--nototal"]);if(!success)return finish("failed");const lines=o.stdout!.split(/\r?\n/);if(lines.at(-1)==="")lines.pop();if(!lines.length){s.admission="admitted";s.emptyParentResult=true;continue;}if(lines.length!==1)return finish("failed");const f=lines[0].split("|");if(f.length!==2||f[0]!==source.branch||!parseSwitchTarget(f[0])||!f[1]||!parseSwitchTarget(f[1])||parseSwitchTarget(f[1])!.repository!==null)return finish("failed","observation_failed","Parent read did not admit one matching branch and parent path; pass an explicit target.");s.parentPath=f[1];s.admission="admitted";const target=source.repository===null?f[1]:`${f[1]}@${source.repository}@${source.server}`;if(!parseSwitchTarget(target))return finish("failed","invalid_request","Derived target is outside the bounded branch admission; pass a bounded explicit target.");data.targetBranch=target;data.targetSource="parent-read";resolved=true;break;}
-   if(!resolved)return finish("failed","observation_failed","Parent read did not yield an admitted parent; pass an explicit target.");
+   const {s,o,success}=await read("parent",buildCloseoutParentArgv(data.sourceBranch));if(!success)return finish("failed");
+   const lines=o.stdout!.split(/\r?\n/);if(lines.at(-1)==="")lines.pop();
+   if(!lines.length){s.admission="admitted";s.emptyParentResult=true;return finish("failed","observation_failed","Parent query returned no admitted matching branch; pass an explicit target.");}
+   if(lines.length!==1)return finish("failed","observation_failed","Parent leaf query is ambiguous or malformed; pass an explicit target.");
+   const f=lines[0].split("|"),expectedParent=source.branch.slice(0,source.branch.lastIndexOf("/"));
+   if(f.length!==2||f[0]!==source.branch||!parseSwitchTarget(f[0])||!f[1]||f[1]!==expectedParent||!parseSwitchTarget(f[1])||parseSwitchTarget(f[1])!.repository!==null)return finish("failed","observation_failed","Parent read did not admit one matching full branch and direct parent path; pass an explicit target.");
+   s.parentPath=f[1];s.admission="admitted";const target=source.repository===null?f[1]:`${f[1]}@${source.repository}@${source.server}`;
+   if(!parseSwitchTarget(target))return finish("failed","invalid_request","Derived target is outside the bounded branch admission; pass a bounded explicit target.");data.targetBranch=target;data.targetSource="parent-read";
   }
   if(source.branch===parseSwitchTarget(data.targetBranch!)!.branch)return finish("failed","invalid_request","Refusing a same-branch closeout within the admitted workspace scope.");
   const cardLine=submitted.cardRef?.trim()?`\n\n${submitted.cardRef.trim()}`:"";data.checkinMessage=submitted.message?.trim()?submitted.message.trim():`Merge ${data.sourceBranch} into ${data.targetBranch}${cardLine}`;

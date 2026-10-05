@@ -5,7 +5,7 @@ import { switchOutputSchema, validateSwitchOutput } from "./switch-output";
 import { updateOutputSchema, validateUpdateOutput } from "./update-output";
 import { workspaceMergeOutputSchema, validateWorkspaceMergeOutput } from "./workspace-merge-output";
 import { checkinOutputSchema, validateCheckinOutput } from "./checkin-output";
-import { assembleCloseoutReceipt, presentCloseoutReceipt, CLOSEOUT_STAGE_NAMES, CLOSEOUT_DTO_BYTES, closeoutCaptures, closeoutChildEffect, compareSwitchTarget, parseSwitchTarget, safeSwitchValue, switchPendingArgv, checkinSafeValue, cmWhereEquals, type CloseoutReceipt, type CloseoutStage, type CloseoutRead } from "../operations/closeout-receipt";
+import { buildCloseoutParentArgv, assembleCloseoutReceipt, presentCloseoutReceipt, CLOSEOUT_STAGE_NAMES, CLOSEOUT_DTO_BYTES, closeoutCaptures, closeoutChildEffect, compareSwitchTarget, parseSwitchTarget, safeSwitchValue, switchPendingArgv, checkinSafeValue, cmWhereEquals, type CloseoutReceipt, type CloseoutStage, type CloseoutRead } from "../operations/closeout-receipt";
 const obj=(p:Record<string,any>)=>Type.Object(p,{additionalProperties:false}),enm=(v:readonly string[])=>Type.Union(v.map(x=>Type.Literal(x))),nil=(t:any)=>Type.Union([t,Type.Null()]),str=(max=4096)=>Type.String({maxLength:max}),uint=(max=Number.MAX_SAFE_INTEGER)=>Type.Integer({minimum:0,maximum:max});
 const attempt=obj({state:enm(["not-attempted","not-started","started","unknown"]),terminal:enm(["not-observed","observed"]),exitCode:nil(uint(2147483647)),aborted:Type.Boolean(),timedOut:Type.Boolean()});
 const capture=obj({stdoutBytes:uint(),stderrBytes:uint(),stdoutRetainedBytes:uint(65536),stderrRetainedBytes:uint(16384),truncated:Type.Boolean(),complete:Type.Boolean(),validUtf8:Type.Boolean()});
@@ -43,7 +43,7 @@ export function validateCloseoutOutput(value:unknown):value is CloseoutReceipt {
  if(d.effect!==effect)return false;
  if(!r)return !dto.ok&&dto.outcome==="failed"&&dto.error.code==="invalid_request"&&dto.error.stage==="input"&&!stages.length&&!d.unobservedChild&&!d.sourceBranch&&!d.targetBranch&&d.targetSource==="unresolved"&&!d.checkinMessage&&!d.createdChangeset&&!d.pendingAfter&&d.targetVerification==="unverified";
  if(!safeSwitchValue(r.workdir)||r.source!==null&&!parseSwitchTarget(r.source)||r.target!==null&&!parseSwitchTarget(r.target)||r.message!==null&&!checkinSafeValue(r.message)||r.cardRef!==null&&!checkinSafeValue(r.cardRef)||Buffer.byteLength(JSON.stringify(r),"utf8")>32768+256)return false;
- const parentCount=stages.filter(s=>s.name==="parent").length;if(parentCount>3||r.target!==null&&parentCount)return false;
+ const parentCount=stages.filter(s=>s.name==="parent").length;if(parentCount>1||r.target!==null&&parentCount)return false;
  const plan=["loaded-before",...(r.target===null?Array(Math.max(1,parentCount)).fill("parent"):[]),"pending-before","switch","loaded-after-switch",...(r.updateTarget?["update"]:[]),"loaded-before-merge","merge","readiness","loaded-before-checkin","checkin-preflight","checkin","loaded-final","pending-final"];
  if(stages.some((s,i)=>s.name!==plan[i])||d.unobservedChild&&d.unobservedChild!==plan[stages.length])return false;
  if(d.unobservedChild&&(dto.ok||dto.error.code!=="producer_failed"||dto.error.stage!==d.unobservedChild))return false;
@@ -59,7 +59,7 @@ export function validateCloseoutOutput(value:unknown):value is CloseoutReceipt {
   if(s.kind==="read") {
    if(!validateRead(s))return false;
    if(s.name==="readiness"){const merge=stages.slice(0,index).find(x=>x.kind==="merge");if(!merge||merge.kind!=="merge"||!same(s.result.argv,merge.result.data.protocol==="apply-add-copied"?[...switchPendingArgv]:["status"]))return false;}
-   if(s.name==="parent"){if(!d.sourceBranch)return false;const src=parseSwitchTarget(d.sourceBranch)!,candidates=src.repository!==null?[src.branch]:[...new Set([d.sourceBranch,src.branch,`br:${src.branch}`])],n=stages.slice(0,index).filter(x=>x.name==="parent").length,clause=src.repository===null?"":` on repository '${(src.repository+"@"+src.server).replace(/'/g,"''")}'`;if(!same(s.result.argv,["find","branch",`where ${cmWhereEquals("name",candidates[n])}${clause}`,"--format={name}|{parent}","--nototal"]))return false;if(index<stages.length-1&&s.result.emptyParentResult&&stages[index+1].name!=="parent"||index<stages.length-1&&s.result.parentPath&&stages[index+1].name!=="pending-before")return false;}
+   if(s.name==="parent"){if(!d.sourceBranch||!same(s.result.argv,buildCloseoutParentArgv(d.sourceBranch)))return false;const src=parseSwitchTarget(d.sourceBranch)!;if(s.result.parentPath&&(s.result.parentPath!==src.branch.slice(0,src.branch.lastIndexOf("/"))||!s.result.capture?.stdoutBytes))return false;if(s.result.emptyParentResult&&s.result.capture?.stdoutBytes!==0)return false;if(index<stages.length-1&&(s.result.emptyParentResult||!s.result.parentPath||stages[index+1].name!=="pending-before"))return false;}
    if(index<stages.length-1&&s.result.admission!=="admitted")return false;
    if(s.name.startsWith("loaded-")&&s.name!=="loaded-before"&&s.result.branch){if(!d.targetBranch)return false;lastVerification=compareSwitchTarget(s.result.branch,d.targetBranch);if(index<stages.length-1&&lastVerification==="unverified")return false;}
   }else{
