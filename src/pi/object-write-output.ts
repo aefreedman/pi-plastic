@@ -27,11 +27,12 @@ export function validateObjectWriteOutput(v:unknown):v is ObjectWriteReceipt {
     if(a.exitCode!==null&&a.terminal!=="observed"||["not-attempted","not-started"].includes(a.state)&&(a.terminal!=="not-observed"||a.exitCode!==null)||a.state==="not-attempted"&&a.timedOut)return false;
     if(c) {
         if(!r||c.stdoutRetainedBytes>c.stdoutBytes||c.stderrRetainedBytes>c.stderrBytes)return false;
+        if(c.truncated!==(c.stdoutBytes>65536||c.stderrBytes>16384))return false;
         if(c.complete&&(!c.validUtf8||c.truncated||c.stdoutBytes!==c.stdoutRetainedBytes||c.stderrBytes!==c.stderrRetainedBytes||a.state!=="started"||a.terminal!=="observed"||a.exitCode===null||a.aborted||a.timedOut))return false;
         if(a.state==="not-attempted"&&(!a.aborted||c.stdoutBytes||c.stderrBytes||c.validUtf8||c.complete))return false;
     }
     const completed=!!c?.complete&&a.state==="started"&&a.exitCode===0;
-    if(o!==null) {if(!r||!completed||Buffer.byteLength(o.text,"utf8")!==c!.stdoutBytes||JSON.stringify(id)!==JSON.stringify(parseObjectWriteIdentity(dto.action,r,o.text)))return false;}
+    if(o!==null) {if(!r||!completed||/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(o.text)||Buffer.byteLength(o.text,"utf8")!==c!.stdoutBytes||JSON.stringify(id)!==JSON.stringify(parseObjectWriteIdentity(dto.action,r,o.text)))return false;}
     else if(id!==null||completed)return false;
     if(d.effect!==(id?"identity-emitted":dto.ok&&dto.outcome==="command-completed"?"not-proven":["started","unknown"].includes(a.state)?"uncertain":"not-attempted"))return false;
     if(r?.preflight)return dto.ok&&dto.outcome==="preflight"&&a.state==="not-attempted"&&a.terminal==="not-observed"&&a.exitCode===null&&!a.aborted&&!a.timedOut&&!c&&!o&&!id;
