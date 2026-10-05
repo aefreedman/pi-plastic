@@ -37,6 +37,11 @@ const render = (name: string, result: Parameters<typeof renderPlasticResult>[1],
 };
 
 try {
+  const {executeObjectWriteOutput}=await import("../src/pi/object-write-output");
+  const invalidWrite=await executeObjectWriteOutput("code-review-update",{id:"--force",preflight:true});
+  assert.match(render("codeReviewUpdate",invalidWrite,false,{args:{preflight:true},isError:true}),/Object write: failed/);
+  const writePreview=await executeObjectWriteOutput("shelveset-apply",{shelveset:"sh:7",preview:true,preflight:true});
+  assert.match(render("shelvesetApply",writePreview),/Object write: preflight/);
   const {executePatchOutput}=await import("../src/pi/patch-output");
   const invalidPatch=await executePatchOutput({source:"--apply",preflight:true});
   assert.match(render("patch",invalidPatch,false,{args:{preflight:true},isError:true}),/Patch: failed/);

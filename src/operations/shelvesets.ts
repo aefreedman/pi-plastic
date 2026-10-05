@@ -1,6 +1,6 @@
 import { tool } from "../tool-definition";
 import { workdirArg } from "./arguments";
-import { runCm } from "../execution/cm";
+import { assembleObjectWriteReceipt, presentObjectWriteReceipt } from "./object-write-receipt";
 import { executeShelvesetList } from "./shelveset-list";
 import { assembleObjectDeleteReceipt, presentObjectDeleteReceipt } from "./object-delete-receipt";
 import { outputFormatArg } from "../presentation/results";
@@ -14,53 +14,15 @@ export const shelvesetCreate = tool({
         all: tool.schema.boolean().optional().describe("Include changed, moved, and deleted items."),
         dependencies: tool.schema.boolean().optional().describe("Include local change dependencies."),
         summaryFormat: tool.schema.boolean().optional().describe("Print only created shelveset spec for automation."),
+        preflight: tool.schema.boolean().optional().describe("Command-only zero-CLI preview; no existence/conflict/state analysis."),
+        output: outputFormatArg,
         workdir: workdirArg,
     },
-    async execute(args)
-    {
-        if (args.comment && args.commentsFile)
-        {
-            throw new Error("Provide either comment or commentsFile, not both.");
-        }
-
-        if (args.comment !== undefined && args.comment.trim().length === 0)
-        {
-            throw new Error("Comment must be non-empty when provided.");
-        }
-
-        const cmdArgs: string[] = ["shelveset", "create"];
-
-        if (args.paths && args.paths.length > 0)
-        {
-            cmdArgs.push(...args.paths);
-        }
-
-        if (args.all)
-        {
-            cmdArgs.push("--all");
-        }
-
-        if (args.dependencies)
-        {
-            cmdArgs.push("--dependencies");
-        }
-
-        if (args.summaryFormat)
-        {
-            cmdArgs.push("--summaryformat");
-        }
-
-        if (args.comment)
-        {
-            cmdArgs.push(`-c=${args.comment}`);
-        }
-
-        if (args.commentsFile)
-        {
-            cmdArgs.push(`-commentsfile=${args.commentsFile}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
+    async execute(args) {
+        const dto = await assembleObjectWriteReceipt("shelveset-create", Object.freeze({...args}));
+        const result = presentObjectWriteReceipt(dto);
+        if (!dto.ok) throw new Error(result);
+        return result;
     },
 });
 
@@ -77,33 +39,15 @@ export const shelvesetApply = tool({
             "ignoreeolandwhitespaces",
             "recognizeall",
         ]).optional().describe("Comparison method used when applying changes."),
+        preflight: tool.schema.boolean().optional().describe("Command-only zero-CLI preview; no existence/conflict/state analysis."),
+        output: outputFormatArg,
         workdir: workdirArg,
     },
-    async execute(args)
-    {
-        const cmdArgs: string[] = ["shelveset", "apply", args.shelveset];
-
-        if (args.changePaths && args.changePaths.length > 0)
-        {
-            cmdArgs.push(...args.changePaths);
-        }
-
-        if (args.preview)
-        {
-            cmdArgs.push("--preview");
-        }
-
-        if (args.dontCheckout)
-        {
-            cmdArgs.push("--dontcheckout");
-        }
-
-        if (args.comparisonMethod)
-        {
-            cmdArgs.push(`--comparisonmethod=${args.comparisonMethod}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
+    async execute(args) {
+        const dto = await assembleObjectWriteReceipt("shelveset-apply", Object.freeze({...args}));
+        const result = presentObjectWriteReceipt(dto);
+        if (!dto.ok) throw new Error(result);
+        return result;
     },
 });
 

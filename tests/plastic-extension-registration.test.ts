@@ -1,3 +1,4 @@
+import { shelvesetCreateOutputSchema, shelvesetApplyOutputSchema, codeReviewCreateOutputSchema, codeReviewUpdateOutputSchema } from "../src/pi/object-write-output";
 import { patchOutputSchema } from "../src/pi/patch-output";
 import { checkinOutputSchema } from "../src/pi/checkin-output";
 import { switchOutputSchema } from "../src/pi/switch-output";
@@ -28,10 +29,10 @@ import { currentBranchOutputSchema, branchExistsOutputSchema } from "../src/pi/b
 async function main(): Promise<void> {
   const tools = await loadRegisteredTools();
   for (const tool of tools.values()) {
-    assert.deepEqual(tool.outputSchema, tool.name === "plastic_patch" ? patchOutputSchema : tool.name === "plastic_status" ? statusOutputSchema : tool.name === "plastic_currentBranch" ? currentBranchOutputSchema : tool.name === "plastic_branchExists" ? branchExistsOutputSchema : tool.name === "plastic_branchList" ? branchListOutputSchema : tool.name === "plastic_workspaceList" ? workspaceListOutputSchema : tool.name === "plastic_shelvesetList" ? shelvesetListOutputSchema : tool.name === "plastic_codeReviewFind" ? codeReviewFindOutputSchema : tool.name === "plastic_diff" ? diffOutputSchema : tool.name === "plastic_mergeBranches" ? serverMergeOutputSchema : tool.name === "plastic_checkin" ? checkinOutputSchema : tool.name === "plastic_branchCreate" ? branchCreateOutputSchema : tool.name === "plastic_switchBranch" ? switchOutputSchema : tool.name === "plastic_update" ? updateOutputSchema : tool.name === "plastic_add" ? addOutputSchema : tool.name === "plastic_undo" ? undoOutputSchema : tool.name === "plastic_resolveDeleteChangeConflict" ? removalOutputSchema : tool.name === "plastic_merge" || tool.name === "plastic_finalizeMerge" ? workspaceMergeOutputSchema : tool.name === "plastic_mergeToBranch" ? closeoutOutputSchema : tool.name === "plastic_branchDelete" ? branchDeleteOutputSchema : tool.name === "plastic_shelvesetDelete" ? shelvesetDeleteOutputSchema : tool.name === "plastic_codeReviewDelete" ? codeReviewDeleteOutputSchema : undefined, "Exactly twenty-three selected tools own structured output schemas");
+    assert.deepEqual(tool.outputSchema, tool.name === "plastic_shelvesetCreate" ? shelvesetCreateOutputSchema : tool.name === "plastic_shelvesetApply" ? shelvesetApplyOutputSchema : tool.name === "plastic_codeReviewCreate" ? codeReviewCreateOutputSchema : tool.name === "plastic_codeReviewUpdate" ? codeReviewUpdateOutputSchema : tool.name === "plastic_patch" ? patchOutputSchema : tool.name === "plastic_status" ? statusOutputSchema : tool.name === "plastic_currentBranch" ? currentBranchOutputSchema : tool.name === "plastic_branchExists" ? branchExistsOutputSchema : tool.name === "plastic_branchList" ? branchListOutputSchema : tool.name === "plastic_workspaceList" ? workspaceListOutputSchema : tool.name === "plastic_shelvesetList" ? shelvesetListOutputSchema : tool.name === "plastic_codeReviewFind" ? codeReviewFindOutputSchema : tool.name === "plastic_diff" ? diffOutputSchema : tool.name === "plastic_mergeBranches" ? serverMergeOutputSchema : tool.name === "plastic_checkin" ? checkinOutputSchema : tool.name === "plastic_branchCreate" ? branchCreateOutputSchema : tool.name === "plastic_switchBranch" ? switchOutputSchema : tool.name === "plastic_update" ? updateOutputSchema : tool.name === "plastic_add" ? addOutputSchema : tool.name === "plastic_undo" ? undoOutputSchema : tool.name === "plastic_resolveDeleteChangeConflict" ? removalOutputSchema : tool.name === "plastic_merge" || tool.name === "plastic_finalizeMerge" ? workspaceMergeOutputSchema : tool.name === "plastic_mergeToBranch" ? closeoutOutputSchema : tool.name === "plastic_branchDelete" ? branchDeleteOutputSchema : tool.name === "plastic_shelvesetDelete" ? shelvesetDeleteOutputSchema : tool.name === "plastic_codeReviewDelete" ? codeReviewDeleteOutputSchema : undefined, "All twenty-seven core tools own structured output schemas; loader has none");
   }
   assert.equal(tools.size, 28, "27 core registrations plus loader");
-  assert.equal([...tools.values()].filter(t => t.outputSchema).length,23);
+  assert.equal([...tools.values()].filter(t => t.outputSchema).length,27);
   const shape = [...tools.values()].map(({ name, label, description, parameters, prepareArguments, promptSnippet, promptGuidelines, constrainedSampling, outputSchema }) => ({
     name, label, description, parameters, defaults: prepareArguments?.({}), promptSnippet, promptGuidelines, constrainedSampling, hasOutputSchema: outputSchema !== undefined,
   }));
@@ -47,7 +48,8 @@ async function main(): Promise<void> {
 
   assert.match(registerText, /buildParameters\(coreTool\.args\)/, "plastic tools should derive schemas from core args without approval-only parameters");
   assert.match(registerText, /prepareArguments:\s*config\.prepareArguments/, "plastic tools should wire prepareArguments");
-  assert.match(registerText, /runWithAbortSignal\(signal, async \(\) => coreTool\.execute\(normalizedParams\)\)/, "plastic tools should propagate abort signals into core execution");
+  assert.doesNotMatch(registerText, /coreTool\.execute|rawResult|function toText/, "All core tools use producer-owned adapters; no generic core reparse fallback");
+  assert.match(registerText, /runWithAbortSignal\(signal, \(\) => executeObjectWriteOutput/, "Remaining producers use sole abort context");
   assert.doesNotMatch(registerText, /authorizationToken|authorizationProvenance|ctx\.ui\.confirm/, "Plastic tool registration must not implement token or UI-confirmation approvals");
 
   assert.match(argumentsText, /assignAlias\(input, "includeRaw", \["include_raw"\]\);/, "plastic_status should normalize include_raw");
@@ -76,7 +78,7 @@ async function main(): Promise<void> {
     ["plastic_status", { cwd: "/alias", include_raw: true, max_items: 5, format: "markdown" }, { workdir: "/alias", includeRaw: true, maxItems: 5, format: "text" }],
     ["plastic_checkin", { comment: "message", file: "one", include_private: true }, { message: "message", paths: ["one"], includePrivate: true }],
     ["plastic_mergeToBranch", { source_branch: "/source", destination_branch: "/target", card_code: "card" }, { source: "/source", target: "/target", cardRef: "card" }],
-    ["plastic_codeReviewUpdate", { review_id: 42 }, { reviewId: 42, id: 42 }],
+    ["plastic_codeReviewUpdate", { review_id: 42 }, { id: 42 }],
     ["plastic_codeReviewDelete", { id: 42 }, { ids: ["42"] }],
   ] as const) {
     const original = structuredClone(input);
@@ -88,35 +90,7 @@ async function main(): Promise<void> {
   assert.equal(canonical.workdir, "/canonical");
   assert.equal(canonical.maxItems, 7, "Canonical arguments must win over aliases");
 
-  // Intercept only the operation boundary: adapter tests must never start cm.
-  for (const exportName of ["shelvesetCreate"] as const) {
-    const definition = PLASTIC_TOOL_REGISTRY[exportName];
-    const originalExecute = definition.execute;
-    const signal = new AbortController().signal;
-    let received: unknown;
-    let receivedSignal: AbortSignal | undefined;
-    definition.execute = async (args) => {
-      received = args;
-      receivedSignal = getActiveAbortSignal();
-      return "synthetic adapter result";
-    };
-    try {
-      const tool = tools.get(toToolName(exportName))!;
-      const params = {};
-      const result = await tool.execute("adapter", params, signal, undefined, { cwd: "/session-cwd" });
-      assert.deepEqual(received, { workdir: "/session-cwd" }, "Only workspace tools default workdir to ctx.cwd");
-      assert.equal(receivedSignal, signal, "Adapter must use the sole shared abort context");
-      assert.deepEqual(params, {}, "Execution defaulting must not mutate caller params");
-      assert.equal(result.content[0].text, "synthetic adapter result");
-      assert.equal(result.details.exportName, exportName);
-      assert.equal(result.details.rawResult, "synthetic adapter result");
-      assert.equal(result.details.workdir, "/session-cwd");
-      await tool.execute("explicit-workdir", { workdir: "/explicit" }, signal, undefined, { cwd: "/session-cwd" });
-      assert.deepEqual(received, { workdir: "/explicit" }, "Explicit workdir must survive even on the server merge adapter");
-    } finally {
-      definition.execute = originalExecute;
-    }
-  }
+  assert.equal([...tools.values()].filter(t=>!t.outputSchema).map(t=>t.name).join(","),"plastic_tool_search","Loader is the only schema-less registration");
 
   console.log("PASS: plastic extension registration test succeeded");
 }

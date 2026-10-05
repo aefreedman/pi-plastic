@@ -1,3 +1,4 @@
+import { executeObjectWriteOutput, shelvesetCreateOutputSchema, shelvesetApplyOutputSchema, codeReviewCreateOutputSchema, codeReviewUpdateOutputSchema } from "./object-write-output";
 import { executePatchOutput, patchOutputSchema } from "./patch-output";
 import { executeCheckinOutput, checkinOutputSchema } from "./checkin-output";
 import { executeSwitchOutput, switchOutputSchema } from "./switch-output";
@@ -38,11 +39,6 @@ import { buildParameters } from "./schemas";
 import { getCoreTool, getRegisteredPlasticExportNames, toToolName } from "./tool-registry";
 import { notifyPatchCapabilityWarning, type CapabilityDiagnosticContext } from "./capability-diagnostics";
 
-function toText(result: unknown): string {
-  if (typeof result === "string") return result;
-  return JSON.stringify(result, null, 2);
-}
-
 export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: string) {
   const exportNames = getRegisteredPlasticExportNames();
   const coreDescriptions = new Map<string, string>();
@@ -59,7 +55,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
       label: toToolName(exportName),
       description: coreTool.description ?? toToolName(exportName),
       parameters: exportName === "diff" ? diffInputSchema : buildParameters(coreTool.args),
-      ...(exportName === "patch" ? {outputSchema:patchOutputSchema} : exportName === "status" ? { outputSchema: statusOutputSchema } : exportName === "currentBranch" ? { outputSchema: currentBranchOutputSchema } : exportName === "branchExists" ? { outputSchema: branchExistsOutputSchema } : exportName === "branchList" ? { outputSchema: branchListOutputSchema } : exportName === "workspaceList" ? { outputSchema: workspaceListOutputSchema } : exportName === "shelvesetList" ? { outputSchema: shelvesetListOutputSchema } : exportName === "codeReviewFind" ? { outputSchema: codeReviewFindOutputSchema } : exportName === "diff" ? { outputSchema: diffOutputSchema } : exportName === "mergeBranches" ? { outputSchema: serverMergeOutputSchema } : exportName === "checkin" ? { outputSchema: checkinOutputSchema } : exportName === "branchCreate" ? { outputSchema: branchCreateOutputSchema } : exportName === "switchBranch" ? { outputSchema: switchOutputSchema } : exportName === "update" ? { outputSchema: updateOutputSchema } : exportName === "add" ? { outputSchema: addOutputSchema } : exportName === "undo" ? { outputSchema: undoOutputSchema } : exportName === "resolveDeleteChangeConflict" ? { outputSchema: removalOutputSchema } : exportName === "merge" || exportName === "finalizeMerge" ? { outputSchema: workspaceMergeOutputSchema } : exportName === "mergeToBranch" ? { outputSchema: closeoutOutputSchema } : exportName === "branchDelete" ? { outputSchema: branchDeleteOutputSchema } : exportName === "shelvesetDelete" ? {outputSchema:shelvesetDeleteOutputSchema} : exportName === "codeReviewDelete" ? {outputSchema:codeReviewDeleteOutputSchema} : {}),
+      ...(exportName === "shelvesetCreate" ? {outputSchema:shelvesetCreateOutputSchema} : exportName === "shelvesetApply" ? {outputSchema:shelvesetApplyOutputSchema} : exportName === "codeReviewCreate" ? {outputSchema:codeReviewCreateOutputSchema} : exportName === "codeReviewUpdate" ? {outputSchema:codeReviewUpdateOutputSchema} : exportName === "patch" ? {outputSchema:patchOutputSchema} : exportName === "status" ? { outputSchema: statusOutputSchema } : exportName === "currentBranch" ? { outputSchema: currentBranchOutputSchema } : exportName === "branchExists" ? { outputSchema: branchExistsOutputSchema } : exportName === "branchList" ? { outputSchema: branchListOutputSchema } : exportName === "workspaceList" ? { outputSchema: workspaceListOutputSchema } : exportName === "shelvesetList" ? { outputSchema: shelvesetListOutputSchema } : exportName === "codeReviewFind" ? { outputSchema: codeReviewFindOutputSchema } : exportName === "diff" ? { outputSchema: diffOutputSchema } : exportName === "mergeBranches" ? { outputSchema: serverMergeOutputSchema } : exportName === "checkin" ? { outputSchema: checkinOutputSchema } : exportName === "branchCreate" ? { outputSchema: branchCreateOutputSchema } : exportName === "switchBranch" ? { outputSchema: switchOutputSchema } : exportName === "update" ? { outputSchema: updateOutputSchema } : exportName === "add" ? { outputSchema: addOutputSchema } : exportName === "undo" ? { outputSchema: undoOutputSchema } : exportName === "resolveDeleteChangeConflict" ? { outputSchema: removalOutputSchema } : exportName === "merge" || exportName === "finalizeMerge" ? { outputSchema: workspaceMergeOutputSchema } : exportName === "mergeToBranch" ? { outputSchema: closeoutOutputSchema } : exportName === "branchDelete" ? { outputSchema: branchDeleteOutputSchema } : exportName === "shelvesetDelete" ? {outputSchema:shelvesetDeleteOutputSchema} : exportName === "codeReviewDelete" ? {outputSchema:codeReviewDeleteOutputSchema} : {}),
       prepareArguments: config.prepareArguments,
       renderCall(args, theme, context) {
         return renderPlasticCall(exportName, args ?? {}, theme, context);
@@ -72,6 +68,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
         if (exportName !== "mergeBranches" && normalizedParams.workdir === undefined && ctx?.cwd) {
           normalizedParams.workdir = ctx.cwd;
         }
+        if (exportName === "shelvesetCreate" || exportName === "shelvesetApply" || exportName === "codeReviewCreate" || exportName === "codeReviewUpdate") return runWithAbortSignal(signal, () => executeObjectWriteOutput(({shelvesetCreate:"shelveset-create",shelvesetApply:"shelveset-apply",codeReviewCreate:"code-review-create",codeReviewUpdate:"code-review-update"} as const)[exportName], normalizedParams));
         if (exportName === "patch") return runWithAbortSignal(signal, () => executePatchOutput(normalizedParams));
         if (exportName === "checkin") return runWithAbortSignal(signal, () => executeCheckinOutput(normalizedParams));
         if (exportName === "switchBranch") return runWithAbortSignal(signal, () => executeSwitchOutput(normalizedParams));
@@ -92,16 +89,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
         if (exportName === "branchList") return runWithAbortSignal(signal, () => executeBranchListOutput(normalizedParams));
         if (exportName === "status") return runWithAbortSignal(signal, () => executeStatusOutput(normalizedParams));
         if (exportName === "currentBranch" || exportName === "branchExists") return runWithAbortSignal(signal, () => executeBranchOutput(exportName, normalizedParams));
-        const result = await runWithAbortSignal(signal, async () => coreTool.execute(normalizedParams));
-        const text = toText(result);
-        return {
-          content: [{ type: "text", text }],
-          details: {
-            exportName,
-            rawResult: result,
-            ...(typeof normalizedParams.workdir === "string" ? { workdir: normalizedParams.workdir } : {}),
-          },
-        };
+        throw new Error(`Missing producer-owned Plastic adapter: ${exportName}`);
       },
     });
   }

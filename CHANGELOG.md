@@ -7,6 +7,8 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+- Own all remaining shelveset create/apply and code-review create/update receipts; preserve custom formatting/defaults, distinguish opaque output/emitted identity from unproven state, snapshot exact controls, block configured comment-editor launches, and separate zero-CLI preflight from real shelveset preview. All27 core tools have schemas; generic core-result fallback removed.
+
 - Own typed review-patch receipts: strict request snapshots, selector/backend fidelity, bounded byte/hash/excerpt observation, atomic no-overwrite publication, truthful owned cleanup/retention and no retries or patch application. Existing JSON/default backend policy retained; command-only preflight and text presentation added.
 
 - Correct typed closeout parent discovery using one bounded installed-client leaf-name query with emitted full-name/direct-parent validation. Preserve exact repository/server spelling; empty, ambiguous, mismatched or failed observations stop without alternate selector attempts or guessed parents. Explicit targets remain unchanged.

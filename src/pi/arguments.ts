@@ -178,6 +178,7 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       assignAlias(input, "paths", ["items"]);
       assignAlias(input, "commentsFile", ["comments_file"]);
       assignAlias(input, "summaryFormat", ["summary_format"]);
+      for (const key of ["cwd","workingDirectory","working_directory","path","file","items","comments_file","summary_format"]) delete input[key];
       return input;
     },
   },
@@ -188,6 +189,7 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       assignAlias(input, "changePaths", ["change_paths"]);
       assignAlias(input, "dontCheckout", ["dont_checkout"]);
       assignAlias(input, "comparisonMethod", ["comparison_method"]);
+      for (const key of ["cwd","workingDirectory","working_directory","change_paths","dont_checkout","comparison_method"]) delete input[key];
       return input;
     },
   },
@@ -213,7 +215,7 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
     prepareArguments(args) {
       const input = normalizeArgs(args);
       normalizeWorkdirAliases(input);
-      assignAlias(input, "reviewId", ["id"]);
+      for (const key of ["cwd","workingDirectory","working_directory"]) delete input[key];
       return input;
     },
   },
@@ -223,6 +225,7 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       normalizeWorkdirAliases(input);
       assignAlias(input, "reviewId", ["review_id"]);
       if (input.reviewId !== undefined && input.id === undefined) input.id = input.reviewId;
+      for (const key of ["cwd","workingDirectory","working_directory","reviewId","review_id"]) delete input[key];
       return input;
     },
   },

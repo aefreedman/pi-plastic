@@ -83,7 +83,7 @@ export function renderPlasticCall(name: string, input: unknown, theme: RenderThe
 
 function payload(result: Result, raw: string): Record<string, unknown> {
   const structured = record((result as Result & {structuredContent?:unknown}).structuredContent);
-  if (structured.action === "patch" || structured.action === "diff" || structured.action === "merge-branches" || structured.action === "checkin" || structured.action === "branch-create" || structured.action === "switch-branch" || structured.action === "update" || structured.action === "add" || structured.action === "undo" || structured.action === "resolve-delete-change-conflict" || structured.action === "merge" || structured.action === "finalize-merge" || structured.action === "merge-to-branch" || structured.action === "branch-delete" || structured.action === "shelveset-delete" || structured.action === "code-review-delete") return structured;
+  if (["shelveset-create","shelveset-apply","code-review-create","code-review-update"].includes(scalar(structured.action)) || structured.action === "patch" || structured.action === "diff" || structured.action === "merge-branches" || structured.action === "checkin" || structured.action === "branch-create" || structured.action === "switch-branch" || structured.action === "update" || structured.action === "add" || structured.action === "undo" || structured.action === "resolve-delete-change-conflict" || structured.action === "merge" || structured.action === "finalize-merge" || structured.action === "merge-to-branch" || structured.action === "branch-delete" || structured.action === "shelveset-delete" || structured.action === "code-review-delete") return structured;
   const rawResult = record(result.details).rawResult;
   if (rawResult !== null && typeof rawResult === "object") return record(rawResult);
   // Only decode the package's whole JSON envelope, never a JSON fragment in CLI or diff output.
@@ -111,14 +111,20 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
   const notices = strings(envelope.warnings);
   const summary: Summary = { label: "Result returned", tone: "toolOutput", notices, rows: [] };
   const textLines = raw.split(/\r?\n/).filter(line => line.trim());
-  const preview = !["update", "add", "undo", "resolve-delete-change-conflict", "merge", "finalize-merge", "merge-to-branch", "branch-delete", "shelveset-delete", "code-review-delete", "patch"].includes(action) && (record(context?.args).preflight === true || action.endsWith("-preflight") || envelope.outcome === "preflight");
-  if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes)) && !(name === "mergeBranches" && action === "merge-branches") && !["checkin", "branch-create", "switch-branch", "update", "add", "undo", "resolve-delete-change-conflict", "merge", "finalize-merge", "merge-to-branch", "branch-delete", "shelveset-delete", "code-review-delete", "patch"].includes(action)) {
+  const preview = !["update", "add", "undo", "resolve-delete-change-conflict", "merge", "finalize-merge", "merge-to-branch", "branch-delete", "shelveset-delete", "code-review-delete", "patch","shelveset-create","shelveset-apply","code-review-create","code-review-update"].includes(action) && (record(context?.args).preflight === true || action.endsWith("-preflight") || envelope.outcome === "preflight");
+  if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes)) && !(name === "mergeBranches" && action === "merge-branches") && !["checkin", "branch-create", "switch-branch", "update", "add", "undo", "resolve-delete-change-conflict", "merge", "finalize-merge", "merge-to-branch", "branch-delete", "shelveset-delete", "code-review-delete", "patch","shelveset-create","shelveset-apply","code-review-create","code-review-update"].includes(action)) {
     summary.label = "Failed";
     summary.tone = "error";
     summary.rows = textLines.slice(0, 3);
     return summary;
   }
-  if (name === "patch" && action === "patch") {
+  if (["shelveset-create","shelveset-apply","code-review-create","code-review-update"].includes(action)) {
+    summary.label = `Object write: ${scalar(envelope.outcome)}`;
+    summary.tone = envelope.ok === false ? "error" : "warning";
+    summary.rows = [`Attempt: ${scalar(record(data.attempt).state)}`, `Effect: ${scalar(data.effect)}`, `Emitted identity: ${scalar(record(data.observedCreatedIdentity).value) || "unobserved"}`];
+    if (envelope.ok === false) notices.unshift(scalar(record(envelope.error).message));
+    notices.push(envelope.outcome === "preflight" ? "Command-only preview; no conflict/state analysis." : "Applied items, requested review state, repository scope and rollback remain unverified.");
+  } else if (name === "patch" && action === "patch") {
     summary.label = `Patch: ${scalar(envelope.outcome)}`;
     summary.tone = envelope.ok === false ? "error" : "warning";
     summary.rows = [`Effect: ${scalar(data.effect)}`, `Publication: ${scalar(data.publication)}`, `Cleanup: ${scalar(data.cleanup)}`, `Observed bytes: ${count(record(data.artifact).bytes) ?? "unknown"}`];

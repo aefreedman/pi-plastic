@@ -1082,6 +1082,23 @@
           "type": "boolean",
           "description": "Print only created shelveset spec for automation."
         },
+        "preflight": {
+          "type": "boolean",
+          "description": "Command-only zero-CLI preview; no existence/conflict/state analysis."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
         "workdir": {
           "type": "string",
           "description": "Working directory for the workspace."
@@ -1089,7 +1106,7 @@
       }
     },
     "defaults": {},
-    "hasOutputSchema": false
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_shelvesetApply",
@@ -1142,6 +1159,23 @@
           ],
           "description": "Comparison method used when applying changes."
         },
+        "preflight": {
+          "type": "boolean",
+          "description": "Command-only zero-CLI preview; no existence/conflict/state analysis."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
         "workdir": {
           "type": "string",
           "description": "Working directory for the workspace."
@@ -1149,7 +1183,7 @@
       }
     },
     "defaults": {},
-    "hasOutputSchema": false
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_shelvesetDelete",
@@ -1302,6 +1336,23 @@
           "type": "string",
           "description": "Format string for creation output."
         },
+        "preflight": {
+          "type": "boolean",
+          "description": "Command-only zero-CLI preview; no existence/conflict/state analysis."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
         "workdir": {
           "type": "string",
           "description": "Working directory for the workspace."
@@ -1309,7 +1360,7 @@
       }
     },
     "defaults": {},
-    "hasOutputSchema": false
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_codeReviewUpdate",
@@ -1338,6 +1389,23 @@
           "type": "string",
           "description": "Repository specification when no workspace is used."
         },
+        "preflight": {
+          "type": "boolean",
+          "description": "Command-only zero-CLI preview; no existence/conflict/state analysis."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
         "workdir": {
           "type": "string",
           "description": "Working directory for the workspace."
@@ -1345,7 +1413,7 @@
       }
     },
     "defaults": {},
-    "hasOutputSchema": false
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_codeReviewDelete",

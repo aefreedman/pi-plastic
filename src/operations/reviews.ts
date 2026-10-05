@@ -1,6 +1,6 @@
 import { tool } from "../tool-definition";
 import { workdirArg } from "./arguments";
-import { runCm } from "../execution/cm";
+import { assembleObjectWriteReceipt, presentObjectWriteReceipt } from "./object-write-receipt";
 import { outputFormatArg } from "../presentation/results";
 import { executeCodeReviewFind } from "./code-review-find";
 import { assembleObjectDeleteReceipt, presentObjectDeleteReceipt } from "./object-delete-receipt";
@@ -14,33 +14,15 @@ export const codeReviewCreate = tool({
         assignee: tool.schema.string().optional().describe("Initial review assignee."),
         repository: tool.schema.string().optional().describe("Repository specification when no workspace is used."),
         format: tool.schema.string().optional().describe("Format string for creation output."),
+        preflight: tool.schema.boolean().optional().describe("Command-only zero-CLI preview; no existence/conflict/state analysis."),
+        output: outputFormatArg,
         workdir: workdirArg,
     },
-    async execute(args)
-    {
-        const cmdArgs: string[] = ["codereview", args.target, args.title];
-
-        if (args.status)
-        {
-            cmdArgs.push(`--status=${args.status}`);
-        }
-
-        if (args.assignee)
-        {
-            cmdArgs.push(`--assignee=${args.assignee}`);
-        }
-
-        if (args.repository)
-        {
-            cmdArgs.push(`--repository=${args.repository}`);
-        }
-
-        if (args.format)
-        {
-            cmdArgs.push(`--format=${args.format}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
+    async execute(args) {
+        const dto = await assembleObjectWriteReceipt("code-review-create", Object.freeze({...args}));
+        const result = presentObjectWriteReceipt(dto);
+        if (!dto.ok) throw new Error(result);
+        return result;
     },
 });
 
@@ -51,28 +33,15 @@ export const codeReviewUpdate = tool({
         status: tool.schema.string().optional().describe("Updated review status."),
         assignee: tool.schema.string().optional().describe("Updated review assignee."),
         repository: tool.schema.string().optional().describe("Repository specification when no workspace is used."),
+        preflight: tool.schema.boolean().optional().describe("Command-only zero-CLI preview; no existence/conflict/state analysis."),
+        output: outputFormatArg,
         workdir: workdirArg,
     },
-    async execute(args)
-    {
-        const cmdArgs: string[] = ["codereview", "-e", args.id];
-
-        if (args.status)
-        {
-            cmdArgs.push(`--status=${args.status}`);
-        }
-
-        if (args.assignee)
-        {
-            cmdArgs.push(`--assignee=${args.assignee}`);
-        }
-
-        if (args.repository)
-        {
-            cmdArgs.push(`--repository=${args.repository}`);
-        }
-
-        return runCm(cmdArgs, args.workdir);
+    async execute(args) {
+        const dto = await assembleObjectWriteReceipt("code-review-update", Object.freeze({...args}));
+        const result = presentObjectWriteReceipt(dto);
+        if (!dto.ok) throw new Error(result);
+        return result;
     },
 });
 
