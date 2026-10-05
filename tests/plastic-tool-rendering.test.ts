@@ -37,6 +37,11 @@ const render = (name: string, result: Parameters<typeof renderPlasticResult>[1],
 };
 
 try {
+  const {executePatchOutput}=await import("../src/pi/patch-output");
+  const invalidPatch=await executePatchOutput({source:"--apply",preflight:true});
+  assert.match(render("patch",invalidPatch,false,{args:{preflight:true},isError:true}),/Patch: failed/);
+  const patchPreview=await executePatchOutput({source:"cs:1",toolPath:"fictional-diff",preflight:true});
+  assert.match(render("patch",patchPreview),/Patch: preflight/);
   const { executeUpdateOutput } = await import("../src/pi/update-output");
   const rejectedUpdatePreview = await executeUpdateOutput({preflight:true});
   assert(rejectedUpdatePreview.isError);

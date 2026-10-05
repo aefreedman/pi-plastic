@@ -488,6 +488,23 @@
           "type": "boolean",
           "description": "Show branch changes pending integration into the parent branch."
         },
+        "preflight": {
+          "type": "boolean",
+          "description": "Command-only preview; no staging, backend probe or generation."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Receipt presentation; defaults to JSON."
+        },
         "workdir": {
           "type": "string",
           "description": "Working directory for the workspace."
@@ -495,7 +512,7 @@
       }
     },
     "defaults": {},
-    "hasOutputSchema": false
+    "hasOutputSchema": true
   },
   {
     "name": "plastic_branchCreate",

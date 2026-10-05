@@ -77,10 +77,11 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
   },
   patch: {
     prepareArguments(args) {
-      const input = normalizeArgs(args);
+      const input = normalizeOutputFormatAlias(normalizeArgs(args));
       normalizeWorkdirAliases(input);
       assignAlias(input, "output", ["output_file", "outputFile"]);
       assignAlias(input, "toolPath", ["tool_path", "tool"]);
+      for (const key of ["cwd", "workingDirectory", "working_directory", "output_file", "outputFile", "tool_path", "tool"]) delete input[key];
       return input;
     },
   },

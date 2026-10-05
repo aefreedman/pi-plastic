@@ -61,7 +61,7 @@ const main = (): void => {
   failures += checkRequired(readText(new URL("../src/operations/patch.ts", import.meta.url)), "pi-plastic/src/operations/patch.ts", [
     "export const patch = tool({",
     "__plasticPatchInternals",
-    "buildPatchCommandArgs"
+    "assemblePatchReceipt"
 ]);
   failures += checkRequired(readText(new URL("../src/operations/diff.ts", import.meta.url)), "pi-plastic/src/operations/diff.ts", [
     "export const diff = tool({",
