@@ -7,7 +7,7 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
-- Own all remaining shelveset create/apply and code-review create/update receipts; preserve custom formatting/defaults, distinguish opaque output/emitted identity from unproven state, snapshot exact controls, block configured comment-editor launches, and separate zero-CLI preflight from real shelveset preview. All27 core tools have schemas; generic core-result fallback removed.
+- Own all remaining shelveset create/apply and code-review create/update receipts; preserve custom formatting/defaults, distinguish opaque output/emitted identity from unproven state, snapshot exact controls, block configured comment-editor launches, and separate zero-CLI preflight from real shelveset preview. All27 core tools have schemas; generic core-result fallback removed. Correct opaque Unicode/truncation guards and document sourced creation-format versus find-field protocols, explicit-only assignment, and conflict-preview limits.
 
 - Own typed review-patch receipts: strict request snapshots, selector/backend fidelity, bounded byte/hash/excerpt observation, atomic no-overwrite publication, truthful owned cleanup/retention and no retries or patch application. Existing JSON/default backend policy retained; command-only preflight and text presentation added.
 
