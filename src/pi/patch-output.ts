@@ -39,6 +39,7 @@ export function validatePatchOutput(v:unknown):v is PatchReceipt {
     if((d.retainedStagingDirectory!==null)!==["failed","retained"].includes(d.cleanup)||["failed","retained"].includes(d.cleanup)&&!safe(d.retainedStagingDirectory!))return false;
     if(d.cleanup==="retained"&&(a.terminal==="observed"&&!a.aborted&&!a.timedOut||!["started","unknown"].includes(a.state)))return false;
     if(f) {
+        if(f.utf8&&(f.totalChars===null||f.totalChars>f.bytes||f.bytes>3*f.totalChars))return false;
         if(!c?.complete||a.state!=="started"||a.exitCode!==0||c.stderrBytes!==0||f.empty!==(f.bytes===0)||!f.utf8&&!f.binaryLimited||!f.utf8&&(f.content!==null||f.totalChars!==null||f.truncated)||f.utf8&&f.totalChars===null)return false;
         if(r.output!==null&&(f.content!==null||f.truncated)||r.output===null&&f.utf8&&f.content===null)return false;
         if(r.output===null&&f.utf8) {
