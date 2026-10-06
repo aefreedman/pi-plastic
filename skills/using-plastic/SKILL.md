@@ -45,6 +45,10 @@ CRITICAL: Use relative path references and load files only when needed for the c
 - Read the reference files only when relevant.
 - For long files, use Read with `offset`/`limit` to load only needed sections.
 
+## Public Tool Documentation (Load On Demand)
+
+For parameter semantics, structured receipts, source restrictions, and bounds, start at the [package documentation index](../../docs/README.md), then read only the relevant tool-family section. [Safety and receipts](../../docs/2026-10-06-safety-and-receipts.md) explains completion versus verified effects. Resolve these same-package links relative to this skill directory; no external reference-reader tool is needed. Do not load the entire manual routinely.
+
 ## Reference Files (Load On Demand)
 
 Quick reference -> ../using-plastic/references/quick-reference.md

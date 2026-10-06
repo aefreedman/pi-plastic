@@ -24,7 +24,7 @@ The default suite is credential-free. Keep it that way. Tests that require Plast
 - Preserve built-in and foreign-extension tools when changing active-tool composition.
 - Do not weaken confirmation, preflight, path, process, or mutation safeguards.
 - Add focused regression coverage for behavior changes.
-- Update README documentation when user-facing behavior changes.
+- Keep the README a concise landing page. Update the relevant public docs/tool-family reference and skill guidance when behavior changes; maintain links and the docs index.
 - Keep unreleased user-visible changes under `## Unreleased` in `CHANGELOG.md` during ordinary development.
 - Do not bump the package version for every implementation commit. Convert the accumulated Unreleased section into one dated SemVer release only when preparing a release.
 
@@ -34,6 +34,7 @@ Run:
 
 ```bash
 npm test
+npm run test:docs
 npm run eval:tool-loading -- --dry-run
 npm pack --dry-run
 ```
