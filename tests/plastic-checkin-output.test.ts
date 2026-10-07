@@ -3,19 +3,20 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { readFileSync } from "node:fs";
 import { Check } from "typebox/value";
+import { loadRegisteredTools } from "./pi-tool-harness";
 import { runWithAbortSignal } from "../src/execution/context";
 import { captureCheckinCommand } from "../src/execution/checkin-command";
 import { checkin } from "../src/operations/checkin";
 import { assembleCheckinReceipt } from "../src/operations/checkin-receipt";
 import { checkinOutputSchema, executeCheckinOutput, validateCheckinOutput } from "../src/pi/checkin-output";
-import { parseCheckinEvidence, parseCheckinPending, parseCheckinChangeset } from "../src/domain/checkin-contract";
+import { parseCheckinEvidence, parseCheckinPending, parseCheckinChangeset, checkinSafeComment, checkinSafeValue } from "../src/domain/checkin-contract";
 const us = "\x1f", cwd = "C:\\Example\\workspace", name = "résumé-é-日本-😀.txt", path = cwd + "\\" + name;
 const header = ["STATUS", "9007199254740993", "Example Repository", "example@unity"].join(us) + "\r\n";
 const row = (code = "CH", file = path) => [code, file, "False", code === "PR" || code === "AD" ? "-1" : "9007199254740995", "NO_MERGES"].join(us) + "\r\n";
 const payload = "cs:9007199254740997@br:/main/café-é-日本-😀@Example Repository@example@unity (mount:'/')";
 const input = { message: "Fixture résumé é 日本語 😀", workdir: cwd, paths: [name] };
 type Scenario = { mode?: string; native?: string; private?: boolean; recoveryFail?: boolean; afterFail?: boolean; addFail?: boolean; retryFail?: boolean; fallback?: boolean; pending?: string; preabort?: boolean; launch?: "sync" | "async"; lateError?: boolean; decoded?: boolean; abort?: boolean; timeout?: boolean; ignoreTerm?: boolean; code?: number | null; signal?: string; stderr?: string; scopeMany?: boolean; noSpawn?: boolean; streamError?: boolean; payload?: string };
-async function invoke(scenario: Scenario = {}, args: any = input, core = false) {
+async function invoke(scenario: Scenario = {}, args: any = input, core = false, registered?: any) {
     const calls: string[][] = [], children: any[] = [], timers = new Set<any>(), controller = new AbortController();
     let reads = 0, checkins = 0;
     if (scenario.preabort) controller.abort();
@@ -70,7 +71,7 @@ async function invoke(scenario: Scenario = {}, args: any = input, core = false) 
             c.stdout.end(out); c.stderr.end(err); c.emit("close", code, null);
         }); return c;
     }) as any, setTimeout: ((cb: () => void, delay: number) => { const t = setTimeout(cb, delay); timers.add(t); if (scenario.timeout && calls.at(-1)?.[0] === "checkin" && (delay === 30000 || scenario.ignoreTerm && delay === 5000)) queueMicrotask(cb); return t; }) as any, clearTimeout: ((t: any) => { clearTimeout(t); timers.delete(t); }) as any };
-    const result = await runWithAbortSignal(controller.signal, () => core ? checkin.execute(args) : executeCheckinOutput(args), deps);
+    const result = await runWithAbortSignal(controller.signal, () => registered ? registered.execute("fixture", args) : core ? checkin.execute(args) : executeCheckinOutput(args), deps);
     if (core) return { result, calls, dto: null as any };
     const r = result as Awaited<ReturnType<typeof executeCheckinOutput>>, dto = r.structuredContent;
     assert(Check(checkinOutputSchema, dto)); assert(validateCheckinOutput(dto)); assert.equal(r.isError, !dto.ok); assert.deepEqual(r.details, {});
@@ -84,6 +85,25 @@ if (process.platform !== "win32") {
     console.log("PASS: non-Windows source admission; Windows source suite not applicable");
 } else {
 let r = await invoke(); assert(r.dto.ok); assert.equal(r.dto.data.createdChangeset.id, "9007199254740997"); assert.equal(r.dto.data.createdChangeset.branch, "/main/café-é-日本-😀"); assert.equal(r.dto.data.createdChangeset.server, "example@unity"); assert.equal(r.calls.length, 3);
+const registered = (await loadRegisteredTools()).get("plastic_checkin")!;
+for (const newline of ["\n", "\r\n", "\r"]) {
+    const message = `  Fixture 😀${newline}Details${newline}  `;
+    for (const tool of [undefined, registered]) {
+        r = await invoke({}, { ...input, message }, false, tool);
+        assert(r.dto.ok);
+        assert.deepEqual(r.calls.find(c => c[0] === "checkin")!.filter(a => a.startsWith("-c=")), [`-c=${message}`]);
+        assert.equal(r.dto.data.command[2], `-c=${message}`);
+    }
+}
+for (const control of ["\0", "\t", "\x1f", "\x7f", "\x85"]) {
+    r = await invoke({}, { ...input, message: `Fixture\n${control}Details` }, false, registered);
+    assert.equal(r.calls.length, 0); assert.equal(r.dto.error.code, "invalid_request");
+}
+for (const newline of ["\n", "\r\n"]) {
+    for (const args of [{ ...input, paths: [`file${newline}other`] }, { ...input, workdir: `${cwd}${newline}other` }]) {
+        r = await invoke({}, args); assert.equal(r.calls.length, 0); assert.equal(r.dto.error.code, "invalid_request");
+    }
+}
 for (const format of ["text", "json"]) { r = await invoke({}, { ...input, preflight: true, format }); assert.equal(r.dto.outcome, "preflight"); assert.equal(r.calls.length, 1); }
 r = await invoke({}, { ...input, updateAfter: true, preflight: true }); assert.equal(r.calls.length, 0); assert.equal(r.dto.error.code, "UNATTENDED_UPDATE_AFTER_BLOCKED");
 for (const args of [{ ...input, message: "x".repeat(4097) }, { ...input, message: "bad\uD800" }, { ...input, paths: Array(101).fill("x") }, { ...input, paths: Array(10).fill("x".repeat(4096)) }, { ...input, paths: ["--private"] }, { ...input, paths: ["-"] }, { ...input, includePrivate: "true" }]) { r = await invoke({}, args); assert.equal(r.calls.length, 0); assert.equal(r.dto.outcome, "failed"); }
@@ -131,5 +151,17 @@ const p = parseCheckinPending(header + moved + "\r\n", cwd); assert(p.admitted);
 assert(!parseCheckinPending(header + moved.replace("100%", "99%"), cwd).admitted);
 assert(!parseCheckinPending(header + moved + us + "extra", cwd).admitted);
 assert(!parseCheckinPending(header + header, cwd).admitted);
+// Comment policy is independent of platform; path/identity controls remain strict.
+for (const newline of ["\n", "\r\n", "\r"]) {
+    assert(checkinSafeComment(`Fixture${newline}Details 😀`));
+    assert(!checkinSafeValue(`Fixture${newline}Details`));
+    assert(!parseCheckinChangeset(payload.replace("Example Repository", `Example${newline}Repository`)));
+}
+for (let code = 0; code <= 0x9f; code++) {
+    if (code > 0x1f && code < 0x7f || code === 10 || code === 13) continue;
+    assert(!checkinSafeComment(`Fixture${String.fromCharCode(code)}Details`));
+}
+for (const comment of ["", "x".repeat(4097), "bad\ud800", "bad\udc00", "\ud800\n\udc00", "\ud800\r\n\udc00"]) assert(!checkinSafeComment(comment));
+assert(checkinSafeComment("x".repeat(4096)));
 await assert.rejects(captureCheckinCommand(Array(121).fill("x"), cwd), /argv/);
 await assert.rejects(captureCheckinCommand(Array(10).fill("x".repeat(4096)), cwd), /argv/);

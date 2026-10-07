@@ -16,6 +16,8 @@ export type CheckinReceipt = Base & (
 );
 export const checkinUnsafeText = /[\u0000-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 export const checkinSafeValue = (s: unknown): s is string => typeof s === "string" && s.length > 0 && s.length <= 4096 && !checkinUnsafeText.test(s);
+// Comments alone admit CR/LF; all other controls, bounds and surrogate rules stay unchanged.
+export const checkinSafeComment = (s: unknown): s is string => typeof s === "string" && s.length > 0 && s.length <= 4096 && !checkinUnsafeText.test(s.replace(/[\r\n]/g, " "));
 // Loss-marker rejection is a conservative admission policy, not proof of original Unicode fidelity.
 const identity = (s: string) => checkinSafeValue(s) && s === s.trim() && !/[?\uFFFD]/.test(s);
 const absolute = (s: string) => identity(s) && /^(?:[A-Za-z]:[\\/]|\\\\)/.test(s);

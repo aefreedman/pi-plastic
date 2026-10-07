@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { buildFallbackScopePaths } from "../domain/paths";
 import { summarizePendingItems, resolveCheckinPaths, filterPendingItemsByScope, selectPrivatePathsForAutoAdd, type PendingItem } from "../domain/pending";
 import { captureCheckinCommand, type CheckinCommandObservation } from "../execution/checkin-command";
-import { checkinSafeValue, parseCheckinEvidence, parseCheckinPending, type CheckinData, type CheckinReceipt, type CheckinRequest, type CheckinStep, type CheckinSummary } from "../domain/checkin-contract";
+import { checkinSafeComment, checkinSafeValue, parseCheckinEvidence, parseCheckinPending, type CheckinData, type CheckinReceipt, type CheckinRequest, type CheckinStep, type CheckinSummary } from "../domain/checkin-contract";
 const pendingArgv = ["status", "--machinereadable", "--includeRevId", "--fieldseparator=\x1f"];
 const summary = (items: PendingItem[], cwd: string): CheckinSummary => { const { privatePaths: _, ...s } = summarizePendingItems(items, cwd); return s; };
 const normal = (o: CheckinCommandObservation) => o.capture.complete && !o.failed && o.attempt.state === "started" && o.attempt.terminal === "observed" && o.attempt.exitCode !== null && !o.attempt.aborted && !o.attempt.timedOut;
@@ -10,7 +10,7 @@ const success = (o: CheckinCommandObservation) => normal(o) && o.attempt.exitCod
 function validateRequest(input: unknown): asserts input is CheckinRequest {
     if (!input || typeof input !== "object" || Array.isArray(input)) throw Error("Invalid bounded checkin input.");
     const r = input as Record<string, unknown>;
-    if (!checkinSafeValue(r.message) || !r.message.trim() || r.workdir !== undefined && !checkinSafeValue(r.workdir) || r.format !== undefined && !["text", "json"].includes(r.format as string)) throw Error("Invalid bounded checkin input.");
+    if (!checkinSafeComment(r.message) || !r.message.trim() || r.workdir !== undefined && !checkinSafeValue(r.workdir) || r.format !== undefined && !["text", "json"].includes(r.format as string)) throw Error("Invalid bounded checkin input.");
     for (const k of ["applyChanged", "includePrivate", "includeAll", "updateAfter", "preflight"]) if (r[k] !== undefined && typeof r[k] !== "boolean") throw Error("Invalid checkin option.");
     if (r.paths !== undefined && (!Array.isArray(r.paths) || r.paths.length > 100 || !r.paths.every(p => checkinSafeValue(p) && p.trim() && p !== "-" && !p.startsWith("-")))) throw Error("Invalid bounded checkin paths.");
     const values = [r.message, r.workdir ?? "", ...(r.paths as string[] ?? [])] as string[];

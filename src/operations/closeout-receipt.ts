@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { parseSwitchTarget, parseSwitchLoadedBranch, compareSwitchTarget, parseSwitchPending, switchPendingArgv, safeSwitchValue } from "../domain/switch-contract";
-import { checkinSafeValue } from "../domain/checkin-contract";
+import { checkinSafeComment, checkinSafeValue } from "../domain/checkin-contract";
 import { admitCleanStandardStatus } from "../domain/workspace-merge-contract";
 import { parseCopiedPending } from "../domain/copied-merge";
 import { cmWhereEquals } from "../domain/branches";
@@ -14,11 +14,11 @@ export { presentCloseoutReceipt } from "../presentation/closeout-results";
 export { CLOSEOUT_STAGE_NAMES, CLOSEOUT_DTO_BYTES, closeoutChildEffect, closeoutCaptures } from "../domain/closeout-contract";
 export type { CloseoutReceipt, CloseoutStage, CloseoutRead } from "../domain/closeout-contract";
 export { compareSwitchTarget, parseSwitchTarget, safeSwitchValue, switchPendingArgv } from "../domain/switch-contract";
-export { checkinSafeValue } from "../domain/checkin-contract";
+export { checkinSafeComment, checkinSafeValue } from "../domain/checkin-contract";
 export { cmWhereEquals } from "../domain/branches";
 export { buildCloseoutParentArgv } from "../domain/closeout-contract";
 export function emptyCloseoutData(): CloseoutData { return {requested:null,sourceBranch:null,targetBranch:null,targetSource:"unresolved",checkinMessage:null,stages:[],unattemptedStages:[...CLOSEOUT_STAGE_NAMES],unobservedChild:null,createdChangeset:null,pendingAfter:null,targetVerification:"unverified",serverAliasEquivalence:"unverified",sourceLink:"unverified",branchHead:"unverified",exclusiveScope:"unverified",rollback:"not-proven",effect:"not-attempted"}; }
-function admitRequest(input:unknown):asserts input is CloseoutRequest { if(!input||typeof input!=="object"||Array.isArray(input))throw Error();const r=input as Record<string,unknown>;if(Object.keys(r).some(k=>!["source","target","message","cardRef","strategy","updateTarget","includePrivate","preflight","format","workdir"].includes(k)))throw Error();for(const k of ["source","target"])if(r[k]!==undefined&&(!safeSwitchValue(r[k])||!parseSwitchTarget(r[k])))throw Error();for(const k of ["message","cardRef"])if(r[k]!==undefined&&!checkinSafeValue(r[k]))throw Error();if(r.workdir!==undefined&&!safeSwitchValue(r.workdir))throw Error();if(r.strategy!==undefined&&!["auto","source","destination"].includes(r.strategy as string)||r.format!==undefined&&!["text","json"].includes(r.format as string))throw Error();for(const k of ["updateTarget","includePrivate","preflight"])if(r[k]!==undefined&&typeof r[k]!=="boolean")throw Error();if(Buffer.byteLength(JSON.stringify(r),"utf8")>32768)throw Error(); }
+function admitRequest(input:unknown):asserts input is CloseoutRequest { if(!input||typeof input!=="object"||Array.isArray(input))throw Error();const r=input as Record<string,unknown>;if(Object.keys(r).some(k=>!["source","target","message","cardRef","strategy","updateTarget","includePrivate","preflight","format","workdir"].includes(k)))throw Error();for(const k of ["source","target"])if(r[k]!==undefined&&(!safeSwitchValue(r[k])||!parseSwitchTarget(r[k])))throw Error();if(r.message!==undefined&&!checkinSafeComment(r.message))throw Error();if(r.cardRef!==undefined&&!checkinSafeValue(r.cardRef))throw Error();if(r.workdir!==undefined&&!safeSwitchValue(r.workdir))throw Error();if(r.strategy!==undefined&&!["auto","source","destination"].includes(r.strategy as string)||r.format!==undefined&&!["text","json"].includes(r.format as string))throw Error();for(const k of ["updateTarget","includePrivate","preflight"])if(r[k]!==undefined&&typeof r[k]!=="boolean")throw Error();if(Buffer.byteLength(JSON.stringify(r),"utf8")>32768)throw Error(); }
 export async function assembleCloseoutReceipt(input:unknown):Promise<CloseoutReceipt> {
  const data=emptyCloseoutData();let stage:"input"|CloseoutStageName|"producer"="input";let childEntered=false;
  const finish=(outcome:CloseoutReceipt["outcome"],code:Extract<CloseoutReceipt,{ok:false}>["error"]["code"]="observation_failed",message="Closeout paused; inspect earlier effects before deciding whether to retry."):CloseoutReceipt=>{
@@ -49,9 +49,9 @@ export async function assembleCloseoutReceipt(input:unknown):Promise<CloseoutRec
    if(!parseSwitchTarget(target))return finish("failed","invalid_request","Derived target is outside the bounded branch admission; pass a bounded explicit target.");data.targetBranch=target;data.targetSource="parent-read";
   }
   if(source.branch===parseSwitchTarget(data.targetBranch!)!.branch)return finish("failed","invalid_request","Refusing a same-branch closeout within the admitted workspace scope.");
-  const cardLine=submitted.cardRef?.trim()?`\n\n${submitted.cardRef.trim()}`:"";data.checkinMessage=submitted.message?.trim()?submitted.message.trim():`Merge ${data.sourceBranch} into ${data.targetBranch}${cardLine}`;
-  // Existing checkin owner rejects control/newline text. Never discover that only after target mutation.
-  if(!checkinSafeValue(data.checkinMessage)||[data.checkinMessage,cwd].reduce((n,s)=>n+s.length,0)>16384||Buffer.byteLength(JSON.stringify([data.checkinMessage,cwd]),"utf8")>32768)return finish("failed","invalid_request","Derived checkin message is outside the existing child admission; supply an admitted explicit message before any target mutation.");
+  const cardLine=submitted.cardRef?.trim()?`\n\n${submitted.cardRef.trim()}`:"";data.checkinMessage=submitted.message?.trim()?submitted.message:`Merge ${data.sourceBranch} into ${data.targetBranch}${cardLine}`;
+  // Reuse child comment admission before any target mutation.
+  if(!checkinSafeComment(data.checkinMessage)||[data.checkinMessage,cwd].reduce((n,s)=>n+s.length,0)>16384||Buffer.byteLength(JSON.stringify([data.checkinMessage,cwd]),"utf8")>32768)return finish("failed","invalid_request","Derived checkin message is outside the existing child admission; supply an admitted explicit message before any target mutation.");
   const before=await pending("pending-before");if(!before)return finish("failed");data.targetVerification=compareSwitchTarget(start,data.targetBranch!);
   if(data.requested.preflight)return finish("preflight");
   if(data.targetVerification==="unverified"&&before.totalPending>0)return finish("blocked","policy_blocked","Pending changes block switching under the unchanged cancel policy; no target mutation permitted.");
