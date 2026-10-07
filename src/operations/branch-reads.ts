@@ -41,7 +41,6 @@ const statusChangesetIds = (output: string): string[] => {
 // Only explicit, delimited observations are reusable. Never take a whitespace
 // prefix of a br: selector or normalize an observed path into a different one.
 const statusIdentity = (output: string): string | undefined => {
-    statusChangesetIds(output);
     const candidates: string[] = [];
     for (const line of output.split(/\r?\n/).filter(line => line.trim())) {
         // At most the explicit leading source prefix may carry a br: marker.
@@ -55,6 +54,13 @@ const statusIdentity = (output: string): string | undefined => {
         else if (/\bbr:|^branch\b|^\//iu.test(line)) throw new BranchReadError("malformed_output");
     }
     if (new Set(candidates).size > 1) throw new BranchReadError("malformed_output");
+    // Pending merge-link changesets describe sources, not the loaded identity.
+    // Exclude only their standard-status lines once an explicit header exists;
+    // changeset-only fallback still validates every token for ambiguity.
+    const identityContext = candidates.length > 0
+        ? output.split(/\r?\n/).filter(line => !/^    Merge from cs:[0-9]+ at /u.test(line)).join("\n")
+        : output;
+    statusChangesetIds(identityContext);
     return candidates[0];
 };
 export type CurrentBranchObservation = { action: "current-branch"; branch: string; basis: "status" | "compact_status" | "changeset_lookup"; scope: "workspace" };

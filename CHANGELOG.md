@@ -7,6 +7,8 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+- Read the explicit loaded-branch status header independently of pending merge-link changeset references. Preserve ambiguous header/compact fallback rejection and complete-capture gates, with deterministic branch-read regressions.
+
 - Replace the oversized README with a concise landing page and packaged, task-oriented documentation. Add task/tool navigation, progressive skill links, current schema/runtime wording, readability tables, and deterministic documentation/link/packing checks without changing tool behavior.
 
 - Own all remaining shelveset create/apply and code-review create/update receipts; preserve custom formatting/defaults, distinguish opaque output/emitted identity from unproven state, snapshot exact controls, block configured comment-editor launches, and separate zero-CLI preflight from real shelveset preview. All27 core tools have schemas; generic core-result fallback removed. Correct opaque Unicode/truncation guards and document sourced creation-format versus find-field protocols, explicit-only assignment, and conflict-preview limits.
