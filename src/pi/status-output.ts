@@ -1,6 +1,6 @@
 import { Type, type Static, type TSchema } from "typebox";
 import { Check } from "typebox/value";
-import { assembleStatusObservation, presentStatusObservation, type StatusObservationOptions, type StatusObservation, StatusOptionError } from "../operations/status";
+import { assembleStatusObservation, presentStatusObservation, type StatusObservationOptions, type StatusObservation, StatusOptionError, StatusXmlError } from "../operations/status";
 import { StatusCommandError } from "../execution/status-command";
 
 export const STATUS_OUTPUT_MAX_BYTES = 131072;
@@ -45,7 +45,7 @@ export const statusOutputSchema = Type.Union([
         parse: object({ records: xmlCount, unsupportedRecords: Type.Literal(0), malformedRecords: Type.Literal(0) }),
     }) }),
     object({ ...common, schemaVersion: Type.Literal(2), ok: Type.Literal(false), error: object({
-        code: Type.Union([Type.Literal("command_failed"), Type.Literal("aborted"), Type.Literal("capture_incomplete"), Type.Literal("invalid_producer_data"), Type.Literal("output_overflow")]),
+        code: Type.Union([Type.Literal("command_failed"), Type.Literal("aborted"), Type.Literal("capture_incomplete"), Type.Literal("invalid_producer_data"), Type.Literal("output_overflow"), Type.Literal("unsupported_source"), Type.Literal("malformed_output")]),
         message: Type.String({ maxLength: 256 }),
     }) }),
     object({ ...common, ok: Type.Literal(true), data: object({
@@ -69,7 +69,7 @@ export const statusOutputSchema = Type.Union([
 export type StatusOutput = Static<typeof statusOutputSchema>;
 const provenance = { source: "plastic", producer: "@aefree/pi-plastic", contentTrust: "external" } as const;
 const envelope = { schemaVersion: 1, action: "status", provenance } as const;
-type StatusErrorCode = Extract<StatusOutput, { ok: false }>["error"]["code"];
+type StatusErrorCode = Extract<StatusOutput, { ok: false; schemaVersion: 1 }>["error"]["code"];
 const errorOutput = (code: StatusErrorCode, message: string, schemaVersion: 1 | 2 = 1): StatusOutput => ({ ...envelope, schemaVersion, ok: false, completeness: { read: "incomplete", capture: "unknown", projection: false }, error: { code, message } });
 
 export function validateStatusOutput(value: unknown, schemaVersion: 1 | 2 = 1): StatusOutput {
@@ -139,11 +139,11 @@ export async function executeStatusOutput(args: StatusObservationOptions & { for
         if (dto.ok) rawResult = await presentStatusObservation(observation, args);
     } catch (error) {
         const version = args.source === "xml" ? 2 : 1;
-        dto = validateStatusOutput(error instanceof StatusCommandError ? errorOutput(error.code, error.message, version) : error instanceof StatusOptionError ? errorOutput("command_failed", error.message, version) : errorOutput("invalid_producer_data", "Status producer failed to produce valid data.", version), version);
+        dto = validateStatusOutput(error instanceof StatusXmlError ? ({ ...envelope, schemaVersion: 2, ok: false, completeness: { read: "incomplete", capture: "complete", projection: false }, error: { code: error.code, message: error.message } }) : error instanceof StatusCommandError ? errorOutput(error.code, error.message, version) : error instanceof StatusOptionError ? errorOutput("command_failed", error.message, version) : errorOutput("invalid_producer_data", "Status producer failed to produce valid data.", version), version);
     }
     return {
         content: [{ type: "text" as const, text: dto.ok ? dto.data.mode !== "standard" ? `Status: ${dto.data.itemCount.parsed} parsed records; ${dto.data.itemCount.returned} returned. Read: ${dto.completeness.read}.` : `Status: ${dto.data.summary.totalPending} classified short-output lines. Read: unknown.` : dto.error.message }],
         structuredContent: dto, isError: !dto.ok,
-        details: { exportName: "status", rawResult, ...(args.workdir ? { workdir: args.workdir } : {}) },
+        details: { exportName: "status", rawResult, ...(args.workdir && (dto.ok || args.source !== "xml") ? { workdir: args.workdir } : {}) },
     };
 }

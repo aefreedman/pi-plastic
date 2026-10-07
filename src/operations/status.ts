@@ -6,6 +6,7 @@ import { runStatusCommand, StatusCommandError } from "../execution/status-comman
 import { getActiveAbortSignal } from "../execution/context";
 import { analyzeMergeStatusOutput } from "../domain/merge-output";
 import { parseStatusXml } from "../domain/status-xml";
+export { StatusXmlError } from "../domain/status-xml";
 import { runStatusXmlCommand } from "../execution/status-xml-command";
 
 export class StatusOptionError extends Error {

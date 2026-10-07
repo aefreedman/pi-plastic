@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { performance } from "node:perf_hooks";
 import { Check } from "typebox/value";
-import { parseStatusXml, STATUS_XML_LIMITS } from "../src/domain/status-xml";
+import { parseStatusXml, StatusXmlError, STATUS_XML_LIMITS } from "../src/domain/status-xml";
 import { resolveStatusSource, status as coreStatus } from "../src/operations/status";
 import { statusOutputSchema, validateStatusOutput } from "../src/pi/status-output";
 import { runWithAbortSignal } from "../src/execution/context";
@@ -38,6 +38,20 @@ assert.throws(() => parse(xmlStatus(xmlRecord().replace('<Path>/synthetic/日本
 assert.throws(() => parse(xmlStatus('<Change/>'.repeat(20001))));
 assert.throws(() => parse(xmlStatus('<x>'.repeat(17) + '</x>'.repeat(17))));
 assert.throws(() => parseStatusXml(Buffer.alloc(STATUS_XML_LIMITS.stdoutBytes + 1, 32)));
+// Synthetic unsupported profiles remain fail-closed; malformed/unsafe data takes precedence.
+const unsupportedKind = xmlRecord().replace('enTextFile', 'enBinaryFile');
+const unsupportedStatus = xmlRecord('/synthetic/unadmitted.txt', 'CP');
+const unsafeRecord = xmlRecord('relative-private-value');
+for (const input of [xmlStatus(unsupportedKind), xmlStatus(unsupportedStatus)]) {
+  assert.throws(() => parse(input), (error: unknown) => error instanceof StatusXmlError && error.code === 'unsupported_source');
+}
+for (const input of [mixed.slice(0, -1), xmlStatus(xmlRecord().replace('<Type>PR</Type>', '<Type></Type>')), xmlStatus(xmlRecord().replace('enTextFile', '')), xmlStatus(unsupportedKind + unsafeRecord), xmlStatus(unsafeRecord + unsupportedKind)]) {
+  assert.throws(() => parse(input), (error: unknown) => error instanceof StatusXmlError && error.code === 'malformed_output');
+}
+for (const input of [xmlStatus('<Change/>'.repeat(20001)), xmlStatus('<x>'.repeat(17) + '</x>'.repeat(17)), xmlStatus(xmlRecord('/' + 'x'.repeat(4096)))]) {
+  assert.throws(() => parse(input), (error: unknown) => error instanceof StatusXmlError && error.code === 'output_overflow');
+}
+assert.throws(() => parseStatusXml(Buffer.alloc(STATUS_XML_LIMITS.stdoutBytes + 1)), (error: unknown) => error instanceof StatusXmlError && error.code === 'output_overflow');
 const start = performance.now();
 for (const input of [xmlStatus('<x>'.repeat(10000) + '</x>'.repeat(10000)), xmlStatus('<Change/>'.repeat(20001)), xmlStatus(xmlRecord().replace('</Change>', '<TypeVerbose>' + 'x'.repeat(900000) + '</TypeVerbose></Change>'))]) assert.throws(() => parse(input));
 const adversarialMs = performance.now() - start;
@@ -74,6 +88,22 @@ const invoke = async (output: Buffer | string = mixed, args: Record<string, unkn
   for (const child of children) { assert.equal(child.listenerCount('close'), 0); assert.equal(child.listenerCount('error'), 0); assert.equal(child.stdout.listenerCount('data'), 0); assert.equal(child.stderr.listenerCount('data'), 0); }
   return result;
 };
+for (const [input, code] of [
+  [xmlStatus(unsupportedKind), 'unsupported_source'], [xmlStatus(unsupportedStatus), 'unsupported_source'],
+  [mixed.slice(0, -1), 'malformed_output'], [xmlStatus(unsupportedKind + unsafeRecord), 'malformed_output'],
+  [xmlStatus('<Change/>'.repeat(20001)), 'output_overflow'],
+] as const) {
+  const failed = await invoke(input, { includeRaw: true, workdir: '/synthetic/private-workdir' });
+  assert.equal(failed.structuredContent.error.code, code);
+  assert.equal(failed.structuredContent.schemaVersion, 2);
+  assert.deepEqual(failed.structuredContent.completeness, { read: 'incomplete', capture: 'complete', projection: false });
+  assert.equal(failed.isError, true); assert(!('data' in failed.structuredContent));
+  assert.equal(failed.details.rawResult, undefined); assert.equal(failed.details.workdir, undefined);
+  for (const privateValue of ['<StatusOutput>', 'enBinaryFile', 'CP', 'synthetic.invalid', 'relative-private-value', '/synthetic']) assert(!JSON.stringify(failed).includes(privateValue));
+}
+const transportLimit = await invoke(Buffer.alloc(STATUS_XML_LIMITS.stdoutBytes + 1));
+assert.equal(transportLimit.structuredContent.error.code, 'capture_incomplete');
+assert.equal(transportLimit.structuredContent.completeness.capture, 'unknown');
 const result = await invoke(mixed, { maxItems: 2, format: 'json', includeRaw: true });
 assert.equal(calls.length, 1); assert.deepEqual(calls[0], ['status', '--xml', '--encoding=utf-8', '--fullpaths']);
 const dto = result.structuredContent;
@@ -106,7 +136,7 @@ const decodedSpawn = (() => { const child = Object.assign(new EventEmitter(), { 
 const decodedError = await runWithAbortSignal(undefined, () => registered.execute('fixture', { source: 'xml' }, undefined, undefined, { cwd: '/synthetic' }), { spawn: decodedSpawn }); assert.equal(decodedError.isError, true);
 const bytes = Buffer.from(xmlStatus(xmlRecord()));
 for (let split = 1; split < bytes.length; split++) assert.equal((await invoke(bytes, {}, { split })).structuredContent.data.items[0].path, '/synthetic/日本-é-😀.txt');
-const malformedDto = structuredClone(dto); malformedDto.data.items[0].revisionId = '0'; assert.equal(validateStatusOutput(malformedDto, 2).ok, false);
+const malformedDto = structuredClone(dto); malformedDto.data.items[0].revisionId = '0'; assert.equal(validateStatusOutput(malformedDto, 2).ok, false); assert.equal((validateStatusOutput(malformedDto, 2) as any).error.code, 'invalid_producer_data');
 const wrongCount = structuredClone(dto); wrongCount.data.itemCount.parsed++; assert.equal(validateStatusOutput(wrongCount, 2).ok, false);
 const overflow = xmlStatus(Array.from({ length: 100 }, (_, i) => xmlRecord('/synthetic/' + i + 'x'.repeat(1600))).join('')); assert.equal((await invoke(overflow, { maxItems: 100 })).structuredContent.error.code, 'output_overflow');
 assert.equal((await invoke(xmlStatus(Array.from({ length: 600 }, (_, i) => xmlRecord('/synthetic/' + i)).join('')), { maxItems: 501 })).isError, true);
