@@ -7,97 +7,41 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
-- Admit the observed checked-out `CO` pending-record shape with an unavailable (`-1`) revision in checkin snapshots for any path. Preserve requested path selection so unrelated excluded checkouts no longer block checkins; retain fail-closed metadata validation and add selected/excluded checkout regressions.
-
-- Extend `plastic_mergeBranches` with read-only server conflict analysis and validated per-file JSON resolution submission using `--fileconflictsresolutionsfile`; support explicit source/destination policy for unlisted conflicts, conditional CLI capability checks with an expanded bounded help gate for the updated CLI, local input summaries/hashes, and a documented inspect/resolve/validate/submit workflow. Retain noninteractive dispatch, no retries, command-only preflight and unverified Xlink/link effects; no version bump.
-
-- Admit bounded CR/LF multiline checkin and closeout comments without rewriting explicit comments; retain strict path, workdir, selector, identity and other control-character admission.
-- Read the explicit loaded-branch status header independently of pending merge-link changeset references. Preserve ambiguous header/compact fallback rejection and complete-capture gates, with deterministic branch-read regressions.
-- Categorize rejected XML status observations as unsupported record profiles, malformed contract data, or bounded observation overflow without exposing source values. Preserve fail-closed binary/richer-profile admission and distinguish complete byte capture from incomplete reads and internal DTO failures.
-- Make unsupported merge readiness actionable by identifying applying, pending/path-cardinality and full-status evidence gates without implying rollback or retry. Add a sanitized six-copy asset/sidecar DO_COPIED/ADD/CP regression through workspace merge and typed closeout; retain narrow copied-add admission and unresolved historical producer/load uncertainty.
-
-- Replace the oversized README with a concise landing page and packaged, task-oriented documentation. Add task/tool navigation, progressive skill links, current schema/runtime wording, readability tables, and deterministic documentation/link/packing checks without changing tool behavior.
-
-- Own all remaining shelveset create/apply and code-review create/update receipts; preserve custom formatting/defaults, distinguish opaque output/emitted identity from unproven state, snapshot exact controls, block configured comment-editor launches, and separate zero-CLI preflight from real shelveset preview. All27 core tools have schemas; generic core-result fallback removed. Correct opaque Unicode/truncation guards and document sourced creation-format versus find-field protocols, explicit-only assignment, and conflict-preview limits.
-
-- Own typed review-patch receipts: strict request snapshots, selector/backend fidelity, bounded byte/hash/excerpt observation, atomic no-overwrite publication, truthful owned cleanup/retention and no retries or patch application. Existing JSON/default backend policy retained; command-only preflight and text presentation added.
-
-- Correct typed closeout parent discovery using one bounded installed-client leaf-name query with emitted full-name/direct-parent validation. Preserve exact repository/server spelling; empty, ambiguous, mismatched or failed observations stop without alternate selector attempts or guessed parents. Explicit targets remain unchanged.
-
-- Admit the sourced Windows copied-add merge profile: framed DO_COPIED/ADD, bounded CP pending records and exact standard pending-link/copied sections. Correlate paths, namespace and merge metadata; preserve opaque volatile display and pause unknown/mixed/conflicting output. Checkin accepts narrow CP selection/events; typed closeout independently rechecks copied readiness without retries, conflict-policy changes or source-link/head/rollback proof.
-
-- Add bounded producer-owned shelveset/code-review deletion command receipts, exact scalar/plural/duplicate and repository operands, additive command-only previews and uncertainty-aware core/native presentation. No inferred deleted objects, exclusive scope or rollback; creator/apply/update adapters remain separate.
-
-- Add producer-owned branch-delete command receipts with exact bounded branch operands, preserved delete-changesets policy, command-only preview and uncertainty-aware core/native output. Completion does not infer deleted identity, history effects, scope or rollback; no hidden reads/retries.
-- Add producer-owned typed merge-to-branch closeout stage receipts, bounded branch-only admission and qualifier-sensitive target gates; preserve observed checkin identity across later read failure and stop on unadmitted readiness without new retries or compensation. Other richer pending-merge profiles remain unsupported; read-only previews are not zero CLI.
+## [0.8.0] - 2026-10-08
 
 ### Added
 
-- Producer-owned workspace merge/finalization receipts record applying completion separately from conflict/readiness evidence. Preserve noninteractive strategy defaults and exact bounded source operands; reject source options, record read failures instead of swallowing them, and stop core/closeout checkin on unknown readiness. Initial client profile is explicitly narrow; rich pending/unknown output pauses without implying rollback. No dependency/version change.
-- Closed producer-owned delete/change-conflict removal receipts preserve requested --nodisk/preview/format controls while rejecting option/stdin/private-mode interpretation in paths. Completion no longer implies conflict resolution, preservation or zero pending items; hidden status/version readback, raw diagnostic and automatic merge-continuation claims removed. Aliases retain canonical precedence; SDK transport normalization is separately scoped.
-- Closed producer-owned undo command receipts preserve exact path expressions/defaults and reject option/filter operands that could imply unintended destructive scope. Native/core output distinguishes requested operands from unverified undone items or restored content; uncertainty never authorizes retry/rollback. Existing undo aliases keep canonical precedence with consumed aliases removed at preparation.
-- Closed producer-owned add command receipts preserve exact path/pattern operands and defaults while rejecting CLI options/stdin in the path array. Bounded native/core output distinguishes requested operands from unverified added identities and keeps partial-failure uncertainty without retry/readback. Existing internal checkin add execution is unchanged.
-- Closed producer-owned update command receipts preserving `--dontmerge --noinput` dispatch, one-command bounds, opaque lifecycle completion and uncertain partial effects. No inferred workspace identity/changed-item count, raw progress reconstruction or retry; core errors stop compound closeout before merge/checkin.
-- Closed producer-owned switchBranch receipts with ordered bounded reads/shelve/switch outcomes, preserved pending policies, native cancellation/errors and retained earlier-effect uncertainty. Direct loaded status and strict full pending evidence replace selected unsafe owner/empty-recovery inference; full target qualifiers are preserved without guessed alias equivalence. Core rejection prevents compound continuation after unsuccessful switching.
-
-### Fixed
-
-- Reject every failed non-preflight core checkin so legacy closeout cannot report a successful checkin after native failure; registered native receipts remain unchanged.
-- Bound selected checkin/branch-create collector retirement even without terminal/pipe closure or successful kills: preserve TERM/KILL escalation with an additional same-grace drain, incomplete capture and truthful terminal/effect uncertainty, with state-free late-error guards.
-- Isolate rendering-test SDK configuration before transitive runtime imports and verify the actual local root/version in a fresh stale-override subprocess.
-
-- Server receipt evidence now shares one aggregate 100-reference budget across changesets/conflicts, with truthful omission counts and a semantic guard against separately valid over-budget collections. Mixed contradictory output remains uncertain; completed created identities stay intact.
-- Server-merge selected-tool parsing now preserves full @cloud/@unity qualifiers and genuine emitted server tails rather than moving repository text into branch names or rejecting qualified changeset records. Requested versus reported aliases remain separate and unverified.
-- Added a direct-core and registered-tool aggregate diff regression: individually complete Unicode excerpts exceed the UTF-8 envelope limit, so whole trailing outcomes are omitted without changing completed counts, retained identities or native success semantics.
-- Consolidated diff now fails closed on permission/I/O errors during deleted-file absence checks and nearest-workspace discovery. Only genuine missing paths allow synthetic deletion sides or continued discovery; observed unsupported/symlink workspace markers cannot select an enclosing workspace. Deterministic fault-injection regressions cover native failures, zero-dispatch discovery and retained partial workspace outcomes.
-
-### Added
-
-- Closed checkin and branch-create producer receipts, bringing selected output schemas to eleven without changing the 27-tool core registry plus loader. Checkin retains eligible compound recovery and honest earlier effects, never treating failed/empty recovery reads as successful completion; branch creation rejects ambiguous relative qualification, requires a directly observed loaded parent when omitted, and proves terminal completion only with null created identity.
-- Strict selected-tool bounded byte/UTF-8/lifecycle/source capture, schema narrowing, original Unicode/decimal identity regressions and file-loaded Pi 1.0.1 deterministic host coverage for native errors, command counts, selective consumers and policy/foreign hooks. No registered live or cross-platform acceptance claimed.
-
-- Closed producer-owned `plastic_mergeBranches` receipts for command-only preflight, completion, no-op, unsupported syntax, conflict and uncertain/nonstart failures; native structuredContent/isError, typed narrowing, bounded reference projection and capture/effect evidence shared with core presentation.
-- Selected server-merge strict byte/start/terminal/UTF-8/timeout/cancellation safeguards, no duplicate/version/postflight commands or retries, independent server alias facts, sanitized diagnostics and focused source/host/lifecycle regressions. Other mutation adapters and shared process collectors are unchanged.
-
-- Consolidated non-GUI `plastic_diff` with required file/revisions/workspace modes, closed input/output, qualified hash-verified loaded bases, bounded stable local snapshots and truthful partial workspace outcomes. Removed specialized diff registrations/core tools without aliases or stale-name redirects; raw GUI diff remains blocked. Text/JSON now present the unified observation without CLI-version decoration.
-
-- Reusable historical comparison observations with exact requested selectors, byte classification, explicit comparison basis and normalized bounded excerpt/count/completeness fields; unresolved identities remain null in consolidated revisions mode.
-- Diff-only selector/export, signal/timeout/capture/fatal-UTF-8/unified-output and cleanup safeguards; bounded retained file reads and surrogate-safe UTF-8-envelope projection, reused across consolidated modes without changing generic mutation/process primitives.
-- Historical source/transport/consumer regressions plus consolidated-mode coverage for loaded identities, Unicode controlled/local moves, controlled/local deletion, added-empty/private-binary files and bounded/partial workspace review; authorized sandbox probes restore original bytes, selector and clean status.
-
-- Code-review-find closed native/ids/error output with a single bounded UTF-8 numeric-ID source, exact decimal strings, query/projection counts and duplicate diagnostics. Preserves all filters, ordering, CLI limits/templates/aliases and native text/fenced JSON with existing version caching; no review mutation or metadata recovery.
-- Code-review schema/core/transport/ordering/precision regressions, file-loaded Pi host consumer checks and read-only live empty-query/native JSON acceptance. Populated live review IDs remain unverified; no reviews were created for fixtures.
-
-- Shelveset-list closed native/ids/error structured output with one explicit UTF-8 numeric-ID observation, exact decimal-string IDs and workspace-scoped unqualified selectors, bounded projection/counts/duplicate diagnostics, preserved native custom templates and independent text/JSON presentation. No metadata query or mutation.
-- Shelveset-list schema/core/transport regressions and real file-loaded Pi host consumers; read-only live empty-query acceptance. Populated live identities remain unverified because the sandbox has no shelvesets; no fixtures were created.
-
-- Workspace-list closed native/fields/error structured output with explicit ASCII-original-name/path configuration prerequisite and formatter-loss caveat, one supported template observation, bounded projection and observed-record accounting. Exact repeated records remain in order with full-response duplicate diagnostics; conflicting identities fail closed. Native custom templates and legacy text/JSON behavior remain intact.
-- Workspace-list strict raw capture, schema/core/transport/limits regression tests and deterministic real Pi host consumers; read-only live acceptance against independently known ASCII originals without runtime registry access.
-
-- Versioned structured `plastic_branchList` output with additive explicit UTF-8 `source="names"`, exact bounded unqualified identities, query-scoped counts and one-observation text/JSON presentation. Native/default table and legacy query behavior remain intact with explicitly unavailable normalized rows/counts.
-- Branch-list strict bounded raw capture, fatal UTF-8/identity/duplicate validation, default 100/max 500 projection, 4096-code-unit identity/query and 131072-byte compact DTO limits; names rejects unsupported hidden inclusion before execution, with no alternate-source fallback or repository-total inference.
-- Deterministic branch-list transport/schema/core tests, compile-time narrowing, real Pi host consumers and opt-in read-only registered-adapter Unicode acceptance against externally supplied owned synthetic fixtures.
-
-- Opt-in status `source="xml"`: strict bounded UTF-8 XML capture and parsing, absolute Unicode identities, verified ordinary/added/deleted/local-deleted/moved/private text-file and directory records, XML-specific v2 DTOs and one-snapshot synthesized presentation. Existing machine/standard v1 routes and mutation/branch consumers remain unchanged.
-- XML transport fails closed on malformed/unsupported records, DTD/entities, encoding disagreement, capture bounds, stderr, cancellation and command failure. Base revisions are explicitly unavailable; XML short/revision requests are rejected before execution. Literal U+FFFD is rejected by the strict parser-warning policy, not diagnosed as CLI decoding loss.
-- Status XML parser, transport, DTO, source-selection and real Pi host regression coverage; maintained MIT-licensed `@xmldom/xmldom` pinned to 0.9.12.
-- Versioned structured output for `plastic_currentBranch` and `plastic_branchExists`, with exact scoped branch identities, actual boolean existence, single-observation presentation, sanitized native failures, 4096-character identity and 16384-byte compact DTO bounds.
-- Deterministic branch-read contract/transport tests and real Pi host finalizer/codemode/nested-consumer coverage; qualified existence requests explicitly remain workspace-repository path comparisons, not requested-repository verification.
-- Status-only versioned structured output schema with machine/standard observations, parsed totals, independent read/capture/projection evidence, bounded identity projection, sanitized native errors and compact UTF-8 overflow rejection.
-- Deterministic status adapter/diagnostic tests and a standalone real Pi 0.99.2 file-loaded host test for finalization, codemode and nested consumers without network/provider charges.
+- Producer-owned structured output schemas for all 27 core tools, with explicit request snapshots, bounded observations, capture/read completeness, and uncertainty-aware mutation receipts. The on-demand capability loader remains schema-less.
+- Agent-driven server conflict resolution through `plastic_mergeBranches`: read-only conflict analysis, validated per-file JSON resolutions, explicit source/destination fallback policy for unlisted conflicts, and conditional installed-client capability checks.
+- Opt-in XML status with absolute Unicode paths and typed v2 results for supported text-file and directory records. XML capture and parsing reject malformed, unsupported, lossy, overflowing, or incomplete observations; base revisions remain unavailable.
+- Structured branch reads/listing, workspace listing, shelveset listing, and code-review queries, including bounded identities, exact decimal IDs, query-scoped counts, and documented source prerequisites.
+- Typed workspace merge and merge-to-branch closeout stage receipts, including narrow Windows copied-add admission, independently checked readiness, and actionable evidence gates for unsupported merge profiles.
+- A task-oriented installed manual, concise README, tool/task navigation, progressive skill references, and deterministic documentation/link/packing checks.
 
 ### Changed
 
-- Align exact Pi SDK/tui development pins, lockfile, host/rendering tests and eval runtime baseline with latest stable Pi1.0.2 patch and TypeBox1.3.27 resolution; no package release/version or global installation change.
-- Modularize execution, domain, operations, text diff, presentation and Pi adapters behind the existing explicit core export facade and canonical-root entry wiring; preserve tool behavior, loading, rendering and exposure.
-- Add a typed internal status observation seam and shared single-observation presentation, preserving core string results and renderers; add deterministic runtime import-layer/cycle, shared-owner and registry-parity regression checks.
+- **Breaking:** replace `plastic_diffFile`, `plastic_diffRevisions`, and `plastic_workspaceDiff` registrations with `plastic_diff` and explicit `file`, `revisions`, or `workspace` modes. The old tool names have no aliases or redirects. Pending review requires selected paths or explicit `allPending=true`; raw GUI diff remains blocked.
+- Consolidated diffs use qualified, hash-verified loaded bases, bounded stable local snapshots, explicit binary/unavailable results, and truthful partial workspace outcomes.
+- Mutation receipts distinguish command completion, emitted identity, observed state, partial effects, and unverified outcomes. Failed core operations reject so compound callers cannot proceed from success-looking presentation text; uncertainty never authorizes blind retries or rollback.
+- Review-patch receipts expose selector/backend fidelity, bounded hash/byte/excerpt observations, atomic no-overwrite publication, and owned cleanup/retention without applying patches.
+- Admit bounded multiline checkin and closeout comments while retaining strict validation of paths, selectors, identities, and other control characters.
+- Align active development, deterministic host/rendering checks, and tool-loading evals with stable Pi 1.1.0; host framework packages remain peers.
+- Modularize execution, domain, operations, presentation, and Pi adapters while preserving canonical-root loading and core export ownership.
+- Keep tests, evals, and contributor tooling repository-only while packaging the consumer manual and required runtime resources.
+- Remove the post-publish registry-visibility gate while retaining fail-closed version/commit reconciliation before publishing.
 
 ### Fixed
 
-- Fail branch reads closed on malformed/ambiguous/lossy identities, partial query rows, successful stderr uncertainty and failed/aborted/truncated captures; preserve mutation resolver behavior and do not retry failed resolution commands.
-- Preserve split UTF-8 subprocess sequences across capture chunks and flush incomplete sequences at stream end while retaining character limits and lifecycle behavior.
-- Exclude Windows status path/source identities containing pre-decoding `?` substitutions and report incomplete reads, without changing POSIX question-mark filenames or legacy checkin/diff selection. Non-UTF-8 Windows cm machine output remains unsupported; no encoding fallback is added.
-- Remove the post-publish registry visibility gate while preserving fail-closed identity reconciliation before publishing.
+- Accept observed checked-out `CO` pending records with unavailable (`-1`) revisions, preserving selected paths so unrelated excluded checkouts do not block checkins.
+- Resolve closeout parents through bounded installed-client leaf-name queries with emitted full-name/direct-parent validation; preserve repository/server qualifiers and stop on ambiguous or failed observations.
+- Read the explicit loaded-branch status header independently of pending merge-link changeset references; reject malformed, ambiguous, lossy, or incomplete branch observations without guessing alternate identities.
+- Stop compound merge/checkin continuation after failed switches, updates, readiness reads, or checkins, and retain observed created identities and earlier-effect uncertainty across later failures.
+- Bound selected command collectors even when terminal or pipe closure never arrives, preserving escalation, listener cleanup, incomplete-capture facts, and no-retry behavior.
+- Preserve split UTF-8 sequences across subprocess chunks; reject unsupported Windows pre-decoding path substitutions without adding an encoding fallback.
+- Fail consolidated diffs closed on permission/I/O errors and unsupported workspace markers, and enforce aggregate UTF-8 response bounds without changing retained identities or completed counts.
+- Preserve full cloud/server qualifiers and exact large decimal identities in server merge results; enforce one aggregate reference budget and retain contradictory-output uncertainty.
+- Separate XML unsupported profiles, malformed contract data, and observation overflow without exposing source values.
+- Isolate SDK rendering-test configuration before runtime imports and validate canonical package ownership in deterministic host tests.
 
 ## [0.7.6] - 2026-09-29
 

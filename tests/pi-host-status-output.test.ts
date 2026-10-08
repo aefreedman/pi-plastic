@@ -39,8 +39,8 @@ process.env.PI_PACKAGE_DIR = localPackageDir;
 const { createAgentSessionServices, createAgentSessionFromServices, createCodemodeExtension, ModelRuntime, SessionManager, SettingsManager } = await import(sdkUrl);
 const runtimeConfig = await import(new URL("./config.js",sdkUrl).href);
 assert.equal(resolve(runtimeConfig.getPackageDir()),resolve(localPackageDir));
-assert.equal(runtimeConfig.VERSION,"1.0.2");
-assert.equal(execFileSync(process.execPath,[fileURLToPath(new URL("./cli.js",sdkUrl)),"--version"],{env:{...process.env,PI_PACKAGE_DIR:localPackageDir},encoding:"utf8"}).trim(),"1.0.2");
+assert.equal(runtimeConfig.VERSION,"1.1.0");
+assert.equal(execFileSync(process.execPath,[fileURLToPath(new URL("./cli.js",sdkUrl)),"--version"],{env:{...process.env,PI_PACKAGE_DIR:localPackageDir},encoding:"utf8"}).trim(),"1.1.0");
 const aiUrl = (() => { try { return import.meta.resolve("@earendil-works/pi-ai"); } catch { return new URL("../node_modules/@earendil-works/pi-ai/dist/index.js", sdkUrl).href; } })();
 const ai = await import(aiUrl);
 const extensionPath = fileURLToPath(new URL("../index.ts", import.meta.url));
@@ -568,7 +568,7 @@ await writeFile(modifierPath, `export default function(pi) {
   // Selected mutation receipts use the file-loaded adapter/finalizer, not direct executors.
   const runtimeVersion = JSON.parse(await readFile(new URL("../package.json", sdkUrl), "utf8")).version;
   const tuiVersion = JSON.parse(await readFile(new URL("../package.json", import.meta.resolve("@earendil-works/pi-tui")), "utf8")).version;
-  assert.equal(runtimeVersion, "1.0.2"); assert.equal(tuiVersion, "1.0.2");
+  assert.equal(runtimeVersion, "1.1.0"); assert.equal(tuiVersion, "1.1.0");
   const receiptRun = (scenario: string, name: string, args: Record<string, unknown>, mode = "completed", parent = "loaded") => run(scenario, name, args, JSON.stringify({kind:"receipts",mode,parent}));
   const checkinRequest = {message:"Fixture résumé é 日本語 😀",paths:["résumé-é-日本-😀.txt"]};
   const branchRequest = {branch:"br:/main/task-é-é-日本-😀@Example Repository@example@unity",comment:"Fixture branch"};

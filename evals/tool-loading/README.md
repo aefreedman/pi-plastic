@@ -1,6 +1,6 @@
 # Dynamic tool-loading behavioral eval
 
-This package-local eval compares `all-active`, `balanced`, and `loader-only` Plastic tool-loading modes through fresh Pi 1.0.2 JSON subprocesses. It is intentionally **not** a skill eval: skills, prompt templates, built-in tools, discovered extensions, context files, and sessions are disabled.
+This package-local eval compares `all-active`, `balanced`, and `loader-only` Plastic tool-loading modes through fresh Pi 1.1.0 JSON subprocesses. It is intentionally **not** a skill eval: skills, prompt templates, built-in tools, discovered extensions, context files, and sessions are disabled.
 
 The runner pins the canonical local SDK package root for each subprocess and checks the actual local CLI version, so inherited `PI_PACKAGE_DIR` cannot select global package metadata/assets. Dry runs also perform this local version-only attestation; they do not call a provider or Plastic.
 

@@ -11,7 +11,7 @@ const previousPackageDir = process.env.PI_PACKAGE_DIR;
 process.env.PI_PACKAGE_DIR = fileURLToPath(new URL("../",sdkUrl));
 const { initTheme } = await import(sdkUrl);
 const config = await import(new URL("./config.js",sdkUrl).href);
-assert.equal(config.VERSION,"1.0.2");
+assert.equal(config.VERSION,"1.1.0");
 assert.equal(resolve(config.getPackageDir()),resolve(fileURLToPath(new URL("../",sdkUrl))));
 const { default: registerPlastic } = await import("../index");
 const { renderPlasticCall, renderPlasticResult, renderPlasticSearchResult } = await import("../src/plastic-renderers");

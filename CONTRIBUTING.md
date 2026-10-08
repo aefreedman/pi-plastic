@@ -7,7 +7,7 @@ Thanks for improving Pi Plastic.
 - Node.js 22.19.0 or newer
 - npm
 - Plastic SCM / Unity Version Control CLI for opt-in live validation
-- Git for the text-only diff tools
+- A compatible non-GUI `diff` executable for text-only comparisons (see the README setup guide)
 
 ## Setup
 

@@ -16,15 +16,15 @@ try {
 const inherited = process.env.PI_PACKAGE_DIR;
 await import(${JSON.stringify(new URL("./plastic-tool-rendering.test.ts",import.meta.url).href)});
 const config = await import(${JSON.stringify(new URL("./config.js",sdkUrl).href)});
-assert.equal(config.VERSION,'1.0.2','SDK must have evaluated only after canonical root pin');
+assert.equal(config.VERSION,'1.1.0','SDK must have evaluated only after canonical root pin');
 assert.equal(process.env.PI_PACKAGE_DIR,inherited,'Owned override must be restored');
 assert.equal(process.env.PI_RENDERING_UNRELATED_SENTINEL,'preserved');
-console.log('PASS: fresh stale override imports canonical SDK VERSION1.0.2 and restores owned environment');`);
+console.log('PASS: fresh stale override imports canonical SDK VERSION1.1.0 and restores owned environment');`);
   const result = spawnSync(process.execPath,[fileURLToPath(new URL("../node_modules/tsx/dist/cli.mjs",import.meta.url)),script],{
     encoding:"utf8",timeout:30000,
     env:{...process.env,PI_PACKAGE_DIR:oldRoot,PI_RENDERING_UNRELATED_SENTINEL:"preserved"},
   });
   assert.equal(result.error,undefined);assert.equal(result.status,0,result.stdout+result.stderr);
-  assert.match(result.stdout,/fresh stale override imports canonical SDK VERSION1.0.2/);
+  assert.match(result.stdout,/fresh stale override imports canonical SDK VERSION1.1.0/);
   console.log(result.stdout.trim());
 } finally { rmSync(fixture,{recursive:true,force:true}); }

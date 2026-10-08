@@ -16,7 +16,7 @@ npm pack --dry-run
 
 Run commands from the manifest root. `npm test` starts with `npm run typecheck`: strict no-emit coverage includes index/src/extensions and compile-only schema-inference contracts. Runtime tests/evals use tsx.
 
-The current pinned development/eval SDK and TUI baseline is **1.0.2**, as declared in package.json; older Pi releases are not a supported matrix. Historical fixture/evidence version strings are not alternate runtime targets. Host-provided framework packages remain peers, not bundled runtime dependencies.
+The current pinned development/eval SDK and TUI baseline is **1.1.0**, as declared in package.json; older Pi releases are not a supported matrix. Historical fixture/evidence version strings are not alternate runtime targets. Host-provided framework packages remain peers, not bundled runtime dependencies.
 
 Default tests are credential-free. They cover schemas/semantic guards, registration/loading, aliases, paths/snapshots, lifecycles/retirement, rendering, Bash guards, documentation/navigation, ownership and constrained-sampling classification. The SDK-host harness uses real file loading/finalization/direct/codemode/nested consumers and JSON execution events, with a deterministic local provider and synthetic CLI—no network/backend-effect acceptance.
 
@@ -78,7 +78,7 @@ For behavior changes, report the narrow actual live test and resulting-state/cle
 
 ## Tool-loading eval
 
-The package-owned behavioral eval is not a skill eval. Fresh SDK 1.0.2 JSON subprocesses compare all-active/balanced/loader-only mode, smallest-sufficient activations and sanitized provider-schema measurements.
+The package-owned behavioral eval is not a skill eval. Fresh SDK 1.1.0 JSON subprocesses compare all-active/balanced/loader-only mode, smallest-sufficient activations and sanitized provider-schema measurements.
 
 Dry-run validates configuration without live provider trials. Actual trials require an explicitly attested dedicated Plastic sandbox and an approved model. Destructive calls are blocked unless supported preflight previews; raw payload captures are deleted by default.
 
