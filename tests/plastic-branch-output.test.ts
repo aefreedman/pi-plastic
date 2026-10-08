@@ -47,6 +47,29 @@ for (const [replies, basis, count] of [
   const result = await invoke("currentBranch", [...replies], {});
   assert.equal(result.structuredContent.data.basis, basis); assert.equal(calls.length, count);
 }
+// Synthetic standard status: merge-link changesets are not loaded identities.
+const pendingLinks = "Pending merge links\r\n    Merge from cs:27 at /main/source@repo@server\r\n    Merge from cs:28 at /main/other-source@repo@server\r\n";
+const loadedWithLinks = `/main/target@repo@server (cs:16 - head)\r\n\r\n${pendingLinks}`;
+const pendingBranch = await invoke("currentBranch", [{ output: loadedWithLinks }]);
+assert.equal(pendingBranch.structuredContent.data.branch, "/main/target");
+assert.equal(pendingBranch.structuredContent.data.basis, "status");
+assert.deepEqual(calls, [["status"]]);
+for (const output of [
+  loadedWithLinks + "/main/other@repo@server (cs:16 - head)\r\n",
+  loadedWithLinks.replace("cs:16 - head", "cs:16junk - head"),
+]) {
+  const result = await invoke("currentBranch", [{ output }]);
+  assert.equal(result.structuredContent.error.code, "malformed_output");
+  assert.deepEqual(calls, [["status"]]);
+}
+const linksWithoutHeader = await invoke("currentBranch", [{ output: "no branch" }, { output: `cs:16@rep:repo@server\r\n${pendingLinks}` }]);
+assert.equal(linksWithoutHeader.structuredContent.error.code, "malformed_output");
+assert.deepEqual(calls, [["status"], ["status", "--compact"]]);
+for (const options of [{ outputLimitChars: loadedWithLinks.length - 1 }, { timeoutMs: 0 }]) {
+  const result = await invoke("currentBranch", [{ output: loadedWithLinks, bytes: true }], {}, options);
+  assert.equal(result.structuredContent.error.code, "capture_incomplete");
+  assert.deepEqual(calls, [["status"]]);
+}
 // Every offending status source is terminal: no compact retry or lookup may
 // ignore embedded selectors, malformed tokens, or additional changesets.
 for (const output of [
