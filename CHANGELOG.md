@@ -10,6 +10,7 @@ and this project follows semantic versioning for public package releases.
 - Admit bounded CR/LF multiline checkin and closeout comments without rewriting explicit comments; retain strict path, workdir, selector, identity and other control-character admission.
 - Read the explicit loaded-branch status header independently of pending merge-link changeset references. Preserve ambiguous header/compact fallback rejection and complete-capture gates, with deterministic branch-read regressions.
 - Categorize rejected XML status observations as unsupported record profiles, malformed contract data, or bounded observation overflow without exposing source values. Preserve fail-closed binary/richer-profile admission and distinguish complete byte capture from incomplete reads and internal DTO failures.
+- Make unsupported merge readiness actionable by identifying applying, pending/path-cardinality and full-status evidence gates without implying rollback or retry. Add a sanitized six-copy asset/sidecar DO_COPIED/ADD/CP regression through workspace merge and typed closeout; retain narrow copied-add admission and unresolved historical producer/load uncertainty.
 
 - Replace the oversized README with a concise landing page and packaged, task-oriented documentation. Add task/tool navigation, progressive skill links, current schema/runtime wording, readability tables, and deterministic documentation/link/packing checks without changing tool behavior.
 
