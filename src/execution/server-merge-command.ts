@@ -76,9 +76,9 @@ export async function captureServerMergeCommand(args: string[], timeoutMs: numbe
             result.stdout = new TextDecoder("utf-8", { fatal: true }).decode(stdout);
             result.stderr = new TextDecoder("utf-8", { fatal: true }).decode(stderr);
             capture.validUtf8 = true;
-            // Help retains the legacy decoded-text gate. Merge evidence is bounded
-            // by source bytes, not a lossy/Unicode-dependent character estimate.
-            if (timeoutMs === 3000 && (result.stdout.length > 16384 || result.stderr.length > 16384)) { result.failed = true; }
+            // Updated CM help includes the resolution-file contract (~19 KiB).
+            // Keep a bounded 32 KiB decoded help gate; merge evidence uses source bytes.
+            if (timeoutMs === 3000 && (result.stdout.length > 32768 || result.stderr.length > 16384)) { result.failed = true; }
         } catch { result.stdout = null; result.stderr = null; }
         if (signal?.aborted) attempt.aborted = true;
         capture.complete = !failed && !result.failed && !attempt.aborted && !attempt.timedOut && capture.validUtf8 && !capture.truncated && attempt.terminal === "observed";

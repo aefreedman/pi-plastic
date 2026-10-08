@@ -21,6 +21,10 @@ Plastic does not perform a Git-style fast-forward. It applies the merge into the
 - Only then create the merge checkin.
 - Verify the merge checkin was created on the target branch. If the workspace or changeset is on the source branch, stop: do not switch to the target and claim completion. Inspect target history and rerun the merge while the target is actually loaded.
 
+## Server-side File Conflict Resolution
+
+Use `plastic_mergeBranches(mode="analyze", source="<qualified-source>", target="<qualified-target>")` for read-only conflict discovery, not `preflight`. Then independently inspect contributors, produce merged files, validate them, and submit a reviewed absolute `fileConflictsResolutionsFile` with a nonempty message. Follow the [full workflow and safety boundaries](../../../docs/2026-10-06-merging.md#agent-conflict-resolution-workflow). Exact destination conflict paths are JSON keys, not local workspace paths. Never guess the roles/repository of numeric FILE_CONFLICT fields, export over workspace files, automatically discard unlisted conflicts, or retry uncertain applying results. Keep all inputs immutable through completion; directory conflicts and shelve modes remain separate.
+
 ## Review Workflow
 
 - Create or reuse review workspace.

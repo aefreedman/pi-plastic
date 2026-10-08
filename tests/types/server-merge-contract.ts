@@ -11,7 +11,7 @@ function narrow(dto: Static<typeof serverMergeOutputSchema>): string | null {
         return id + server + effect;
     }
     if (!dto.ok) { const error: string = dto.error.code; return error; }
-    if (dto.outcome === "preflight") {
+    if (dto.outcome === "preflight" || dto.outcome === "analyzed") {
         const effect: "not-attempted" = dto.data.effect;
         // @ts-expect-error preflight has no created changeset
         dto.data.createdChangeset.id;

@@ -7,6 +7,8 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+- Extend `plastic_mergeBranches` with read-only server conflict analysis and validated per-file JSON resolution submission using `--fileconflictsresolutionsfile`; support explicit source/destination policy for unlisted conflicts, conditional CLI capability checks with an expanded bounded help gate for the updated CLI, local input summaries/hashes, and a documented inspect/resolve/validate/submit workflow. Retain noninteractive dispatch, no retries, command-only preflight and unverified Xlink/link effects; no version bump.
+
 - Admit bounded CR/LF multiline checkin and closeout comments without rewriting explicit comments; retain strict path, workdir, selector, identity and other control-character admission.
 - Read the explicit loaded-branch status header independently of pending merge-link changeset references. Preserve ambiguous header/compact fallback rejection and complete-capture gates, with deterministic branch-read regressions.
 - Categorize rejected XML status observations as unsupported record profiles, malformed contract data, or bounded observation overflow without exposing source values. Preserve fail-closed binary/richer-profile admission and distinguish complete byte capture from incomplete reads and internal DTO failures.

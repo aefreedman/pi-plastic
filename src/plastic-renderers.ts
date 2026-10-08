@@ -192,7 +192,10 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
     }
   } else if (name === "mergeBranches" && typeof envelope.outcome === "string") {
     summary.label = `Server merge: ${envelope.outcome}`;
-    summary.tone = envelope.ok === false ? "error" : envelope.outcome === "completed" ? "success" : "warning";
+    summary.tone = envelope.ok === false ? "error" : envelope.outcome === "completed" || envelope.outcome === "analyzed" ? "success" : "warning";
+    if (data.mode === "analyze") notices.unshift("Read-only analysis; no applying merge requested.");
+    summary.rows = Array.isArray(data.conflictPaths) ? data.conflictPaths.map(path => scalar(path)) : [];
+    if (count(record(data.counts).conflictsOmitted)) notices.unshift(`${count(record(data.counts).conflictsOmitted)} conflicts omitted.`);
     const changeset = scalar(record(data.createdChangeset).id);
     if (changeset) summary.label += `${separator}cs:${changeset}`;
     if (data.mergeLinkIdentity === "unverified" || data.xlinkEffects === "unverified") notices.push("Merge-link identity and Xlink effects remain unverified.");

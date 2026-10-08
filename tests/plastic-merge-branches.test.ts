@@ -57,7 +57,7 @@ async function runScenario(response: (args: string[]) => Response, clock?: Pick<
 const registered = await loadRegisteredTools();
 const publicTool = registered.get("plastic_mergeBranches");
 assert.ok(publicTool, "plastic_mergeBranches must be registered through the native extension path");
-assert.deepEqual(Object.keys((publicTool.parameters as any).properties).sort(), ["format", "message", "preflight", "source", "target"], "workspace-free merge must not expose a workdir identity/default");
+assert.deepEqual(Object.keys((publicTool.parameters as any).properties).sort(), ["fileConflictsResolutionsFile", "format", "message", "mode", "preflight", "source", "target", "unlistedConflictPolicy"], "workspace-free merge must not expose a workdir identity/default");
 for (const format of ["text", "json"] as const) {
   const preflightCalls: SpawnCall[] = [];
   const publicPreflight = await runWithAbortSignal(undefined, () => publicTool.execute("test", { source, target, message, preflight: true, format }, undefined, undefined, { cwd: "C:/unrelated" }), { spawn: createSpawn([], preflightCalls) });

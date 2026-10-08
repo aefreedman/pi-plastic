@@ -65,7 +65,7 @@ export const toStructuredResult = async (
 
 export const formatServerMergeResult = async (
     format: OutputFormat,
-    outcome: "preflight" | "completed" | "no-op" | "conflict" | "uncertain" | "unsupported" | "failed",
+    outcome: "preflight" | "analyzed" | "completed" | "no-op" | "conflict" | "uncertain" | "unsupported" | "failed",
     text: string,
     data: Record<string, unknown>,
 ): Promise<string> =>

@@ -689,13 +689,12 @@
   {
     "name": "plastic_mergeBranches",
     "label": "plastic_mergeBranches",
-    "description": "One bounded workspace-free server merge receipt; server aliases, merge links and Xlink effects remain unverified.",
+    "description": "Inspect server merge conflicts with mode=analyze, then apply reviewed per-file JSON resolutions without a workspace or UI. Server aliases, merge links and Xlink effects remain unverified.",
     "parameters": {
       "type": "object",
       "required": [
         "source",
-        "target",
-        "message"
+        "target"
       ],
       "properties": {
         "source": {
@@ -710,8 +709,27 @@
         },
         "message": {
           "type": "string",
-          "description": "Required bounded nonempty comment; no editor fallback.",
+          "description": "Required for apply; omit in analyze mode. Bounded nonempty comment, no editor fallback.",
           "minimum": 1
+        },
+        "mode": {
+          "anyOf": [
+            { "type": "string", "const": "apply" },
+            { "type": "string", "const": "analyze" }
+          ],
+          "description": "Default apply creates a merge changeset. Analyze performs read-only remote conflict discovery without --merge; not command-only preflight."
+        },
+        "fileConflictsResolutionsFile": {
+          "type": "string",
+          "description": "Apply only: absolute existing UTF-8 JSON file with resolutions entries (exact conflict path plus keep or absolute readable resultFile). Inputs must remain immutable until completion.",
+          "minimum": 1
+        },
+        "unlistedConflictPolicy": {
+          "anyOf": [
+            { "type": "string", "const": "source" },
+            { "type": "string", "const": "destination" }
+          ],
+          "description": "Apply only: explicitly keep this contributor for conflicts absent from the JSON. Omit to retain noninteractive default behavior; never selected automatically."
         },
         "preflight": {
           "type": "boolean",
