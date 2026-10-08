@@ -7,6 +7,8 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+- Admit the observed checked-out `CO` pending-record shape with an unavailable (`-1`) revision in checkin snapshots for any path. Preserve requested path selection so unrelated excluded checkouts no longer block checkins; retain fail-closed metadata validation and add selected/excluded checkout regressions.
+
 - Extend `plastic_mergeBranches` with read-only server conflict analysis and validated per-file JSON resolution submission using `--fileconflictsresolutionsfile`; support explicit source/destination policy for unlisted conflicts, conditional CLI capability checks with an expanded bounded help gate for the updated CLI, local input summaries/hashes, and a documented inspect/resolve/validate/submit workflow. Retain noninteractive dispatch, no retries, command-only preflight and unverified Xlink/link effects; no version bump.
 
 - Admit bounded CR/LF multiline checkin and closeout comments without rewriting explicit comments; retain strict path, workdir, selector, identity and other control-character admission.

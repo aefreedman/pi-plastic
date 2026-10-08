@@ -13,6 +13,7 @@ import { parseCheckinEvidence, parseCheckinPending, parseCheckinChangeset, check
 const us = "\x1f", cwd = "C:\\Example\\workspace", name = "résumé-é-日本-😀.txt", path = cwd + "\\" + name;
 const header = ["STATUS", "9007199254740993", "Example Repository", "example@unity"].join(us) + "\r\n";
 const row = (code = "CH", file = path) => [code, file, "False", code === "PR" || code === "AD" ? "-1" : "9007199254740995", "NO_MERGES"].join(us) + "\r\n";
+const checkedOutRow = (file = path) => ["CO", file, "False", "-1", "NO_MERGES"].join(us) + "\r\n";
 const payload = "cs:9007199254740997@br:/main/café-é-日本-😀@Example Repository@example@unity (mount:'/')";
 const input = { message: "Fixture résumé é 日本語 😀", workdir: cwd, paths: [name] };
 type Scenario = { mode?: string; native?: string; private?: boolean; recoveryFail?: boolean; afterFail?: boolean; addFail?: boolean; retryFail?: boolean; fallback?: boolean; pending?: string; preabort?: boolean; launch?: "sync" | "async"; lateError?: boolean; decoded?: boolean; abort?: boolean; timeout?: boolean; ignoreTerm?: boolean; code?: number | null; signal?: string; stderr?: string; scopeMany?: boolean; noSpawn?: boolean; streamError?: boolean; payload?: string };
@@ -110,6 +111,37 @@ for (const args of [{ ...input, message: "x".repeat(4097) }, { ...input, message
 for (const pending of ["", "UNKNOWN", row(), row("CO"), row("CH").replace("NO_MERGES", "other"), row("CH").replace(path, path + "?"), row("CH").replace(path, path + "\uFFFD"), row("CH").replace("9007199254740995", "1.5"), row("CH").replace("False", "False\x1fEXTRA")]) { r = await invoke({ pending: pending === "" ? "" : pending }); if (pending === "") assert.equal(r.dto.error.code, "NO_PENDING_PATHS"); else if (pending === row()) assert(r.dto.ok); else assert.equal(r.dto.outcome, "unsupported"); }
 for (const s of [{ mode: "empty" }, { mode: "bom" }, { noSpawn: true }, { streamError: true }, { mode: "unknown" }, { mode: "extra" }, { mode: "duplicate" }, { mode: "mount" }, { mode: "repository" }, { mode: "bare" }, { mode: "tail" }, { mode: "overflow" }, { mode: "stderrOverflow" }, { mode: "records" }, { mode: "invalidUtf8" }, { code: null }, { signal: "SIGTERM" }, { lateError: true }, { decoded: true }, { abort: true }, { timeout: true }, { timeout: true, ignoreTerm: true }, { stderr: "PRIVATE_PATH diagnostic" }, { code: 1 }] as Scenario[]) { r = await invoke(s); assert.equal(r.dto.outcome, "uncertain"); assert.equal(r.calls.filter(c => c[0] === "checkin").length, 1); assert.equal(r.dto.data.createdChangeset, null); }
 for (const launch of ["sync", "async"] as const) { r = await invoke({ launch }); assert.equal(r.dto.data.effect, "not-attempted"); assert.equal(r.dto.data.steps[1].attempt.state, "not-started"); }
+// General CO admission: unrelated checkouts must not block a selected CH path,
+// and selected checkouts must retain their requested scope without invented bases.
+const unrelatedCheckout = cwd + "\\unrelated-checked-out.txt";
+const mixedPending = row() + checkedOutRow(unrelatedCheckout);
+const mixedParsed = parseCheckinPending(header + mixedPending, cwd);
+assert(mixedParsed.admitted);
+assert.equal(mixedParsed.items[1].kind, "changed");
+assert.equal(mixedParsed.items[1].revisionId, undefined);
+for (const tool of [undefined, registered]) {
+    r = await invoke({ pending: mixedPending }, input, false, tool);
+    assert(r.dto.ok);
+    assert.equal(r.dto.data.pendingBefore.changed, 2);
+    assert.deepEqual(r.dto.data.includedPaths, [name]);
+    assert(!r.calls.find(c => c[0] === "checkin")!.some(a => a.includes("unrelated-checked-out")));
+    r = await invoke({ pending: checkedOutRow() }, input, false, tool);
+    assert(r.dto.ok);
+    assert.deepEqual(r.dto.data.includedPaths, [name]);
+    assert.deepEqual(r.calls.map(c => c[0]), ["status", "checkin", "status"]);
+}
+for (const invalid of [
+    checkedOutRow().replace("-1", "0"), checkedOutRow().replace("-1", "42"),
+    checkedOutRow().replace("-1", "-2"), checkedOutRow().replace("NO_MERGES", "MERGE"),
+    checkedOutRow().replace("False", "unknown"), checkedOutRow().replace(path, "relative.txt"),
+    checkedOutRow().replace(path, path + "?"), checkedOutRow().replace(path, path + "\uFFFD"),
+    checkedOutRow().replace("NO_MERGES", "NO_MERGES" + us + "extra"),
+]) {
+    r = await invoke({ pending: row() + invalid });
+    assert.equal(r.dto.outcome, "unsupported");
+    assert.equal(r.dto.error.code, "pending_source_unadmitted");
+    assert.deepEqual(r.calls.map(c => c[0]), ["status"]);
+}
 r = await invoke({ preabort: true }); assert.equal(r.calls.length, 0); assert.equal(r.dto.outcome, "unsupported");
 r = await invoke({ private: true, native: "There are no changes in the workspace" }); assert(r.dto.ok); assert.deepEqual(r.calls.map(c => c[0]), ["status", "checkin", "add", "checkin", "status"]); assert.equal(r.dto.data.steps[2].effect, "command-completed"); assert.equal(r.dto.data.usedPrivateAutoAddRecovery, true);
 r = await invoke({ private: true, native: "No changes in the workspace", retryFail: true }); assert.equal(r.dto.outcome, "uncertain"); assert.equal(r.dto.data.steps[2].effect, "command-completed"); assert.equal(r.dto.data.effect, "uncertain");

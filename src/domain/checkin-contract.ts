@@ -59,9 +59,10 @@ export function parseCheckinPending(text: string, cwd: string) {
     for (const line of lines.slice(1)) {
         const f = line.split("\x1f");
         // Exact observed shapes only; unfamiliar status/metadata fails closed.
+        // CO uses -1 (no reusable revision identity), even for unselected paths.
         if (f[0] === "MV") {
             if (f.length !== 7 || f[1] !== "100%" || !absolute(f[2]) || !absolute(f[3]) || f[4] !== "False" || !checkinDecimal.test(f[5]) || f[5] === "0" || f[6] !== "NO_MERGES") admitted = false;
-        } else if (f.length !== 5 || !/^(PR|AD|CH|LD)$/.test(f[0]) || !absolute(f[1]) || !/^(True|False)$/.test(f[2]) || !(/^(PR|AD)$/.test(f[0]) ? f[3] === "-1" : checkinDecimal.test(f[3]) && f[3] !== "0") || f[4] !== "NO_MERGES") admitted = false;
+        } else if (f.length !== 5 || !/^(PR|AD|CO|CH|LD)$/.test(f[0]) || !absolute(f[1]) || !/^(True|False)$/.test(f[2]) || !(/^(PR|AD|CO)$/.test(f[0]) ? f[3] === "-1" : checkinDecimal.test(f[3]) && f[3] !== "0") || f[4] !== "NO_MERGES") admitted = false;
     }
     const items: PendingItem[] = admitted ? parseMachineReadablePendingItems(text, cwd) : [];
     if (admitted && items.length !== lines.length - 1) admitted = false;
