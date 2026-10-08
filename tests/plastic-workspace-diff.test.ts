@@ -15,7 +15,9 @@ import { parseLoadedFileInfo, parseLoadedLs } from "../src/domain/diff-base-xml"
 import { parseDiffPending } from "../src/domain/diff-pending-xml";
 import { loadRegisteredTools } from "./pi-tool-harness";
 
-const root=await mkdtemp(join(tmpdir(),"pi-consolidated-fixture-"));
+// Hosted Windows TEMP may be a junction: synthetic source paths must share
+// the physical workspace namespace used by the containment contract.
+const root=await fs.realpath(await mkdtemp(join(tmpdir(),"pi-consolidated-fixture-")));
 const esc=(x:string)=>x.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
 const file=join(root,"Tracked 日本-é-😀.txt"), original=Buffer.from("base\n");
 const hash=createHash("md5").update(original).digest("base64");

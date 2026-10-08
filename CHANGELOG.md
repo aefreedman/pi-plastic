@@ -32,6 +32,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Fixed
 
+- Correct cross-platform deterministic tests to assert Windows-only source rejection on other platforms and use physical workspace fixture paths when the temporary root is a junction.
 - Accept observed checked-out `CO` pending records with unavailable (`-1`) revisions, preserving selected paths so unrelated excluded checkouts do not block checkins.
 - Resolve closeout parents through bounded installed-client leaf-name queries with emitted full-name/direct-parent validation; preserve repository/server qualifiers and stop on ambiguous or failed observations.
 - Read the explicit loaded-branch status header independently of pending merge-link changeset references; reject malformed, ambiguous, lossy, or incomplete branch observations without guessing alternate identities.
