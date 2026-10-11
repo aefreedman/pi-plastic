@@ -1,6 +1,6 @@
 import { Type, type Static, type TSchema } from "typebox";
 import { Check } from "typebox/value";
-import { assembleStatusObservation, presentStatusObservation, type StatusObservationOptions, type StatusObservation, StatusOptionError, StatusXmlError } from "../operations/status";
+import { assembleStatusObservation, type StatusObservationOptions, type StatusObservation, StatusOptionError, StatusXmlError } from "../operations/status";
 import { StatusCommandError } from "../execution/status-command";
 
 export const STATUS_OUTPUT_MAX_BYTES = 131072;
@@ -130,19 +130,74 @@ export function projectStatusOutput(observation: StatusObservation, maxItems = 1
     });
 }
 
+// Presentation ceilings, independent of native DTO and transport/domain limits.
+export const STATUS_PRESENTATION_MAX_BYTES = 32768;
+export const STATUS_RAW_PRESENTATION_MAX_BYTES = 8192;
+const safeLine = (line: string) => !line.includes("�") && !(process.platform === "win32" && line.includes("?")) && !/[\u0000-\u0008\u000b\u000c\u000e-\u001e]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(line);
+const lines = (text: string) => text.split(/\r?\n/).filter(line => line.trim().length > 0);
+
+/** Render native admitted rows, not legacy raw presentation. No command/version lookup. */
+function presentStatusOutput(observation: StatusObservation, dto: Extract<StatusOutput, { ok: true }>, args: { format?: "text" | "json"; maxItems?: number; includeRaw?: boolean }): string {
+    const standardLines = observation.kind === "standard" ? lines(observation.output) : [];
+    const admittedLines = standardLines.filter(line => line.length <= 4096 && safeLine(line));
+    const selectedLines = admittedLines.slice(0, args.maxItems ?? 100);
+    const selectedItems = dto.data.mode === "standard" ? [] : [...dto.data.items];
+    const rawSource = observation.kind === "xml" ? "status_xml (utf-8)" : observation.kind === "machine" ? "status --machinereadable" : "status text";
+    const rawWarning = observation.kind === "xml" ? "Raw XML contains private workspace/repository/server metadata." : "Raw status contains private workspace/repository/server metadata.";
+    // A diagnostic must not resurrect machine identities withheld by native admission.
+    const rawWithheld = observation.kind === "machine" && (dto.completeness.read !== "complete" || !dto.completeness.projection);
+    const rawLines = args.includeRaw && !rawWithheld ? lines(observation.output) : [];
+    const selectedRaw: string[] = [];
+    let rawBytes = 0;
+    for (const line of rawLines) {
+        const bytes = Buffer.byteLength(line, "utf8") + (selectedRaw.length ? 1 : 0);
+        if (!safeLine(line) || (observation.kind === "standard" && line.length > 4096) || rawBytes + bytes > STATUS_RAW_PRESENTATION_MAX_BYTES) continue;
+        selectedRaw.push(line); rawBytes += bytes;
+    }
+    const render = () => {
+        const presentation = dto.data.mode === "standard"
+            ? { basis: "external_text_lines", total: standardLines.length, returned: selectedLines.length, omitted: standardLines.length - selectedLines.length, excluded: standardLines.length - admittedLines.length }
+            : { basis: "native_admitted_rows", total: dto.data.itemCount.parsed, returned: selectedItems.length, omitted: dto.data.itemCount.parsed - selectedItems.length, excluded: dto.data.itemCount.excluded };
+        const raw = args.includeRaw ? { source: rawSource, warning: rawWarning, withheld: rawWithheld, text: selectedRaw.join("\n"), returnedLines: selectedRaw.length, omittedLines: rawWithheld ? null : rawLines.length - selectedRaw.length } : undefined;
+        const data = dto.data.mode === "standard"
+            ? { ...dto.data, lines: selectedLines, presentation }
+            : { ...dto.data, items: selectedItems, nativeItemCount: dto.data.itemCount, itemCount: { parsed: presentation.total, returned: presentation.returned, omitted: presentation.omitted, excluded: presentation.excluded }, presentation };
+        if (args.format === "json") return JSON.stringify({ ok: true, action: "status", completeness: dto.completeness, data, ...(raw ? { rawOutput: raw } : {}) });
+        const heading = dto.data.mode === "standard" ? `Status (standard text): ${dto.data.summary.totalPending} classified short-output lines.` : `Status ${dto.data.mode} (synthesized): ${dto.data.itemCount.parsed} parsed records.`;
+        const rows = dto.data.mode === "standard" ? selectedLines : selectedItems.map(row => `${row.statusCode} ${row.sourcePath ? `${row.sourcePath} -> ` : ""}${row.path}${row.isDirectory ? " [directory]" : ""}${"revisionId" in row ? ` [revision ${row.revisionId}]` : ""}`);
+        const hints = dto.data.mode === "standard" ? [`Merge hints (text_hints): ${dto.data.mergeHints.pendingMergeLinkCount} pending merge links; ${dto.data.mergeHints.mergeInProgressHintCount} merge-in-progress hints (not verified conflicts).`] : [];
+        return [heading, `Read: ${dto.completeness.read}; capture: ${dto.completeness.capture}; native projection: ${dto.completeness.projection ? "complete" : "incomplete"}.`, `Summary: ${JSON.stringify(dto.data.summary)}`, ...hints, ...rows,
+            `Presentation: ${presentation.returned} returned; ${presentation.omitted} omitted; ${presentation.excluded} excluded.`,
+            ...(dto.data.mode !== "standard" ? [`Native rows: ${dto.data.itemCount.returned} returned; ${dto.data.itemCount.omitted} omitted; ${dto.data.itemCount.excluded} excluded.`] : []),
+            ...(dto.data.mode === "xml" ? ["Workspace scope; absolute paths; base revisions unavailable."] : []),
+            ...(raw ? [raw.warning, `Raw ${raw.source}: ${raw.withheld ? "withheld due to incomplete native admission" : `${raw.returnedLines} lines returned; ${raw.omittedLines} omitted`}`, raw.text] : []),
+        ].join("\n");
+    };
+    let result = render();
+    while (Buffer.byteLength(result, "utf8") > STATUS_PRESENTATION_MAX_BYTES) {
+        // Drop whole records only; JSON is serialized after selection, never byte-sliced.
+        if (selectedRaw.length) selectedRaw.pop();
+        else if (selectedItems.length) selectedItems.pop();
+        else if (selectedLines.length) selectedLines.pop();
+        else throw new Error("Status fixed presentation exceeded its ceiling.");
+        result = render();
+    }
+    return result;
+}
+
 export async function executeStatusOutput(args: StatusObservationOptions & { format?: "text" | "json"; maxItems?: number; includeRaw?: boolean }) {
     let dto: StatusOutput;
     let rawResult: string | undefined;
     try {
         const observation = await assembleStatusObservation(args);
         dto = projectStatusOutput(observation, args.maxItems);
-        if (dto.ok) rawResult = await presentStatusObservation(observation, args);
+        if (dto.ok) rawResult = presentStatusOutput(observation, dto, args);
     } catch (error) {
         const version = args.source === "xml" ? 2 : 1;
         dto = validateStatusOutput(error instanceof StatusXmlError ? ({ ...envelope, schemaVersion: 2, ok: false, completeness: { read: "incomplete", capture: "complete", projection: false }, error: { code: error.code, message: error.message } }) : error instanceof StatusCommandError ? errorOutput(error.code, error.message, version) : error instanceof StatusOptionError ? errorOutput("command_failed", error.message, version) : errorOutput("invalid_producer_data", "Status producer failed to produce valid data.", version), version);
     }
     return {
-        content: [{ type: "text" as const, text: dto.ok ? dto.data.mode !== "standard" ? `Status: ${dto.data.itemCount.parsed} parsed records; ${dto.data.itemCount.returned} returned. Read: ${dto.completeness.read}.` : `Status: ${dto.data.summary.totalPending} classified short-output lines. Read: unknown.` : dto.error.message }],
+        content: [{ type: "text" as const, text: dto.ok ? rawResult! : args.format === "json" ? JSON.stringify(dto) : dto.error.message }],
         structuredContent: dto, isError: !dto.ok,
         details: { exportName: "status", rawResult, ...(args.workdir && (dto.ok || args.source !== "xml") ? { workdir: args.workdir } : {}) },
     };

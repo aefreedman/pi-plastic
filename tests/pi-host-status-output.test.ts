@@ -227,6 +227,7 @@ await writeFile(modifierPath, `export default function(pi) {
   pi.on("tool_result", e => {
     if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo","plastic_resolveDeleteChangeConflict","plastic_merge","plastic_finalizeMerge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate"].includes(e.toolName)) return;
     if (globalThis.__plasticHostFixture.scenario === "content-only") return { content: [{ type: "text", text: "foreign replacement" }] };
+    if (globalThis.__plasticHostFixture.scenario === "content-pass") return { content: e.content };
   });
 }`, { flag: "wx" });
   const modelRuntime = await ModelRuntime.create({ authPath: join(fixture, "agent/auth.json"), modelsPath: null, refreshOnCreate: false });
@@ -278,6 +279,21 @@ await writeFile(modifierPath, `export default function(pi) {
   const text = (result: any) => result.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
   const direct = await run("direct", "plastic_status", { machineReadable: true });
   const dto = direct.children[0].result.structuredContent;
+  assert.match(text(direct.parent), /space ü.txt/);
+  const directJson = await run("direct-json", "plastic_status", { machineReadable: true, format: "json" });
+  assert.equal(JSON.parse(text(directJson.parent)).data.items[0].path, "space ü.txt");
+  assert.equal(directJson.calls.length, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(directJson.children[0])), directJson.children[0]);
+  const contentFallback = await run("content-pass", "codemode", { code: 'const result=await tools.plastic_status({machineReadable:true,format:"json"}); if(typeof result!=="string") throw Error("expected content fallback"); text(JSON.parse(result).data.items.map(i=>i.path));' });
+  assert.equal(contentFallback.children[0].result.structuredContent, undefined);
+  assert.match(text(contentFallback.parent), /space ü.txt/); assert.equal(contentFallback.calls.length, 1);
+  for (const format of ["text", "json"]) {
+    const standard = await run("standard-direct-" + format, "plastic_status", { format }, "Changed Assets/日本😀.txt\nMoved old.txt -> new.txt\nPending merge links\nMerge from fixture\nMerge in progress");
+    assert.match(text(standard.parent), /Assets\/日本😀.txt/); assert.match(text(standard.parent), /old.txt/);
+    assert.match(text(standard.parent), /Merge from fixture/); assert.match(text(standard.parent), /unknown/);
+    if (format === "json") assert.equal(JSON.parse(text(standard.parent)).data.mergeHints.hasMergeInProgress, true);
+    assert.equal(standard.calls.length, 2);
+  }
   assert(dto.ok); assert.equal(dto.data.items[0].revisionId, "0"); assert.equal(dto.data.items[0].isDirectory, false);
   assert.equal(direct.calls.length, 1); assert.equal(direct.parent.isError, false);
   assert.equal(direct.parent.structuredContent, undefined, "DTO is not automatically persisted into ordinary tool-result messages");
@@ -312,6 +328,10 @@ await writeFile(modifierPath, `export default function(pi) {
   const xmlDirect = await run("xml-direct", "plastic_status", { source: "xml" }, xml);
   const xmlDto = xmlDirect.children[0].result.structuredContent;
   assert.equal(xmlDto.schemaVersion, 2); assert.equal(xmlDto.data.items[0].path, "/synthetic/日本-é-😀.txt"); assert.equal(xmlDirect.calls.length, 1);
+  assert.match(text(xmlDirect.parent), /日本-é-😀.txt/);
+  const xmlJsonDirect = await run("xml-json-direct", "plastic_status", { source: "xml", format: "json" }, xml);
+  assert.equal(JSON.parse(text(xmlJsonDirect.parent)).data.items[0].path, xmlDto.data.items[0].path);
+  assert.equal(xmlJsonDirect.calls.length, 1);
   for (const format of ["text", "json"]) {
     const xmlCode = await run("xml-code-" + format, "codemode", script({ source: "xml", format }), xml);
     assert.deepEqual(xmlCode.children[0].result.structuredContent, xmlDto);

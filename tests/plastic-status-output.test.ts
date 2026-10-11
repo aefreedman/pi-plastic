@@ -7,6 +7,8 @@ import { runWithAbortSignal } from "../src/execution/context";
 import { diagnoseMachineReadablePendingItems, hasStatusPathDecodingLoss, parseMachineReadablePendingItems } from "../src/domain/pending";
 import { projectStatusOutput, validateStatusOutput, statusOutputSchema } from "../src/pi/status-output";
 import { loadRegisteredTools } from "./pi-tool-harness";
+import { STATUS_PRESENTATION_MAX_BYTES, STATUS_RAW_PRESENTATION_MAX_BYTES } from "../src/pi/status-output";
+import { xmlRecord, xmlStatus } from "./fixtures/status-xml";
 
 const tools = await loadRegisteredTools();
 const status = tools.get("plastic_status")!;
@@ -179,4 +181,55 @@ assert.equal(Check(statusOutputSchema, { ...text.structuredContent, data: { ...t
 assert.equal(Check(statusOutputSchema, { ...text.structuredContent, data: { ...text.structuredContent.data, items: [{ ...text.structuredContent.data.items[0], kind: "invented" }] } }), false);
 const capped = await invoke(Array.from({ length: 501 }, (_, i) => record(String(i))).join("\n"), { maxItems: 500 });
 assert.equal(capped.structuredContent.data.itemCount.omitted, 1);
-console.log("PASS: status DTO schema, single-read adapter, diagnostics, limits, format/mode matrix, native errors and shared execution context");
+// Direct content is useful even to consumers that never inspect details or the DTO.
+const content = (result: any) => result.content.map((block: any) => block.text).join("\n");
+for (const format of ["text", "json"] as const) {
+  const moved = await invoke(output, { format });
+  assert.match(content(moved), /space ü.txt/);
+  assert.match(content(moved), /old.txt/); assert.match(content(moved), /new.txt/);
+  assert.equal(content(moved), moved.details.rawResult);
+  if (format === "json") {
+    const parsed = JSON.parse(content(moved));
+    assert.equal(parsed.data.items[0].revisionId, "0"); assert.equal(parsed.data.items[0].isDirectory, false);
+    assert.equal(parsed.data.items[1].sourcePath, "old.txt");
+  }
+  const omitted = await invoke(output, { format, maxItems: 1 });
+  if (format === "json") assert.equal(JSON.parse(content(omitted)).data.presentation.omitted, 2);
+  else assert.match(content(omitted), /2 omitted/);
+  const unsafe = await invoke(record("lost\uFFFD.txt") + "\n" + record("safe.txt"), { format, includeRaw: true });
+  assert.doesNotMatch(content(unsafe), /lost/); assert.match(content(unsafe), /safe.txt/);
+  assert.match(content(unsafe), /withheld/); assert.match(content(unsafe), /incomplete/);
+  const standard = await invoke("Changed Assets/日本😀.txt\nMoved old.txt -> new.txt\nPending merge links\nMerge from fixture\nMerge in progress", { machineReadable: false, format });
+  assert.match(content(standard), /Assets\/日本😀.txt/); assert.match(content(standard), /old.txt/);
+  assert.match(content(standard), /Merge from fixture/); assert.match(content(standard), /unknown/);
+  if (format === "json") {
+    const parsed = JSON.parse(content(standard)); assert.equal(parsed.data.mergeHints.hasPendingMergeLinks, true);
+    assert.equal(parsed.data.mergeHints.hasMergeInProgress, true);
+  }
+  const xml = await invoke(xmlStatus(xmlRecord("/synthetic/new😀.txt", "MV", "/synthetic/old日本.txt")), { machineReadable: undefined, source: "xml", format });
+  assert.match(content(xml), /old日本.txt/); assert.match(content(xml), /new😀.txt/);
+  assert.equal(calls.length, 1);
+  if (format === "json") assert.equal(JSON.parse(content(xml)).data.source.baseRevisionAvailability, "unavailable");
+  const largeRows = Array.from({ length: 100 }, (_, i) => record(`${i}-${"😀".repeat(200)}.txt`)).join("\n");
+  const budget = await invoke(largeRows, { format, includeRaw: true });
+  assert.equal(budget.structuredContent.data.itemCount.returned, 100, "presentation does not shrink native rows");
+  assert(Buffer.byteLength(content(budget), "utf8") <= STATUS_PRESENTATION_MAX_BYTES);
+  assert.doesNotMatch(content(budget), /\uFFFD/);
+  if (format === "json") {
+    const parsed = JSON.parse(content(budget)); assert(parsed.data.presentation.omitted > 0);
+    assert.equal(parsed.data.itemCount.returned, parsed.data.items.length);
+    assert.equal(parsed.data.itemCount.omitted, 100 - parsed.data.items.length);
+    assert.equal(parsed.data.nativeItemCount.returned, 100);
+    assert(Buffer.byteLength(parsed.rawOutput.text, "utf8") <= STATUS_RAW_PRESENTATION_MAX_BYTES);
+    for (const row of parsed.data.items) assert(budget.structuredContent.data.items.some((native: any) => native.path === row.path));
+  } else assert.match(content(budget), /[1-9]\d* omitted/);
+  const standardBudget = await invoke(Array.from({ length: 100 }, (_, i) => `Changed ${i}-${"😀".repeat(1000)}.txt`).join("\n") + "\n" + "x".repeat(4097) + "\nunsafe\uFFFD.txt", { machineReadable: false, format, includeRaw: true });
+  assert(Buffer.byteLength(content(standardBudget), "utf8") <= STATUS_PRESENTATION_MAX_BYTES);
+  assert.doesNotMatch(content(standardBudget), /unsafe|x{4097}|\uFFFD/);
+  if (format === "json") assert(JSON.parse(content(standardBudget)).data.presentation.omitted > 0);
+}
+const rawJson = JSON.parse(content(await invoke(output, { format: "json", includeRaw: true })));
+assert.match(rawJson.rawOutput.source, /machinereadable/); assert.match(rawJson.rawOutput.warning, /private/);
+assert(rawJson.rawOutput.text.includes("old.txt"));
+assert.equal(JSON.parse(content(await invoke("private", { format: "json" }, 1))).ok, false);
+console.log("PASS: status DTO schema, single-read adapter, diagnostics, limits, direct text/parseable JSON, Unicode budgets, format/mode matrix and native errors");
