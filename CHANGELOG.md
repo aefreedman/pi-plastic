@@ -7,6 +7,10 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Fixed
+
+- Restored useful bounded direct status text and parseable JSON for standard, machine and XML sources, including exact admitted paths/moves, merge hints, uncertainty and presentation omissions. Native DTOs remain unchanged; opt-in raw diagnostics are separately bounded and cannot restore excluded machine identities.
+
 ## [0.8.0] - 2026-10-08
 
 ### Added
