@@ -210,6 +210,16 @@ for (const format of ["text", "json"] as const) {
   assert.match(content(xml), /old日本.txt/); assert.match(content(xml), /new😀.txt/);
   assert.equal(calls.length, 1);
   if (format === "json") assert.equal(JSON.parse(content(xml)).data.source.baseRevisionAvailability, "unavailable");
+  const xmlBudget = await invoke(xmlStatus(Array.from({ length: 100 }, (_, i) => xmlRecord(`/synthetic/${i}-${"😀".repeat(200)}.txt`)).join("")), { machineReadable: undefined, source: "xml", format, includeRaw: true });
+  assert.equal(calls.length, 1); assert.equal(xmlBudget.structuredContent.data.itemCount.returned, 100);
+  assert(Buffer.byteLength(content(xmlBudget), "utf8") <= STATUS_PRESENTATION_MAX_BYTES);
+  if (format === "json") {
+    const parsed = JSON.parse(content(xmlBudget)); assert(parsed.data.presentation.omitted > 0);
+    assert.equal(parsed.data.itemCount.returned, parsed.data.items.length);
+    assert.equal(parsed.data.nativeItemCount.returned, 100);
+    assert.match(parsed.rawOutput.source, /status_xml/);
+    assert(Buffer.byteLength(parsed.rawOutput.text, "utf8") <= STATUS_RAW_PRESENTATION_MAX_BYTES);
+  }
   const largeRows = Array.from({ length: 100 }, (_, i) => record(`${i}-${"😀".repeat(200)}.txt`)).join("\n");
   const budget = await invoke(largeRows, { format, includeRaw: true });
   assert.equal(budget.structuredContent.data.itemCount.returned, 100, "presentation does not shrink native rows");
