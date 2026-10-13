@@ -1,6 +1,6 @@
 # Dynamic tool-loading behavioral eval
 
-This package-local eval compares `all-active`, `balanced`, and `loader-only` Plastic tool-loading modes through fresh Pi 1.1.0 JSON subprocesses. It is intentionally **not** a skill eval: skills, prompt templates, built-in tools, discovered extensions, context files, and sessions are disabled.
+This package-local eval compares `all-active`, `balanced`, and `loader-only` Plastic tool-loading modes through fresh manifest-selected Pi JSON subprocesses. It is intentionally **not** a skill eval: skills, prompt templates, built-in tools, discovered extensions, context files, and sessions are disabled.
 
 The runner pins the canonical local SDK package root for each subprocess and checks the actual local CLI version, so inherited `PI_PACKAGE_DIR` cannot select global package metadata/assets. Dry runs also perform this local version-only attestation; they do not call a provider or Plastic.
 
@@ -38,3 +38,5 @@ npm run eval:tool-loading -- --help
 ```
 
 Each trial writes provider payloads only to a unique system-temp capture file, never stdout. The runner deletes raw captures by default. Pass `--keep` only when you explicitly need those sensitive raw payloads. Sanitized timestamped summaries are written to ignored `results/`; use `--include-events` to include event type/tool-name crumbs only.
+
+The exact runtime selector is `package.json` → `devDependencies["@earendil-works/pi-coding-agent"]`. The runner rejects floating declarations and installed-version mismatches; `config.json` no longer carries `piVersionPrefix` (legacy overrides are rejected).

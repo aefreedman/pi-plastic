@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 // A fresh process is essential: an already cached SDK VERSION cannot certify import order.
+const expectedPi = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).devDependencies["@earendil-works/pi-coding-agent"];
 const fixture = mkdtempSync(join(tmpdir(),"plastic-rendering-root-"));
 try {
   const oldRoot = join(fixture,"older-package"); mkdirSync(oldRoot);
@@ -16,15 +17,15 @@ try {
 const inherited = process.env.PI_PACKAGE_DIR;
 await import(${JSON.stringify(new URL("./plastic-tool-rendering.test.ts",import.meta.url).href)});
 const config = await import(${JSON.stringify(new URL("./config.js",sdkUrl).href)});
-assert.equal(config.VERSION,'1.1.0','SDK must have evaluated only after canonical root pin');
+assert.equal(config.VERSION,${JSON.stringify(expectedPi)},'SDK must have evaluated only after canonical root pin');
 assert.equal(process.env.PI_PACKAGE_DIR,inherited,'Owned override must be restored');
 assert.equal(process.env.PI_RENDERING_UNRELATED_SENTINEL,'preserved');
-console.log('PASS: fresh stale override imports canonical SDK VERSION1.1.0 and restores owned environment');`);
+console.log('PASS: fresh stale override imports canonical SDK VERSION matches manifest and restores owned environment');`);
   const result = spawnSync(process.execPath,[fileURLToPath(new URL("../node_modules/tsx/dist/cli.mjs",import.meta.url)),script],{
     encoding:"utf8",timeout:30000,
     env:{...process.env,PI_PACKAGE_DIR:oldRoot,PI_RENDERING_UNRELATED_SENTINEL:"preserved"},
   });
   assert.equal(result.error,undefined);assert.equal(result.status,0,result.stdout+result.stderr);
-  assert.match(result.stdout,/fresh stale override imports canonical SDK VERSION1.1.0/);
+  assert.match(result.stdout,/fresh stale override imports canonical SDK VERSION matches manifest/);
   console.log(result.stdout.trim());
 } finally { rmSync(fixture,{recursive:true,force:true}); }

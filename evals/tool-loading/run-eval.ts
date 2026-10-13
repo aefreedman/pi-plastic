@@ -1,3 +1,4 @@
+import { declaredPiVersion, assertPiVersion } from "./pi-version.ts";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -8,7 +9,6 @@ type Condition = "all-active" | "balanced" | "loader-only";
 type JsonObject = Record<string, unknown>;
 type EvalCase = { id: string; prompt: string; requiredTools: string[]; minimalActivatedTools: string[]; forbiddenTools: string[]; requiredPreflightTools?: string[] };
 type EvalConfig = {
-  piVersionPrefix: string;
   sandboxCwdEnv: string;
   sandboxMarkerFile: string;
   sandboxMarkerContent: string;
@@ -23,6 +23,7 @@ type EvalConfig = {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(HERE, "../..");
+const PI_VERSION = declaredPiVersion();
 const CONFIG_PATH = join(HERE, "config.json");
 const CASES_PATH = join(HERE, "cases.json");
 const BASELINE_PATH = join(HERE, "baseline.json");
@@ -83,7 +84,7 @@ function parseOptions(argv: string[]): Options {
 }
 
 function validate(config: EvalConfig, cases: EvalCase[], baseline: JsonObject, options: Options): void {
-  if (config.piVersionPrefix !== "1.1.0") fail("config piVersionPrefix must select Pi 1.1.0 exactly");
+  if ("piVersionPrefix" in config) fail("remove piVersionPrefix: package.json selects the exact Pi runtime");
   if (config.sandboxCwdEnv !== "PI_PLASTIC_EVAL_SANDBOX") fail("config sandboxCwdEnv must use the dedicated eval environment variable");
   if (config.sandboxMarkerFile !== ".pi-plastic-eval-sandbox" || config.sandboxMarkerContent !== "pi-plastic-eval-sandbox\n") fail("config sandbox marker attestation is invalid");
   if (config.sandboxAuthorizationEnv !== "PI_PLASTIC_EVAL_ALLOW" || config.sandboxAuthorizationValue !== "dedicated-sandbox") fail("config sandbox authorization attestation is invalid");
@@ -335,15 +336,15 @@ async function main(): Promise<void> {
 
   const piPackagePath = join(PACKAGE_ROOT, "node_modules", "@earendil-works", "pi-coding-agent", "package.json");
   const piVersion = existsSync(piPackagePath) ? (readJson<{ version?: string }>(piPackagePath).version ?? "unknown") : "missing";
-  if (piVersion !== config.piVersionPrefix) fail(`This eval requires Pi ${config.piVersionPrefix} exactly; found ${piVersion}`);
+  assertPiVersion(piVersion, PI_VERSION);
   const piCli = join(PACKAGE_ROOT, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js");
   const localRuntimeEnv = { ...process.env, PI_PACKAGE_DIR: dirname(piPackagePath) };
   const versionProbe = await runProcess(process.execPath,[piCli,"--version"],PACKAGE_ROOT,localRuntimeEnv,10000,4096);
-  if (versionProbe.exitCode !== 0 || versionProbe.timedOut || versionProbe.outputLimitExceeded || versionProbe.stderr.trim() || versionProbe.stdout.trim() !== config.piVersionPrefix) fail("Local Pi CLI version attestation failed");
+  if (versionProbe.exitCode !== 0 || versionProbe.timedOut || versionProbe.outputLimitExceeded || versionProbe.stderr.trim() || versionProbe.stdout.trim() !== PI_VERSION) fail("Local Pi CLI version attestation failed");
   const baseArgs = ["--mode", "json", "--no-session", "--no-approve", "--no-context-files", "--no-extensions", "-e", join(PACKAGE_ROOT, "index.ts"), "-e", join(HERE, "mutation-guard.ts"), "-e", join(HERE, "provider-capture.ts"), "--no-skills", "--no-prompt-templates", "--no-builtin-tools"];
   if (options.dryRun) {
     console.log(`VALID: ${selectedCases.length} cases × ${options.conditions.length} conditions × ${options.trials} trial(s)`);
-    console.log(`Pi ${config.piVersionPrefix} subprocess: ${process.execPath} ${piCli} ${baseArgs.join(" ")} --model <approved-model> <case-prompt>`);
+    console.log(`Pi ${PI_VERSION} subprocess: ${process.execPath} ${piCli} ${baseArgs.join(" ")} --model <approved-model> <case-prompt>`);
     console.log(`cwd: ${sandboxCwd}`);
     return;
   }

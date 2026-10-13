@@ -120,8 +120,9 @@ for (const path of [readmePath, ...paths]) {
 }
 assert(examples > 0);
 const dev = paths.find(path => path.endsWith("-development.md"))!;
+assert(read(dev).includes("as declared in package.json"), "Contributor docs must route the validation baseline to the owning manifest");
 for (const packageName of ["@earendil-works/pi-coding-agent", "@earendil-works/pi-tui"]) {
-    assert(read(dev).includes(`**${manifest.devDependencies[packageName]}**`), `Keep documented validation baseline aligned: ${packageName}`);
+    assert.match(manifest.devDependencies[packageName], /^\d+\.\d+\.\d+$/, `Keep the manifest validation baseline exact: ${packageName}`);
 }
 assert(read(skillPath).includes("../../docs/README.md"), "Route agents into same-package docs progressively");
 console.log(`PASS: concise README, ${paths.length} dated/index manual pages, ${routes.size} tool routes, ${links} local links/anchors/packed targets, ${examples} example calls and current schemas/runtime baseline; no tool execution or network`);

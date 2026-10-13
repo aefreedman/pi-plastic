@@ -30,6 +30,7 @@ import { xmlStatus, xmlRecord } from "./fixtures/status-xml";
 
 // File-loaded package, real finalizer and codemode; node itself is the fake cm executable.
 // Node treats fixture/status and fixture/version as scripts, so this works without shell wrappers.
+const declaredPi = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")).devDependencies;
 const fixture = await mkdtemp(join(tmpdir(), "pi-plastic-status-host-"));
 const sdkUrl = import.meta.resolve("@earendil-works/pi-coding-agent");
 const previousPackageDir = process.env.PI_PACKAGE_DIR;
@@ -39,8 +40,8 @@ process.env.PI_PACKAGE_DIR = localPackageDir;
 const { createAgentSessionServices, createAgentSessionFromServices, createCodemodeExtension, ModelRuntime, SessionManager, SettingsManager } = await import(sdkUrl);
 const runtimeConfig = await import(new URL("./config.js",sdkUrl).href);
 assert.equal(resolve(runtimeConfig.getPackageDir()),resolve(localPackageDir));
-assert.equal(runtimeConfig.VERSION,"1.1.0");
-assert.equal(execFileSync(process.execPath,[fileURLToPath(new URL("./cli.js",sdkUrl)),"--version"],{env:{...process.env,PI_PACKAGE_DIR:localPackageDir},encoding:"utf8"}).trim(),"1.1.0");
+assert.equal(runtimeConfig.VERSION,declaredPi["@earendil-works/pi-coding-agent"]);
+assert.equal(execFileSync(process.execPath,[fileURLToPath(new URL("./cli.js",sdkUrl)),"--version"],{env:{...process.env,PI_PACKAGE_DIR:localPackageDir},encoding:"utf8"}).trim(),declaredPi["@earendil-works/pi-coding-agent"]);
 const aiUrl = (() => { try { return import.meta.resolve("@earendil-works/pi-ai"); } catch { return new URL("../node_modules/@earendil-works/pi-ai/dist/index.js", sdkUrl).href; } })();
 const ai = await import(aiUrl);
 const extensionPath = fileURLToPath(new URL("../index.ts", import.meta.url));
@@ -588,7 +589,7 @@ await writeFile(modifierPath, `export default function(pi) {
   // Selected mutation receipts use the file-loaded adapter/finalizer, not direct executors.
   const runtimeVersion = JSON.parse(await readFile(new URL("../package.json", sdkUrl), "utf8")).version;
   const tuiVersion = JSON.parse(await readFile(new URL("../package.json", import.meta.resolve("@earendil-works/pi-tui")), "utf8")).version;
-  assert.equal(runtimeVersion, "1.1.0"); assert.equal(tuiVersion, "1.1.0");
+  assert.equal(runtimeVersion, declaredPi["@earendil-works/pi-coding-agent"]); assert.equal(tuiVersion, declaredPi["@earendil-works/pi-tui"]);
   const receiptRun = (scenario: string, name: string, args: Record<string, unknown>, mode = "completed", parent = "loaded") => run(scenario, name, args, JSON.stringify({kind:"receipts",mode,parent}));
   const checkinRequest = {message:"Fixture résumé é 日本語 😀",paths:["résumé-é-日本-😀.txt"]};
   const branchRequest = {branch:"br:/main/task-é-é-日本-😀@Example Repository@example@unity",comment:"Fixture branch"};

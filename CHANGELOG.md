@@ -7,6 +7,12 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.8.2] - 2026-10-13
+
+- Add focused real-Pi codemode declaration coverage for existing Plastic input constraints, including explicit absence of schema patterns/defaults.
+
+- Refresh exact Pi development dependencies to stable 1.2.0; derive validation expectations from package.json and retain strict installed-version checks.
+
 ## [0.8.1] - 2026-10-12
 
 ### Fixed
