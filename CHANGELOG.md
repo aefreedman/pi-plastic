@@ -7,6 +7,8 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.8.3] - 2026-10-13
+
 ### Fixed
 
 - Accept strictly validated server analysis `APPLY ADD/FSPROT` and `DIS_OP_WARN CHG` records, expose discard-warning counts without inferring content equality, and distinguish malformed evidence from unsupported operations. Applying-merge verification remains unchanged.
