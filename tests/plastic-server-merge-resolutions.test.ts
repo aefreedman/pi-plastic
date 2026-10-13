@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { Check } from "typebox/value";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { mkdtemp, readFile, writeFile, rm, mkdir } from "node:fs/promises";
@@ -7,7 +8,8 @@ import { join } from "node:path";
 import { loadRegisteredTools } from "./pi-tool-harness";
 import { runWithAbortSignal } from "../src/execution/context";
 import { serverMergeCapabilityTokens } from "../src/operations/server-merge";
-import { validateServerMergeOutput } from "../src/pi/server-merge-output";
+import { serverMergeOutputSchema, validateServerMergeOutput } from "../src/pi/server-merge-output";
+import { parseServerMergeOutput } from "../src/domain/merge-output";
 import { inspectResolutionFile, RESOLUTIONS_MAX_BYTES } from "../src/domain/server-merge-resolutions";
 
 const tool = (await loadRegisteredTools()).get("plastic_mergeBranches")!;
@@ -79,6 +81,57 @@ try {
         assert.equal(r.dto.data.conflictPaths.length, records[0][0] === "FILE_CONFLICT" ? 1 : 0);
         const forged = structuredClone(r.dto); forged.data.command.push("--merge"); assert(!validateServerMergeOutput(forged));
     }
+    // Issue #12: exact sanitized captured profiles, not inferred warning semantics.
+    const mixed: Array<[string, string[]]> = [
+        ["DIS_OP_WARN", ["CHG", "/Assets/Settings/BuildProfile.asset"]],
+        ["FILE_SRC", ["/Assets/Editor/BuildPreprocessor.cs", "100", "110", "200"]],
+        ["APPLY", ["FSPROT", "/Tools"]],
+        ["APPLY", ["ADD", "/Tools/distribution"]],
+        ["APPLY", ["ADD", "/Tools/distribution/dashboard.js"]],
+    ];
+    r = await invoke(analyze, { records: mixed });
+    assert.equal(r.dto.outcome, "analyzed"); assert.equal(r.dto.data.parse.warningsObserved, 1);
+    assert.equal(r.dto.data.parse.malformed, false); assert.equal(r.dto.data.parse.unknownOperations, 0);
+    assert.equal(r.dto.data.createdChangeset, null); assert.equal(r.dto.data.effect, "not-attempted");
+    assert.match(r.result.content[0].text, /content equality unverified/);
+    assert(!r.calls[1].includes("--merge"));
+    const forgedWarnings = structuredClone(r.dto); forgedWarnings.data.parse.warningsObserved = 501;
+    assert(!validateServerMergeOutput(forgedWarnings));
+    const excessiveWarnings = structuredClone(r.dto); excessiveWarnings.data.parse.warningsObserved = excessiveWarnings.data.parse.records + 1;
+    assert(Check(serverMergeOutputSchema, excessiveWarnings)); assert(!validateServerMergeOutput(excessiveWarnings));
+    const applyWarning = (await invoke({ ...identity, message: "Apply" })).dto;
+    applyWarning.data.parse.warningsObserved = 1;
+    assert(Check(serverMergeOutputSchema, applyWarning)); assert(!validateServerMergeOutput(applyWarning));
+    r = await invoke(analyze, { records: [...mixed, ["FILE_CONFLICT", ["/conflict", "1", "2", "3", "4"]]] });
+    assert.equal(r.dto.outcome, "analyzed"); assert.deepEqual(r.dto.data.conflictPaths, ["/conflict"]);
+    for (const records of [mixed, [...mixed, ["CHANGESET", ["cs:42@/main@repo@server (mount:'/')"]] as [string, string[]]]]) {
+        r = await invoke({ ...identity, message: "Apply" }, { records });
+        assert.equal(r.dto.outcome, "uncertain"); assert.equal(r.dto.data.createdChangeset, null);
+    }
+    for (const options of [{ exitCode: 1 }, { stderr: "warning" }]) {
+        r = await invoke(analyze, { records: mixed, ...options }); assert.equal(r.dto.outcome, "uncertain");
+    }
+    const separators = { start: "__START__", end: "__END__", field: "__FIELD__" };
+    const encode = (fields: string[]) => separators.start + fields.join(separators.field) + separators.end;
+    for (const fields of [["APPLY", "DEL", "/Tools"], ["DIS_OP_WARN", "OTHER", "/file"], ["OTHER", "/file"]]) {
+        const parsed = parseServerMergeOutput(encode(fields), separators, "analyze");
+        assert.equal(parsed.malformed, false); assert.equal(parsed.unknownOperations.length, 1);
+        r = await invoke(analyze, { records: [[fields[0], fields.slice(1)]] });
+        assert.equal(r.dto.outcome, "uncertain"); assert.match(r.dto.error.message, /Unsupported/);
+    }
+    for (const fields of [
+        ["APPLY", "ADD"], ["APPLY", "ADD", "/file", "extra"], ["APPLY", "ADD", "relative"],
+        ["DIS_OP_WARN", "CHG", ""], ["DIS_OP_WARN", "CHG", "relative"],
+        ["DIS_OP_WARN", "CHG", "/bad\u0000"], ["DIS_OP_WARN", "CHG", "/bad\uD800"],
+        ["DIS_OP_WARN", "CHG", "/" + "x".repeat(4096)],
+    ]) {
+        assert.equal(parseServerMergeOutput(encode(fields), separators, "analyze").malformed, true);
+    }
+    for (const out of ["foreign" + encode(["APPLY", "ADD", "/file"]), separators.start + "APPLY", encode(["APPLY", "ADD", "/file"]) + "tail"]) {
+        assert.equal(parseServerMergeOutput(out, separators, "analyze").malformed, true);
+    }
+    r = await invoke(analyze, { records: [["APPLY", ["ADD", "relative"]]] });
+    assert.equal(r.dto.outcome, "uncertain"); assert.match(r.dto.error.message, /Malformed/);
     r = await invoke({ ...analyze, preflight: true }); assert.equal(r.calls.length, 0); assert.equal(r.dto.data.remoteAnalysis, "not-performed");
     for (const extra of [{ message: "bad" }, { fileConflictsResolutionsFile: jsonPath }, { unlistedConflictPolicy: "destination" }]) {
         r = await invoke({ ...analyze, ...extra }); assert.equal(r.dto.error.code, "invalid_request"); assert.equal(r.calls.length, 0);

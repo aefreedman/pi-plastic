@@ -18,7 +18,7 @@ const data = {
     command: nullable(Type.Array(str(8192), { maxItems: 16 })),
     capability: object({ state: enumOf(["not-checked", "advertised", "missing", "unavailable"]), missingTokens: Type.Array(str(64), { maxItems: 9 }) }),
     attempt, capture: object({ help: nullable(capture), merge: nullable(capture) }),
-    parse: nullable(object({ records: uint(500), malformed: Type.Boolean(), unknownOperations: uint(500), changesetsObserved: uint(500), conflictsObserved: uint(500) })),
+    parse: nullable(object({ records: uint(500), malformed: Type.Boolean(), unknownOperations: uint(500), changesetsObserved: uint(500), conflictsObserved: uint(500), warningsObserved: uint(500) })),
     observedChangesets: Type.Array(changeset, { maxItems: 100 }), conflictPaths: Type.Array(str(), { maxItems: 100 }),
     counts: object({ changesetsReturned: uint(100), changesetsOmitted: uint(500), conflictsReturned: uint(100), conflictsOmitted: uint(500) }),
     serverAliasEquivalence: Type.Literal("unverified"), mergeLinkIdentity: Type.Literal("unverified"), xlinkEffects: Type.Literal("unverified"), wouldRun: Type.Boolean(), remoteAnalysis: enumOf(["not-performed", "performed"]),
@@ -39,6 +39,7 @@ export function validateServerMergeOutput(value: unknown): value is MergeReceipt
     const safeText = (s: string) => !/[\u0000-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(s);
     for (const cs of [...d.observedChangesets, ...(d.createdChangeset ? [d.createdChangeset] : [])]) if (!splitServerBranch("br:" + cs.branch + "@" + cs.repository + "@" + cs.server) || ![cs.branch, cs.repository, cs.server, cs.mount].every(safeText)) return false;
     if (!d.conflictPaths.every(s => s.startsWith("/") && safeText(s))) return false;
+    if (p && (p.warningsObserved > p.records || d.mode === "apply" && p.warningsObserved > 0 && ["completed", "no-op", "conflict"].includes(dto.outcome))) return false;
     if (!p && (d.observedChangesets.length || d.conflictPaths.length || Object.values(d.counts).some(Boolean))) return false;
     if (dto.completeness.capture === "complete" && !(d.capture.merge?.complete ?? d.capture.help?.complete)) return false;
     if (dto.outcome === "preflight" && dto.completeness.capture !== "unknown") return false;

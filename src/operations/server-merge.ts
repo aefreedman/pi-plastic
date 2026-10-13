@@ -88,9 +88,9 @@ export async function assembleServerMergeReceipt(input: unknown): Promise<MergeR
         const obs = await captureServerMergeCommand(command, SERVER_MERGE_COMMAND_TIMEOUT_MS); data.attempt = obs.attempt; data.capture.merge = obs.capture;
         completeness.capture = obs.capture.complete ? "complete" : "incomplete";
         if (obs.attempt.state === "not-attempted" || obs.attempt.state === "not-started") return finish("failed", "merge", obs.attempt.aborted ? "aborted" : "launch_failed");
-        const parsed = parseServerMergeOutput(obs.stdout ?? "", seps);
+        const parsed = parseServerMergeOutput(obs.stdout ?? "", seps, data.mode);
         const paths = parsed.records.filter(r => r.operation === "FILE_CONFLICT" && r.fields.length === 6 && r.fields[1]!.length <= 4096 && !serverMergeControlPattern.test(r.fields[1]!)).map(r => r.fields[1]!);
-        data.parse = { records: parsed.records.length, malformed: parsed.malformed, unknownOperations: parsed.unknownOperations.length, changesetsObserved: parsed.changesets.length, conflictsObserved: paths.length };
+        data.parse = { records: parsed.records.length, malformed: parsed.malformed, unknownOperations: parsed.unknownOperations.length, changesetsObserved: parsed.changesets.length, conflictsObserved: paths.length, warningsObserved: parsed.warningsObserved };
         // One aggregate evidence budget, not one budget per collection.
         data.observedChangesets = parsed.changesets.slice(0, 100); data.conflictPaths = paths.slice(0, 100 - data.observedChangesets.length);
         data.counts = { changesetsReturned: data.observedChangesets.length, changesetsOmitted: parsed.changesets.length - data.observedChangesets.length, conflictsReturned: data.conflictPaths.length, conflictsOmitted: paths.length - data.conflictPaths.length };
@@ -104,7 +104,8 @@ export async function assembleServerMergeReceipt(input: unknown): Promise<MergeR
                 data.remoteAnalysis = "performed";
                 return finish("analyzed", "merge");
             }
-            return finish("uncertain", "merge", "uncertain", "Server conflict analysis could not be verified; no applying command was requested.");
+            const reason = parsed.malformed ? "Malformed server analysis framing or fields." : parsed.unknownOperations.length ? "Unsupported server analysis operation or subtype." : "Server conflict analysis could not be verified.";
+            return finish("uncertain", "merge", "uncertain", reason + " No applying command was requested.");
         }
         if (!ambiguous && obs.attempt.exitCode === 0 && !obs.capture.stderrBytes && matching.length === 1 && !parsed.hasConflict && !parsed.isAlreadyConnected) { data.createdChangeset = matching[0]!; return finish("completed", "merge"); }
         if (!ambiguous && obs.attempt.exitCode === 0 && !obs.capture.stderrBytes && parsed.isAlreadyConnected && !parsed.changesets.length && !parsed.hasConflict) return finish("no-op", "merge");
@@ -119,7 +120,7 @@ export async function assembleServerMergeReceipt(input: unknown): Promise<MergeR
 }
 export async function presentServerMergeReceipt(dto: MergeReceipt, format: "text" | "json" = "text"): Promise<string> {
     const title = dto.outcome === "no-op" ? "No-op" : dto.outcome[0]!.toUpperCase() + dto.outcome.slice(1);
-    const text = dto.outcome === "preflight" ? `## Server Merge Preflight\n\n- Would run: yes\n- Remote analysis: not performed\n- Command argv: ${JSON.stringify(dto.data.command)}` : dto.outcome === "analyzed" ? `## Server Merge Analysis\n\n- Read-only: no applying merge requested\n- File conflicts observed: ${dto.data.parse?.conflictsObserved ?? "unknown"}\n${dto.data.conflictPaths.map(path => "- " + path).join("\n")}\n- Conflicts omitted: ${dto.data.counts.conflictsOmitted}\n- Point-in-time evidence only; no contributor content retrieved.` : `## Server Merge ${title}\n\n${dto.data.createdChangeset ? "- Created target changeset: cs:" + dto.data.createdChangeset.id + "\n" : ""}- Effect: ${dto.data.effect}\n- Server alias equivalence, merge-link identity and Xlink effects: unverified\n${dto.ok ? "" : "- Do not retry automatically; inspect server state if an attempt may have started."}`;
+    const text = dto.outcome === "preflight" ? `## Server Merge Preflight\n\n- Would run: yes\n- Remote analysis: not performed\n- Command argv: ${JSON.stringify(dto.data.command)}` : dto.outcome === "analyzed" ? `## Server Merge Analysis\n\n- Read-only: no applying merge requested\n- File conflicts observed: ${dto.data.parse?.conflictsObserved ?? "unknown"}\n${dto.data.conflictPaths.map(path => "- " + path).join("\n")}\n- Conflicts omitted: ${dto.data.counts.conflictsOmitted}\n- Discard CHG warnings observed: ${dto.data.parse?.warningsObserved ?? "unknown"} (content equality unverified)\n- Point-in-time evidence only; no contributor content retrieved.` : `## Server Merge ${title}\n\n${dto.data.createdChangeset ? "- Created target changeset: cs:" + dto.data.createdChangeset.id + "\n" : ""}- Effect: ${dto.data.effect}\n- Server alias equivalence, merge-link identity and Xlink effects: unverified\n${dto.ok ? "" : "- " + dto.error.message + "\n- Do not retry automatically; inspect server state if an attempt may have started."}`;
     const rendered = await formatServerMergeResult(format, dto.outcome, text, dto.data);
     return rendered.length <= 24000 ? rendered : JSON.stringify({ action: dto.action, outcome: dto.outcome, ok: dto.ok, note: "Presentation omitted; use the registered tool structuredContent for the bounded receipt." });
 }

@@ -7,6 +7,10 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Fixed
+
+- Accept strictly validated server analysis `APPLY ADD/FSPROT` and `DIS_OP_WARN CHG` records, expose discard-warning counts without inferring content equality, and distinguish malformed evidence from unsupported operations. Applying-merge verification remains unchanged.
+
 ## [0.8.2] - 2026-10-13
 
 - Add focused real-Pi codemode declaration coverage for existing Plastic input constraints, including explicit absence of schema patterns/defaults.

@@ -209,9 +209,10 @@ export type ServerMergeParse = {
     changesets: ServerChangeset[];
     isAlreadyConnected: boolean;
     hasConflict: boolean;
+    warningsObserved: number;
 };
 
-export const parseServerMergeOutput = (output: string, separators: { start: string; end: string; field: string }): ServerMergeParse =>
+export const parseServerMergeOutput = (output: string, separators: { start: string; end: string; field: string }, mode: "apply" | "analyze" = "apply"): ServerMergeParse =>
 {
     const records: ServerMergeRecord[] = [];
     const unknownOperations = new Set<string>();
@@ -258,10 +259,9 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
             else
             {
                 records.push({ operation, fields });
-                if (!["FILE_SRC", "CHANGESET", "STATUS", "FILE_CONFLICT"].includes(operation))
+                if (!["FILE_SRC", "CHANGESET", "STATUS", "FILE_CONFLICT", "APPLY", "DIS_OP_WARN"].includes(operation))
                 {
                     unknownOperations.add(operation);
-                    malformed = true;
                 }
             }
         }
@@ -273,6 +273,7 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
     const safe = (s: string) => s.length <= 4096 && !/[\u0000-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(s);
     let isAlreadyConnected = false;
     let hasConflict = false;
+    let warningsObserved = 0;
     for (const record of records)
     {
         switch (record.operation)
@@ -283,6 +284,28 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
                     malformed = true;
                 }
                 break;
+            case "APPLY":
+            case "DIS_OP_WARN":
+            {
+                // Only captured analysis profiles are supported. CHG is an observed
+                // discard warning, not proof of identical contributor content.
+                const subtype = record.fields[1]!;
+                const supported = record.operation === "APPLY" ? ["ADD", "FSPROT"].includes(subtype) : subtype === "CHG";
+                const validFields = record.fields.length === 3 && record.fields[2]!.startsWith("/") && safe(record.fields[2]!);
+                if (!validFields)
+                {
+                    malformed = true;
+                }
+                if (!supported || mode !== "analyze")
+                {
+                    unknownOperations.add(record.operation + "/" + subtype);
+                }
+                else if (record.operation === "DIS_OP_WARN" && validFields)
+                {
+                    warningsObserved++;
+                }
+                break;
+            }
             case "CHANGESET":
             {
                 if (record.fields.length !== 2)
@@ -323,5 +346,5 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
                 break;
         }
     }
-    return { records, malformed, unknownOperations: [...unknownOperations], changesets, isAlreadyConnected, hasConflict };
+    return { records, malformed, unknownOperations: [...unknownOperations], changesets, isAlreadyConnected, hasConflict, warningsObserved };
 };
