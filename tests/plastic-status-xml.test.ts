@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { performance } from "node:perf_hooks";
@@ -11,6 +12,29 @@ import { loadRegisteredTools } from "./pi-tool-harness";
 import { xmlRecord, xmlStatus } from "./fixtures/status-xml";
 
 const parse = (text: string) => parseStatusXml(Buffer.from(text));
+const observedXml = JSON.parse(readFileSync(new URL('./fixtures/plastic-status-observed-xml.json', import.meta.url), 'utf8')) as Array<{ label: string; stdout: string }>;
+const observed = (label: string): string => observedXml.find(row => row.label === label)!.stdout;
+const expectedObservedRows = [
+  [['AD', 'added', true], ['AD', 'added', false], ['AD', 'added', false], ['AD', 'added', false]],
+  [['CH', 'changed', false], ['CH', 'changed', false]],
+  [['CO', 'changed', false], ['RP', 'changed', false], ['CP', 'added', false]],
+  [['CO', 'changed', false]],
+];
+assert.equal(observedXml.length, expectedObservedRows.length);
+for (const [index, fixture] of observedXml.entries()) {
+  const parsed = parse(fixture.stdout);
+  assert.deepEqual(parsed.items.map(row => [row.statusCode, row.kind, row.isDirectory]), expectedObservedRows[index]);
+  for (const row of parsed.items) { assert(!('revisionId' in row)); assert(!('sourcePath' in row)); }
+}
+// Synthetic adversarial derivatives: merge display metadata is scalar, not readiness evidence.
+const observedMerged = observed('29-merged-mixed-xml');
+for (const code of ['CO', 'CP', 'RP']) {
+  assert.throws(() => parse(xmlStatus(xmlRecord('/synthetic/new', code, '/synthetic/old'))));
+}
+for (const metadata of ['TypeVerbose', 'MergesInfo']) {
+  assert.throws(() => parse(observedMerged.replace(`<${metadata}>`, `<${metadata}><Nested/>`)));
+  assert.throws(() => parse(observedMerged.replace(`</${metadata}>`, `</${metadata}><${metadata}/>`)));
+}
 const mixed = xmlStatus([xmlRecord(), xmlRecord("/synthetic/ordinary.txt", "CH"), xmlRecord("/synthetic/deleted.txt", "DE"), xmlRecord("/synthetic/local.txt", "LD"), xmlRecord("/synthetic/new.txt", "MV", "/synthetic/old.txt"), xmlRecord("/synthetic/directory", "AD", "", true)].join(""));
 assert.equal(parse(mixed).items.length, 6);
 assert.deepEqual(parse(mixed).items[4], { statusCode: "MV", kind: "moved", path: "/synthetic/new.txt", sourcePath: "/synthetic/old.txt", isDirectory: false });
@@ -21,7 +45,7 @@ assert.throws(() => parse(xmlStatus(xmlRecord("/synthetic/literal-�.txt"))));
 assert.equal(parse(xmlStatus(xmlRecord("/synthetic/reference-&#xFFFD;.txt"))).items[0].path, "/synthetic/reference-�.txt");
 assert.equal(parse(xmlStatus(xmlRecord("/synthetic/a&amp;b&#x65;&#769;&#x1F600;.txt"))).items[0].path, "/synthetic/a&bé😀.txt");
 assert.equal(parseStatusXml(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(mixed)])).items.length, 6);
-for (const bad of [mixed.replace('utf-8', 'utf-16'), mixed.replace('utf-8', 'windows-1252'), mixed.replace('<?xml version="1.0" encoding="utf-8"?>', ''), '<StatusOutput/>', xmlStatus('<Foreign/>'), xmlStatus(xmlRecord().replace('<Type>PR</Type>', '<Type>ZZ</Type>')), xmlStatus(xmlRecord().replace('<Path>', '<Unknown>')), xmlStatus(xmlRecord().replace('enTextFile', 'enBinaryFile')), xmlStatus(xmlRecord('/synthetic/a', 'MV')), xmlStatus(xmlRecord('/synthetic/a', 'CH', '/synthetic/b')), xmlStatus(xmlRecord('/synthetic/a') + xmlRecord('/synthetic/a')), xmlStatus(xmlRecord('relative')), mixed.slice(0, -1), mixed + '<another/>', mixed.replace('<Type>PR</Type>', '<Type>PR</Type><Type>PR</Type>'), mixed.replace('<StatusOutput>', '<StatusOutput attr="1">'), mixed.replace('<StatusOutput>', '<StatusOutput xmlns="foreign">')]) assert.throws(() => parse(bad));
+for (const bad of [mixed.replace('utf-8', 'utf-16'), mixed.replace('utf-8', 'windows-1252'), mixed.replace('<?xml version="1.0" encoding="utf-8"?>', ''), '<StatusOutput/>', xmlStatus('<Foreign/>'), xmlStatus(xmlRecord().replace('<Type>PR</Type>', '<Type>ZZ</Type>')), xmlStatus(xmlRecord().replace('<Path>', '<Unknown>')), xmlStatus(xmlRecord().replace('enTextFile', 'enFutureFile')), xmlStatus(xmlRecord('/synthetic/a', 'MV')), xmlStatus(xmlRecord('/synthetic/a', 'CH', '/synthetic/b')), xmlStatus(xmlRecord('/synthetic/a') + xmlRecord('/synthetic/a')), xmlStatus(xmlRecord('relative')), mixed.slice(0, -1), mixed + '<another/>', mixed.replace('<Type>PR</Type>', '<Type>PR</Type><Type>PR</Type>'), mixed.replace('<StatusOutput>', '<StatusOutput attr="1">'), mixed.replace('<StatusOutput>', '<StatusOutput xmlns="foreign">')]) assert.throws(() => parse(bad));
 // Genuine base revisions are absent on this transport. These numeric fields are explicitly synthetic,
 // including 0 and -1; the parser must not manufacture or accept an XML revision contract.
 for (const token of ['0', '-1', '41', 'oops']) assert.throws(() => parse(xmlStatus(xmlRecord().replace('</Change>', `<RevisionId>${token}</RevisionId></Change>`))));
@@ -39,13 +63,13 @@ assert.throws(() => parse(xmlStatus('<Change/>'.repeat(20001))));
 assert.throws(() => parse(xmlStatus('<x>'.repeat(17) + '</x>'.repeat(17))));
 assert.throws(() => parseStatusXml(Buffer.alloc(STATUS_XML_LIMITS.stdoutBytes + 1, 32)));
 // Synthetic unsupported profiles remain fail-closed; malformed/unsafe data takes precedence.
-const unsupportedKind = xmlRecord().replace('enTextFile', 'enBinaryFile');
-const unsupportedStatus = xmlRecord('/synthetic/unadmitted.txt', 'CP');
+const unsupportedKind = xmlRecord().replace('enTextFile', 'enFutureFile');
+const unsupportedStatus = xmlRecord('/synthetic/unadmitted.txt', 'FUTURE');
 const unsafeRecord = xmlRecord('relative-private-value');
 for (const input of [xmlStatus(unsupportedKind), xmlStatus(unsupportedStatus)]) {
   assert.throws(() => parse(input), (error: unknown) => error instanceof StatusXmlError && error.code === 'unsupported_source');
 }
-for (const input of [mixed.slice(0, -1), xmlStatus(xmlRecord().replace('<Type>PR</Type>', '<Type></Type>')), xmlStatus(xmlRecord().replace('enTextFile', '')), xmlStatus(unsupportedKind + unsafeRecord), xmlStatus(unsafeRecord + unsupportedKind)]) {
+for (const input of [mixed.slice(0, -1), xmlStatus(xmlRecord().replace('<Type>PR</Type>', '<Type></Type>')), xmlStatus(xmlRecord().replace('enTextFile', '')), xmlStatus(unsupportedKind + unsafeRecord), xmlStatus(unsafeRecord + unsupportedKind), xmlStatus(unsupportedStatus + unsafeRecord), xmlStatus(unsafeRecord + unsupportedStatus)]) {
   assert.throws(() => parse(input), (error: unknown) => error instanceof StatusXmlError && error.code === 'malformed_output');
 }
 for (const input of [xmlStatus('<Change/>'.repeat(20001)), xmlStatus('<x>'.repeat(17) + '</x>'.repeat(17)), xmlStatus(xmlRecord('/' + 'x'.repeat(4096)))]) {
@@ -99,7 +123,41 @@ for (const [input, code] of [
   assert.deepEqual(failed.structuredContent.completeness, { read: 'incomplete', capture: 'complete', projection: false });
   assert.equal(failed.isError, true); assert(!('data' in failed.structuredContent));
   assert.equal(failed.details.rawResult, undefined); assert.equal(failed.details.workdir, undefined);
-  for (const privateValue of ['<StatusOutput>', 'enBinaryFile', 'CP', 'synthetic.invalid', 'relative-private-value', '/synthetic']) assert(!JSON.stringify(failed).includes(privateValue));
+  for (const privateValue of ['<StatusOutput>', 'enFutureFile', 'FUTURE', 'synthetic.invalid', 'relative-private-value', '/synthetic']) assert(!JSON.stringify(failed).includes(privateValue));
+}
+for (const fixture of observedXml) {
+  const parsed = parse(fixture.stdout);
+  const admitted = await invoke(fixture.stdout, { format: 'json' });
+  assert.equal(calls.length, 1);
+  assert.equal(admitted.isError, false);
+  assert.deepEqual(admitted.structuredContent.data.items, parsed.items);
+  assert.deepEqual(admitted.structuredContent.data.summary, parsed.summary);
+  assert.deepEqual(admitted.structuredContent.completeness, { read: 'complete', capture: 'complete', projection: true });
+  assert.equal(admitted.structuredContent.data.source.baseRevisionAvailability, 'unavailable');
+  assert.deepEqual(JSON.parse(admitted.details.rawResult).data.items, parsed.items);
+  const text = await invoke(fixture.stdout);
+  for (const row of parsed.items) assert(text.details.rawResult.includes(`${row.statusCode} ${row.path}`));
+  assert(!JSON.stringify(admitted.structuredContent).includes('MergesInfo'));
+}
+const mergedDto = (await invoke(observedMerged)).structuredContent;
+assert.deepEqual(mergedDto.data.summary, { totalPending: 3, added: 1, changed: 2, moved: 0, deleted: 0, private: 0, other: 0, tracked: 3 });
+for (const index of [0, 1, 2]) {
+  const wrongKind = structuredClone(mergedDto); wrongKind.data.items[index].kind = 'private';
+  assert.equal(validateStatusOutput(wrongKind, 2).ok, false);
+  const revision = structuredClone(mergedDto); revision.data.items[index].revisionId = '47';
+  assert.equal(validateStatusOutput(revision, 2).ok, false);
+}
+// Synthetic derivatives prove metadata changes/absence do not authorize anything beyond observation.
+const noMergeMetadata = observedMerged.replace(/<MergesInfo>[^<]*<\/MergesInfo>/g, '<MergesInfo/>');
+assert.deepEqual(parse(noMergeMetadata).items, parse(observedMerged).items);
+for (const unsupported of [unsupportedKind, unsupportedStatus]) {
+  for (const records of [xmlRecord('/synthetic/supported', 'CO') + unsupported, unsupported + xmlRecord('/synthetic/supported', 'CO')]) {
+    const failed = await invoke(xmlStatus(records));
+    assert.equal(failed.structuredContent.error.code, 'unsupported_source');
+    assert(!('data' in failed.structuredContent));
+  }
+  const failed = await invoke(xmlStatus(unsupported + unsafeRecord));
+  assert.equal(failed.structuredContent.error.code, 'malformed_output');
 }
 const transportLimit = await invoke(Buffer.alloc(STATUS_XML_LIMITS.stdoutBytes + 1));
 assert.equal(transportLimit.structuredContent.error.code, 'capture_incomplete');

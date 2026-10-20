@@ -13,7 +13,7 @@ export class StatusXmlError extends Error {
 }
 function invalid(): never { throw new StatusXmlError(); }
 function limit(): never { throw new StatusXmlError("output_overflow"); }
-const kinds = { CH: "changed", AD: "added", DE: "deleted", LD: "deleted", MV: "moved", PR: "private" } as const;
+const kinds = { CH: "changed", CO: "changed", CP: "added", RP: "changed", AD: "added", DE: "deleted", LD: "deleted", MV: "moved", PR: "private" } as const;
 const fields = new Set(["Type", "TypeVerbose", "Path", "OldPath", "PrintableMovedPath", "MergesInfo", "SimilarityPerUnit", "Similarity", "Size", "PrintableSize", "PrintableLastModified", "RevisionType", "LastModified"]);
 const isAbsolute = (path: string): boolean => path.startsWith("/") || /^[A-Za-z]:\\/.test(path) || /^\\\\[^\\]+\\[^\\]+\\/.test(path);
 const identity = (value: string): string => {
@@ -95,6 +95,7 @@ export function parseStatusXml(bytes: Uint8Array): { output: string; items: XmlS
         if (change.tagName !== "Change") invalid();
         const row = children(change, fields);
         // All recognized fields are scalar in the verified configuration.
+        // TypeVerbose/MergesInfo are display metadata, never merge-readiness evidence.
         for (const value of row.values()) leaf(value);
         const statusCode = leaf(row.get("Type"));
         if (!/^[A-Z][A-Z0-9_]*$/.test(statusCode)) invalid();
@@ -104,7 +105,7 @@ export function parseStatusXml(bytes: Uint8Array): { output: string; items: XmlS
         const oldPath = leaf(row.get("OldPath"));
         const revisionType = leaf(row.get("RevisionType"));
         if (!/^en[A-Za-z0-9]+$/.test(revisionType)) invalid();
-        const supportedType = revisionType === "enDirectory" || revisionType === "enTextFile";
+        const supportedType = revisionType === "enDirectory" || revisionType === "enTextFile" || revisionType === "enBinaryFile";
         if (supportedStatus && (kind === "moved") !== Boolean(oldPath)) invalid();
         if (oldPath && identity(oldPath) === path) invalid();
         if (seen.has(path)) invalid();

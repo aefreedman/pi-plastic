@@ -30,7 +30,7 @@ const xmlCount = Type.Integer({ minimum: 0, maximum: 20000 });
 const xmlSummary = { totalPending: xmlCount, added: xmlCount, changed: xmlCount, moved: xmlCount, deleted: xmlCount, other: Type.Literal(0), private: xmlCount, tracked: xmlCount };
 const xmlPathPattern = `^(?:/|[A-Za-z]:\\\\|\\\\\\\\)[^\\u0000-\\u001f${process.platform === "win32" ? "?" : ""}]*$`;
 const xmlItem = object({
-    statusCode: Type.Union([Type.Literal("CH"), Type.Literal("AD"), Type.Literal("DE"), Type.Literal("LD"), Type.Literal("MV"), Type.Literal("PR")]),
+    statusCode: Type.Union([Type.Literal("CH"), Type.Literal("CO"), Type.Literal("CP"), Type.Literal("RP"), Type.Literal("AD"), Type.Literal("DE"), Type.Literal("LD"), Type.Literal("MV"), Type.Literal("PR")]),
     kind: Type.Union([Type.Literal("added"), Type.Literal("changed"), Type.Literal("moved"), Type.Literal("deleted"), Type.Literal("private")]),
     path: Type.String({ minLength: 1, maxLength: 4096, pattern: xmlPathPattern }), isDirectory: Type.Boolean(),
     sourcePath: Type.Optional(Type.String({ minLength: 1, maxLength: 4096, pattern: xmlPathPattern })),
@@ -79,7 +79,7 @@ export function validateStatusOutput(value: unknown, schemaVersion: 1 | 2 = 1): 
         const data = checked.data;
         const { parsed, returned, omitted, excluded, overCap } = data.itemCount;
         const seen = new Set<string>();
-        const kinds = { CH: "changed", AD: "added", DE: "deleted", LD: "deleted", MV: "moved", PR: "private" };
+        const kinds = { CH: "changed", CO: "changed", CP: "added", RP: "changed", AD: "added", DE: "deleted", LD: "deleted", MV: "moved", PR: "private" };
         const invalidRows = data.items.some(row => {
             const unsafe = (path: string) => /[\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(path);
             const invalid = unsafe(row.path) || (row.sourcePath !== undefined && unsafe(row.sourcePath)) || row.kind !== kinds[row.statusCode] || (row.kind === "moved") !== Boolean(row.sourcePath) || row.sourcePath === row.path || seen.has(row.path);

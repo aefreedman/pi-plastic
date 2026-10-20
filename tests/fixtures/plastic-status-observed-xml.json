@@ -1,0 +1,82 @@
+[
+  {
+    "label": "06-added-xml",
+    "provenance": {
+      "kind": "sanitized-live-producer-candidate",
+      "client": "Windows cm 11.0.16.10468",
+      "sourceReceipt": "06-added-xml.json",
+      "sourceStdoutSha256": "4b68853211ea1f0f9524a51fbfc39cc85fe1e6e3c0a4b99c091783631ddce2d2",
+      "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged.",
+      "admissionScope": "Bounded Windows cm 11.0.16.10468 XML observation only; no readiness, base revision identity, server alias equivalence or client-family claim. Adversarial test derivatives are synthetic, not additional live observations."
+    },
+    "argv": [
+      "status",
+      "--xml",
+      "--encoding=utf-8",
+      "--fullpaths"
+    ],
+    "exitCode": 0,
+    "stdout": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<StatusOutput>\r\n  <WorkspaceStatus>\r\n    <Status>\r\n      <RepSpec>\r\n        <Server>example-numeric@cloud</Server>\r\n        <Name>Example Repository</Name>\r\n      </RepSpec>\r\n      <Changeset>16</Changeset>\r\n    </Status>\r\n  </WorkspaceStatus>\r\n  <WkConfigType>Branch</WkConfigType>\r\n  <WkConfigName>/main/evidence@Example Repository@example-numeric@cloud</WkConfigName>\r\n  <Changes>\r\n    <Change>\r\n      <Type>AD</Type>\r\n      <TypeVerbose>Added</TypeVerbose>\r\n      <Path>C:\\Example\\workspace\\fixtures\\evidence</Path>\r\n      <OldPath />\r\n      <PrintableMovedPath />\r\n      <MergesInfo />\r\n      <SimilarityPerUnit>0</SimilarityPerUnit>\r\n      <Similarity />\r\n      <Size>0</Size>\r\n      <PrintableSize />\r\n      <PrintableLastModified>Just now</PrintableLastModified>\r\n      <RevisionType>enDirectory</RevisionType>\r\n      <LastModified>2026-10-20T07:53:26-04:00</LastModified>\r\n    </Change>\r\n    <Change>\r\n      <Type>AD</Type>\r\n      <TypeVerbose>Added</TypeVerbose>\r\n      <Path>C:\\Example\\workspace\\fixtures\\evidence\\binary.bin</Path>\r\n      <OldPath />\r\n      <PrintableMovedPath />\r\n      <MergesInfo />\r\n      <SimilarityPerUnit>0</SimilarityPerUnit>\r\n      <Similarity />\r\n      <Size>6</Size>\r\n      <PrintableSize>6 bytes</PrintableSize>\r\n      <PrintableLastModified>Just now</PrintableLastModified>\r\n      <RevisionType>enBinaryFile</RevisionType>\r\n      <LastModified>2026-10-20T07:53:26-04:00</LastModified>\r\n    </Change>\r\n    <Change>\r\n      <Type>AD</Type>\r\n      <TypeVerbose>Added</TypeVerbose>\r\n      <Path>C:\\Example\\workspace\\fixtures\\evidence\\changed.txt</Path>\r\n      <OldPath />\r\n      <PrintableMovedPath />\r\n      <MergesInfo />\r\n      <SimilarityPerUnit>0</SimilarityPerUnit>\r\n      <Similarity />\r\n      <Size>311</Size>\r\n      <PrintableSize>311 bytes</PrintableSize>\r\n      <PrintableLastModified>Just now</PrintableLastModified>\r\n      <RevisionType>enTextFile</RevisionType>\r\n      <LastModified>2026-10-20T07:53:26-04:00</LastModified>\r\n    </Change>\r\n    <Change>\r\n      <Type>AD</Type>\r\n      <TypeVerbose>Added</TypeVerbose>\r\n      <Path>C:\\Example\\workspace\\fixtures\\evidence\\replaced.txt</Path>\r\n      <OldPath />\r\n      <PrintableMovedPath />\r\n      <MergesInfo />\r\n      <SimilarityPerUnit>0</SimilarityPerUnit>\r\n      <Similarity />\r\n      <Size>17</Size>\r\n      <PrintableSize>17 bytes</PrintableSize>\r\n      <PrintableLastModified>Just now</PrintableLastModified>\r\n      <RevisionType>enTextFile</RevisionType>\r\n      <LastModified>2026-10-20T07:53:26-04:00</LastModified>\r\n    </Change>\r\n  </Changes>\r\n</StatusOutput>\r\n",
+    "stderr": ""
+  },
+  {
+    "label": "09-ordinary-changed-xml",
+    "provenance": {
+      "kind": "sanitized-live-producer-candidate",
+      "client": "Windows cm 11.0.16.10468",
+      "sourceReceipt": "09-ordinary-changed-xml.json",
+      "sourceStdoutSha256": "c9e0fc189fce457aebf50ebf615420f3a22c9c0b55bd132f8b621a6b5ec8d6b5",
+      "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged.",
+      "admissionScope": "Bounded Windows cm 11.0.16.10468 XML observation only; no readiness, base revision identity, server alias equivalence or client-family claim. Adversarial test derivatives are synthetic, not additional live observations."
+    },
+    "argv": [
+      "status",
+      "--xml",
+      "--encoding=utf-8",
+      "--fullpaths"
+    ],
+    "exitCode": 0,
+    "stdout": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<StatusOutput>\r\n  <WorkspaceStatus>\r\n    <Status>\r\n      <RepSpec>\r\n        <Server>example-numeric@cloud</Server>\r\n        <Name>Example Repository</Name>\r\n      </RepSpec>\r\n      <Changeset>42</Changeset>\r\n    </Status>\r\n  </WorkspaceStatus>\r\n  <WkConfigType>Branch</WkConfigType>\r\n  <WkConfigName>/main/evidence@Example Repository@example-numeric@cloud</WkConfigName>\r\n  <Changes>\r\n    <Change>\r\n      <Type>CH</Type>\r\n      <TypeVerbose>Changed</TypeVerbose>\r\n      <Path>C:\\Example\\workspace\\fixtures\\evidence\\binary.bin</Path>\r\n      <OldPath />\r\n      <PrintableMovedPath />\r\n      <MergesInfo />\r\n      <SimilarityPerUnit>0</SimilarityPerUnit>\r\n      <Similarity />\r\n      <Size>6</Size>\r\n      <PrintableSize>6 bytes</PrintableSize>\r\n      <PrintableLastModified>Just now</PrintableLastModified>\r\n      <RevisionType>enBinaryFile</RevisionType>\r\n      <LastModified>2026-10-20T07:53:33-04:00</LastModified>\r\n    </Change>\r\n    <Change>\r\n      <Type>CH</Type>\r\n      <TypeVerbose>Changed</TypeVerbose>\r\n      <Path>C:\\Example\\workspace\\fixtures\\evidence\\replaced.txt</Path>\r\n      <OldPath />\r\n      <PrintableMovedPath />\r\n      <MergesInfo />\r\n      <SimilarityPerUnit>0</SimilarityPerUnit>\r\n      <Similarity />\r\n      <Size>19</Size>\r\n      <PrintableSize>19 bytes</PrintableSize>\r\n      <PrintableLastModified>Just now</PrintableLastModified>\r\n      <RevisionType>enTextFile</RevisionType>\r\n      <LastModified>2026-10-20T07:53:33-04:00</LastModified>\r\n    </Change>\r\n  </Changes>\r\n</StatusOutput>\r\n",
+    "stderr": ""
+  },
+  {
+    "label": "29-merged-mixed-xml",
+    "provenance": {
+      "kind": "sanitized-live-producer-candidate",
+      "client": "Windows cm 11.0.16.10468",
+      "sourceReceipt": "29-merged-mixed-xml.json",
+      "sourceStdoutSha256": "d3b03efd9fe8d5594897c98d5949b5afd71d5c58b094d7d16461b308f8a7b318",
+      "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged.",
+      "admissionScope": "Bounded Windows cm 11.0.16.10468 XML observation only; no readiness, base revision identity, server alias equivalence or client-family claim. Adversarial test derivatives are synthetic, not additional live observations."
+    },
+    "argv": [
+      "status",
+      "--xml",
+      "--encoding=utf-8",
+      "--fullpaths"
+    ],
+    "exitCode": 0,
+    "stdout": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<StatusOutput>\r\n  <WorkspaceStatus>\r\n    <Status>\r\n      <RepSpec>\r\n        <Server>example-numeric@cloud</Server>\r\n        <Name>Example Repository</Name>\r\n      </RepSpec>\r\n      <Changeset>47</Changeset>\r\n    </Status>\r\n  </WorkspaceStatus>\r\n  <WkConfigType>Branch</WkConfigType>\r\n  <WkConfigName>/main/evidence@Example Repository@example-numeric@cloud</WkConfigName>\r\n  <Changes>\r\n    <Change>\r\n      <Type>CO</Type>\r\n      <TypeVerbose>Checked-out (Merge from 46)</TypeVerbose>\r\n      <Path>C:\\Example\\workspace\\fixtures\\evidence\\changed.txt</Path>\r\n      <OldPath />\r\n      <PrintableMovedPath />\r\n      <MergesInfo> (Merge from 46)</MergesInfo>\r\n      <SimilarityPerUnit>0</SimilarityPerUnit>\r\n      <Similarity />\r\n      <Size>320</Size>\r\n      <PrintableSize>320 bytes</PrintableSize>\r\n      <PrintableLastModified>Just now</PrintableLastModified>\r\n      <RevisionType>enTextFile</RevisionType>\r\n      <LastModified>2026-10-20T07:54:21-04:00</LastModified>\r\n    </Change>\r\n    <Change>\r\n      <Type>RP</Type>\r\n      <TypeVerbose>Replaced (Merge from 46)</TypeVerbose>\r\n      <Path>C:\\Example\\workspace\\fixtures\\evidence\\replaced.txt</Path>\r\n      <OldPath />\r\n      <PrintableMovedPath />\r\n      <MergesInfo> (Merge from 46)</MergesInfo>\r\n      <SimilarityPerUnit>0</SimilarityPerUnit>\r\n      <Similarity />\r\n      <Size>25</Size>\r\n      <PrintableSize>25 bytes</PrintableSize>\r\n      <PrintableLastModified>Just now</PrintableLastModified>\r\n      <RevisionType>enTextFile</RevisionType>\r\n      <LastModified>2026-10-20T07:54:19-04:00</LastModified>\r\n    </Change>\r\n    <Change>\r\n      <Type>CP</Type>\r\n      <TypeVerbose>Copied (new) (Merge from 46)</TypeVerbose>\r\n      <Path>C:\\Example\\workspace\\fixtures\\evidence\\added.txt</Path>\r\n      <OldPath />\r\n      <PrintableMovedPath />\r\n      <MergesInfo> (Merge from 46)</MergesInfo>\r\n      <SimilarityPerUnit>0</SimilarityPerUnit>\r\n      <Similarity />\r\n      <Size>19</Size>\r\n      <PrintableSize>19 bytes</PrintableSize>\r\n      <PrintableLastModified>Just now</PrintableLastModified>\r\n      <RevisionType>enTextFile</RevisionType>\r\n      <LastModified>2026-10-20T07:54:19-04:00</LastModified>\r\n    </Change>\r\n  </Changes>\r\n</StatusOutput>\r\n",
+    "stderr": ""
+  },
+  {
+    "label": "54-unresolved-xml",
+    "provenance": {
+      "kind": "sanitized-live-producer-candidate",
+      "client": "Windows cm 11.0.16.10468",
+      "sourceReceipt": "54-unresolved-xml.json",
+      "sourceStdoutSha256": "625d76b5c250934f9df502c74d408369f93ad4f22737e1ef1a7ad440f696a9f2",
+      "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged.",
+      "admissionScope": "Bounded Windows cm 11.0.16.10468 XML observation only; no readiness, base revision identity, server alias equivalence or client-family claim. Adversarial test derivatives are synthetic, not additional live observations."
+    },
+    "argv": [
+      "status",
+      "--xml",
+      "--encoding=utf-8",
+      "--fullpaths"
+    ],
+    "exitCode": 0,
+    "stdout": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<StatusOutput>\r\n  <WorkspaceStatus>\r\n    <Status>\r\n      <RepSpec>\r\n        <Server>example-numeric@cloud</Server>\r\n        <Name>Example Repository</Name>\r\n      </RepSpec>\r\n      <Changeset>52</Changeset>\r\n    </Status>\r\n  </WorkspaceStatus>\r\n  <WkConfigType>Branch</WkConfigType>\r\n  <WkConfigName>/main/evidence/conflict-target@Example Repository@example-numeric@cloud</WkConfigName>\r\n  <Changes>\r\n    <Change>\r\n      <Type>CO</Type>\r\n      <TypeVerbose>Checked-out</TypeVerbose>\r\n      <Path>C:\\Example\\workspace\\fixtures\\evidence\\changed.txt</Path>\r\n      <OldPath />\r\n      <PrintableMovedPath />\r\n      <MergesInfo />\r\n      <SimilarityPerUnit>0</SimilarityPerUnit>\r\n      <Similarity />\r\n      <Size>337</Size>\r\n      <PrintableSize>337 bytes</PrintableSize>\r\n      <PrintableLastModified>Just now</PrintableLastModified>\r\n      <RevisionType>enTextFile</RevisionType>\r\n      <LastModified>2026-10-20T07:55:34-04:00</LastModified>\r\n    </Change>\r\n  </Changes>\r\n</StatusOutput>\r\n",
+    "stderr": ""
+  }
+]
