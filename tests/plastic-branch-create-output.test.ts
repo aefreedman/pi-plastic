@@ -8,11 +8,14 @@ import { parseBranchCreateParent } from "../src/domain/branch-create-contract";
 import { captureBranchCreateCommand } from "../src/execution/branch-create-command";
 import { runWithAbortSignal } from "../src/execution/context";
 import { executeBranchCreateOutput, branchCreateOutputSchema, validateBranchCreateOutput } from "../src/pi/branch-create-output";
+import { loadRegisteredTools } from "./pi-tool-harness";
+const tools = await loadRegisteredTools();
+const behind: string = JSON.parse(readFileSync(new URL("./fixtures/plastic-behind-head-header.json", import.meta.url), "utf8")).stdout;
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/plastic-branch-create-contract.json", import.meta.url), "utf8"));
 assert(Check(branchCreateOutputSchema, fixture)); assert(validateBranchCreateOutput(fixture));
 const input = { branch: "/main/résumé-é-日本-😀", comment: "Fixture résumé 日本 😀", workdir: "C:/fictional/workspace" };
 type Scenario = { output?: string | Buffer; stderr?: string; code?: number | null; signal?: string; launch?: "sync" | "async"; abort?: boolean; preAbort?: boolean; timeout?: boolean; ignoreTerm?: boolean; decoded?: boolean; lateError?: boolean; streamError?: boolean; status?: string; compact?: string; parentFail?: boolean; missingSpawn?: boolean };
-async function invoke(s: Scenario = {}, args: unknown = input, core = false) {
+async function invoke(s: Scenario = {}, args: unknown = input, core = false, registered = false) {
     const calls: string[][] = [], children: any[] = [], timers: any[] = [];
     const controller = new AbortController();
     if (s.preAbort) controller.abort();
@@ -37,7 +40,7 @@ async function invoke(s: Scenario = {}, args: unknown = input, core = false) {
         }); return c;
     }) as any;
     const deps = { spawn, setTimeout: ((cb: () => void, delay: number) => { const t = setTimeout(cb, delay); timers.push(t); if (s.timeout && (delay === 30000 || s.ignoreTerm && delay === 5000)) queueMicrotask(cb); return t; }) as any, clearTimeout: clearTimeout as any };
-    const result = await runWithAbortSignal(controller.signal, () => core ? branchCreate.execute(args as any) : executeBranchCreateOutput(args), deps);
+    const result = await runWithAbortSignal(controller.signal, () => registered ? tools.get("plastic_branchCreate")!.execute("behind-head", args, undefined, undefined, { cwd: (args as any)?.workdir ?? process.cwd() }) : core ? branchCreate.execute(args as any) : executeBranchCreateOutput(args), deps);
     for (const c of children) for (const event of ["spawn", "close", "error"]) assert(c.listenerCount(event) === 0 || event === "error" && c.listeners(event).length === 1 && c.listeners(event)[0].name === "ignoreRetiredError");
     for (const c of children) for (const stream of [c.stdout, c.stderr]) for (const event of ["data", "end", "error", "close"]) assert(stream.listenerCount(event) === 0 || event === "error" && stream.listeners(event).length === 1 && stream.listeners(event)[0].name === "ignoreRetiredError");
     for (const t of timers) assert(t._destroyed, "timers cleaned up");
@@ -56,6 +59,15 @@ for (const s of [{ code: 1 }, { code: null }, { signal: "SIGTERM" }, { stderr: "
 for (const s of [{ launch: "sync" }, { launch: "async" }, { preAbort: true }] as Scenario[]) { r = await invoke(s); assert.equal(r.dto.outcome, "failed"); assert.equal(r.dto.data.effect, "not-attempted"); }
 for (const args of [{}, { ...input, extra: true }, { ...input, branch: " " }, { ...input, branch: "x".repeat(4097) }, { ...input, comment: "bad\uD800" }, { ...input, comment: " " }, { ...input, commentsFile: "comment.txt" }, { ...input, changeset: "cs:1", label: "lb:v1" }, { ...input, allowRootBranch: "true" }, { ...input, branch: "/root" }]) { r = await invoke({}, args); assert(!r.dto.ok); assert.equal(r.calls.length, 0); }
 r = await invoke({}, { ...input, branch: "child", parent: "/release", changeset: "cs:9007199254740993", comment: undefined, commentsFile: "fixture-comment.txt" }); assert(r.dto.ok); assert.equal(r.dto.data.parentResolution.basis, "explicit"); assert.deepEqual(r.calls, [["branch", "create", "/release/child", "--changeset=cs:9007199254740993", "-commentsfile=fixture-comment.txt"]]);
+for (const registered of [false,true]) {
+ const created = await invoke({ status: behind }, { ...input, branch: "child" }, false, registered);
+ assert(created.dto.ok);assert.equal(created.dto.data.resolvedTarget,"/main/evidence/child");
+ assert.equal(created.dto.data.parentResolution.observedBranch,"/main/evidence");
+ assert.deepEqual(created.calls,[["status"],["branch","create","/main/evidence/child",`-c=${input.comment}`]]);
+ const rejected = await invoke({ status: behind + behind }, { branch: "child" }, false, registered);
+ assert(!rejected.dto.ok);assert.equal(rejected.dto.data.effect,"not-attempted");
+ assert.deepEqual(rejected.calls,[["status"],["status","--compact"]]);
+}
 r = await invoke({}, { ...input, branch: "child" }); assert(r.dto.ok); assert.equal(r.dto.data.parentResolution.basis, "status"); assert.equal(r.calls.length, 2); assert.deepEqual(r.calls[0], ["status"]); assert.equal(r.dto.data.resolvedTarget, "/main/child");
 r = await invoke({ status: input.branch + "@Fictional Repository@fictional-org@cloud (cs:16 - head)\r\n" }, { branch: "child" }); assert(r.dto.ok); assert.equal(r.dto.data.resolvedTarget, input.branch + "/child");
 for (const status of ["\uFEFF/main@rep@server (cs:16 - head)", "", "unknown", "cs:16@rep:Fixture@repserver:fixture@cloud", "/one@rep@server (cs:16 - head)\n/two@rep@server (cs:16 - head)", "/ma?n@rep@server (cs:16 - head)", "/m�in@rep@server (cs:16 - head)"]) { r = await invoke({ status }, { branch: "child" }); assert(!r.dto.ok); assert.equal(r.dto.data.effect, "not-attempted"); assert.deepEqual(r.calls, [["status"], ["status", "--compact"]]); }
@@ -88,6 +100,15 @@ await assert.rejects(() => invoke({}, { branch: "/root" }, true), /Refusing to c
 }
 assert.equal(parseBranchCreateParent("/main@rep@server (cs:9007199254740993 - head)\r\n"), "/main");
 assert.equal(parseBranchCreateParent("/main@rep@server (cs:9007199254740993x - head)"), null);
+assert.equal(parseBranchCreateParent(behind), "/main/evidence");
+// Synthetic adversarial derivatives of the bounded live header.
+for (const id of ["0", "9007199254740993", "99999999999999999999"]) assert.equal(parseBranchCreateParent(behind.replace("head:43", `head:${id}`)), "/main/evidence");
+for (const id of ["", "-1", "+43", "043", "43.0", "43x", "100000000000000000000", "４３", "43\u0000"]) {
+    assert.equal(parseBranchCreateParent(behind.replace("head:43", `head:${id}`)), null);
+    assert.equal(parseBranchCreateParent(behind.replace("cs:42", `cs:${id}`)), null);
+}
+for (const text of [behind + behind, behind + "/other@rep@server (cs:1 - head)", "/other@rep@server (cs:1 - head)\n" + behind, behind.trimEnd() + " junk", behind + "unknown", behind.replace("/main/evidence", "/main/e?vidence"), behind.replace("/main/evidence", "/main/e�vidence"), behind.replace("/main/evidence", "/main/" + "x".repeat(4096)), behind.replace("/main/evidence", "/main/\uD800"), "cs:42@rep:Example Repository@example@unity"]) assert.equal(parseBranchCreateParent(text), null);
+assert.equal(parseBranchCreateParent(behind.replace("/main/evidence", input.branch)), input.branch);
 // Byte-decoding must not silently remove a source BOM or merge split codepoints.
 const captured = await runWithAbortSignal(undefined, () => captureBranchCreateCommand(["status"]), {
     spawn: (() => {

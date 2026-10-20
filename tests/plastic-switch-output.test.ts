@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { Check } from "typebox/value";
@@ -7,18 +8,19 @@ import { switchBranch } from "../src/operations/switch";
 import { runWithAbortSignal } from "../src/execution/context";
 import { parseSwitchPending, parseSwitchLoadedBranch } from "../src/domain/switch-contract";
 import { loadRegisteredTools } from "./pi-tool-harness";
+const behind: string = JSON.parse(readFileSync(new URL("./fixtures/plastic-behind-head-header.json", import.meta.url), "utf8")).stdout;
 const cwd="C:\\Example\\workspace",us="\x1f",repo="Example Repository",server="example@unity";
 const header=(b="/main/source",r=repo,s=server)=>`${b}@${r}@${s} (cs:123 - head)\r\n`;
 const pending=(kind="")=>["STATUS","123",repo,server].join(us)+"\r\n"+(kind?kind.split(",").map((k,i)=>[k,cwd+`\\fixture-${i}.txt`,"False",k==="PR"||k==="AD"?"-1":"125","NO_MERGES"].join(us)+"\r\n").join(""):"");
 type Slot={out?:string|Buffer;err?:string;code?:number;noSpawn?:boolean;stall?:boolean;throws?:boolean;streamError?:boolean};
-async function invoke(args:Record<string,unknown>,slots:Slot[],core=false){
+async function invoke(args:Record<string,unknown>,slots:Slot[],core=false,registered=false){
  const calls:string[][]=[],children:any[]=[];const controller=new AbortController();
  const deps={timeoutMs:15,abortKillDelayMs:2,spawn:((_:string,argv:string[])=>{
   calls.push([...argv]);const slot=slots.shift();assert(slot,"Unexpected source command "+JSON.stringify(argv));if(slot.throws)throw Object.assign(Error("Private launch detail"),{code:"ENOENT"});
   const c=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill(){return false;}});children.push(c);
   queueMicrotask(()=>{if(!slot.noSpawn)c.emit("spawn");if(slot.stall)return;if(slot.streamError)c.stdout.destroy(Error("Private stream detail"));else c.stdout.end(slot.out??"");c.stderr.end(slot.err??"");c.emit("close",slot.code??0,null);});return c;
  }) as any};
- const result=await runWithAbortSignal(controller.signal,()=>core?switchBranch.execute({...args,workdir:cwd} as any):executeSwitchOutput({...args,workdir:cwd}),deps);
+ const result=await runWithAbortSignal(controller.signal,()=>registered?tools.get("plastic_switchBranch")!.execute("behind-head",{...args,workdir:cwd},undefined,undefined,{cwd}):core?switchBranch.execute({...args,workdir:cwd} as any):executeSwitchOutput({...args,workdir:cwd}),deps);
  if(!core){const r=result as any;assert(Check(switchOutputSchema,r.structuredContent));assert(validateSwitchOutput(r.structuredContent));assert.equal(r.isError,!r.structuredContent.ok);assert.deepEqual(r.details,{});assert(!JSON.stringify(r.structuredContent).includes("Private stream detail"));}
  return {result:result as any,calls,children};
 }
@@ -27,6 +29,19 @@ assert(!validateSwitchOutput({...empty.structuredContent,foreign:true}));
 const tools=await loadRegisteredTools();assert.deepEqual(tools.get("plastic_switchBranch")!.outputSchema,switchOutputSchema);
 if(process.platform==="win32"){
  const clean=()=>[{out:header()},{out:pending()}];
+ // Numeric head must not redirect loaded branch identity or imply latest content.
+ for (const registered of [false,true]) {
+  const r=await invoke({branch:`/main/evidence@${repo}@${server}`},[{out:behind},{out:pending()}],false,registered);
+  assert.equal(r.result.structuredContent.outcome,"already-loaded");assert.equal(r.calls.length,2);
+  assert.equal(r.result.structuredContent.data.branchBefore.branch,"/main/evidence");
+  const switched=await invoke({branch:`/main/evidence@${repo}@${server}`},[{out:header()},{out:pending()},{out:""},{out:behind}],false,registered);
+  assert.equal(switched.result.structuredContent.outcome,"switched");assert.equal(switched.calls.length,4);
+  assert.equal(switched.result.structuredContent.data.targetVerification,"exact-qualifier-spelling");
+  assert.deepEqual(Object.keys(switched.result.structuredContent.data.branchAfter).sort(),["basis","branch","repository","scope","server"]);
+  const rejected=await invoke({branch:"/main/evidence"},[{out:behind+header()}],false,registered);
+  assert(rejected.result.isError);assert.equal(rejected.calls.length,1);
+ }
+
  const direct=await invoke({branch:"/main/target"},[...clean(),{out:""},{out:header("/main/target")}]);
  assert.equal(direct.result.structuredContent.outcome,"switched");assert.equal(direct.result.structuredContent.data.targetVerification,"name-only");assert.deepEqual(direct.calls.map(a=>a[0]),["status","status","switch","status"]);
  const text=direct.result.structuredContent;
@@ -77,4 +92,13 @@ if(process.platform==="win32"){
 }
 assert.equal(parseSwitchPending(pending()+Array.from({length:20000},(_,i)=>["PR",cwd+`\\${i}.txt`,"False","-1","NO_MERGES"].join(us)+"\n").join(""),cwd).admitted,false);
 assert.equal(parseSwitchLoadedBranch(header()+header()),null);
+assert.deepEqual(parseSwitchLoadedBranch(behind),{branch:"/main/evidence",repository:repo,server,basis:"standard-status",scope:"loaded-workspace"});
+// Synthetic adversarial derivatives; revision tokens never pass through JS numbers.
+for (const id of ["0","9007199254740993","99999999999999999999"]) assert(parseSwitchLoadedBranch(behind.replace("head:43",`head:${id}`)));
+for (const id of ["","-1","+43","043","43.0","43x","100000000000000000000","４３","43\u0000"]) {
+ assert.equal(parseSwitchLoadedBranch(behind.replace("head:43",`head:${id}`)),null);
+ assert.equal(parseSwitchLoadedBranch(behind.replace("cs:42",`cs:${id}`)),null);
+}
+for (const text of [behind+behind,behind+header(),header()+behind,behind.trimEnd()+" junk",behind.replace("/main/evidence","/main/e?vidence"),behind.replace("/main/evidence","/main/bad\\path"),behind.replace("example@unity","example@unity@cloud"),behind.replace("/main/evidence","/main/"+"x".repeat(4096)),"cs:42@rep:Example Repository@example@unity",behind.replace("/main/evidence","/main/\uD800")]) assert.equal(parseSwitchLoadedBranch(text),null);
+assert.equal(parseSwitchLoadedBranch(behind.replace("/main/evidence","/main/résumé-é-日本-😀"))?.branch,"/main/résumé-é-日本-😀");
 console.log("PASS: switch closed/semantic schemas, genuine-source shapes, same-observation formats, qualifier/fork safety, pending policy matrix, exact recovery admission, partial effects, core rejection, byte/record/lifecycle bounds and no retry");

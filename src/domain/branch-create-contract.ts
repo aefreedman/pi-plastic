@@ -32,7 +32,8 @@ export const safeBranchCreateText = (s: string): boolean => s.length <= 4096 && 
 export function parseBranchCreateParent(output: string): string | null {
     const lines = output.split(/\r?\n/).filter(line => line.length > 0);
     if (lines.length !== 1) return null;
-    const match = /^(\/[^@]+)@[^@]+@[^\s]+ \(cs:(?:0|[1-9][0-9]{0,19}) - head\)$/u.exec(lines[0]!);
+    // Resolve the loaded branch only; a numeric head does not change its identity.
+    const match = /^(\/[^@]+)@[^@]+@[^\s]+ \(cs:(?:0|[1-9][0-9]{0,19}) - head(?::(?:0|[1-9][0-9]{0,19}))?\)$/u.exec(lines[0]!);
     if (!match || !safeBranchCreateText(match[1]!) || !/^\/(?:[^/@\\]+)(?:\/[^/@\\]+)*$/u.test(match[1]!) || match[1] !== match[1]!.trim() || /[?\uFFFD]/u.test(match[1]!)) return null;
     return match[1]!;
 }

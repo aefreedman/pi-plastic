@@ -1,0 +1,17 @@
+{
+  "label": "12-behind-standard",
+  "provenance": {
+    "kind": "sanitized-live-producer-candidate",
+    "client": "Windows cm 11.0.16.10468",
+    "sourceReceipt": "12-behind-standard.json",
+    "sourceStdoutSha256": "8345296d0dafdf9a7612b160a9204c79d483431f403650222f6ffc0cac7b4e9b",
+    "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged.",
+    "admissionScope": "Additional bounded Windows cm 11.0.16.10468 behind-head observation for branch identity only. Existing sourceAdmission literals retain the prior cm 11.0.16.10371 observation; neither literal nor fixture claims a client family, loaded/head equivalence, or latest-content verification. Adversarial test derivatives are synthetic, not additional live observations."
+  },
+  "argv": [
+    "status"
+  ],
+  "exitCode": 0,
+  "stdout": "/main/evidence@Example Repository@example@unity (cs:42 - head:43)\r\n\r\n",
+  "stderr": ""
+}

@@ -21,7 +21,8 @@ export function parseSwitchTarget(value: string) {
 }
 export function parseSwitchLoadedBranch(text: string): SwitchBranchObservation | null {
     const lines = text.split(/\r?\n/);
-    const grammar = /^(\/[^@]+)@([^@]+)@([^\s]+) \(cs:(?:0|[1-9][0-9]{0,19}) - head\)$/u;
+    // A numeric head is an annotation, not the loaded changeset or branch owner.
+    const grammar = /^(\/[^@]+)@([^@]+)@([^\s]+) \(cs:(?:0|[1-9][0-9]{0,19}) - head(?::(?:0|[1-9][0-9]{0,19}))?\)$/u;
     const match = grammar.exec(lines[0] ?? "");
     if (!match || lines.slice(1).some(line => grammar.test(line)) || !hierarchy(match[1]) || !identity(match[2]) || !identity(match[3]) || !safeSwitchValue(`${match[1]}@${match[2]}@${match[3]}`) || !parseSwitchTarget(`${match[1]}@${match[2]}@${match[3]}`)) return null;
     return { branch: match[1], repository: match[2], server: match[3], basis: "standard-status", scope: "loaded-workspace" };
