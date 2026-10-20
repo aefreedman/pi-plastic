@@ -1,3 +1,4 @@
+import { parseMergedPending, correlateMergedApply, admitMergedStandardStatus } from "../domain/merged-workspace";
 import { randomBytes } from "node:crypto";
 import { win32 } from "node:path";
 import { parseCopiedPending, admitCopiedStandardStatus, copiedPendingArgv, copiedPathKey } from "../domain/copied-merge";
@@ -22,21 +23,23 @@ export async function assembleWorkspaceMergeReceipt(action:MergeAction,args:unkn
   active="apply";const apply=await captureWorkspaceMergeCommand([...data.intendedArgv],cwd);data.apply={attempt:apply.attempt,capture:apply.capture,admission:"unsupported"};active=null;data.effect=["started","unknown"].includes(apply.attempt.state)?"uncertain":"not-attempted";
   if(!apply.capture.complete||apply.failed||apply.attempt.state!=="started")return workspaceMergeFailure(action,data,apply.attempt.aborted?"aborted":data.effect==="not-attempted"?"launch_failed":"uncertain","Merge capture/start/completion is not established; do not retry automatically.");
   data.commandCompleted=apply.attempt.exitCode===0;
-  const parsed=admitWorkspaceMergeOutput(apply.stdout!,token);data.protocol=parsed.protocol;data.pendingReadMode=parsed.protocol==="apply-add-copied"?"copied-machine":"short";data.fileConflictCount=parsed.fileConflictCount;data.apply.admission=parsed.protocol==="unsupported"?"unsupported":"admitted";
+  const parsed=admitWorkspaceMergeOutput(apply.stdout!,token);data.protocol=parsed.protocol;data.pendingReadMode=parsed.protocol==="merged-candidate"?"merged-machine":parsed.protocol==="apply-add-copied"?"copied-machine":"short";data.fileConflictCount=parsed.fileConflictCount;data.apply.admission=parsed.protocol==="unsupported"?"unsupported":"admitted";
   if(parsed.protocol==="file-conflict"){data.checkinReadiness="blocked";return workspaceMergeFailure(action,data,"conflict","Observed file-conflict records; checkin blocked. Earlier effects are not disproven.");}
   if(!data.commandCompleted)return workspaceMergeFailure(action,data,"uncertain","Merge exited nonzero; workspace effects may already exist.");
   if(parsed.protocol==="unsupported")return workspaceMergeFailure(action,data,"unsupported_readiness","Merge completed; applying profile unadmitted. Inspect apply.admission/protocol; verify loaded package revision and retain sanitized producer evidence. Readiness unknown; do not reapply automatically or infer rollback.");
-  const copied=parsed.protocol==="apply-add-copied";data.pendingReadMode=copied?"copied-machine":"short";
-  if(copied&&process.platform!=="win32")return workspaceMergeFailure(action,data,"unsupported_readiness","Copied readiness is sourced only on the observed Windows client.");
-  active="shortStatus";const short=await captureWorkspaceMergeCommand(copied?[...copiedPendingArgv]:["status","--short"],cwd);data.shortStatus={attempt:short.attempt,capture:short.capture,admission:"unsupported"};active=null;
+  const merged=parsed.protocol==="merged-candidate";const copied=parsed.protocol==="apply-add-copied";data.pendingReadMode=merged?"merged-machine":copied?"copied-machine":"short";
+  if(merged&&(strategy!=="auto"||cherry||forced))return workspaceMergeFailure(action,data,"unsupported_readiness","Merged readiness is sourced only for automatic non-forced, non-cherrypicked apply; do not reapply automatically.");
+  if((copied||merged)&&process.platform!=="win32")return workspaceMergeFailure(action,data,"unsupported_readiness","Copied readiness is sourced only on the observed Windows client.");
+  active="shortStatus";const short=await captureWorkspaceMergeCommand((copied||merged)?[...copiedPendingArgv]:["status","--short"],cwd);data.shortStatus={attempt:short.attempt,capture:short.capture,admission:"unsupported"};active=null;
   if(!short.capture.complete||short.failed||short.attempt.exitCode!==0)return workspaceMergeFailure(action,data,"unsupported_readiness","Merge command completed; pending read failed/incomplete. Checkin readiness unknown.");
+  const mergedPending=merged?parseMergedPending(short.stdout!,cwd):null;
   const pending=copied?parseCopiedPending(short.stdout!,cwd):null;
   const copiedKeys=pending?.paths.map(copiedPathKey)??[];
   const coherent=!!pending&&parsed.copiedPaths.length===copiedKeys.length&&new Set(parsed.copiedPaths.map(copiedPathKey)).size===copiedKeys.length&&parsed.copiedPaths.every(p=>copiedKeys.includes(copiedPathKey(p)))&&new Set(parsed.addedPaths.map(p=>copiedPathKey(win32.join(cwd,p)))).size===copiedKeys.length&&parsed.addedPaths.every(p=>p.startsWith("/")&&!p.includes("\\")&&p.slice(1).split("/").every(v=>v!==""&&v!=="."&&v!==".."&&!/[?\uFFFD]/u.test(v))&&copiedKeys.includes(copiedPathKey(win32.join(cwd,p))));
-  data.shortStatus.admission=(copied?coherent:short.stdout==="")&&short.stderr===""?"admitted":"unsupported";
+  data.shortStatus.admission=(merged?!!mergedPending&&correlateMergedApply(parsed.declarations!,mergedPending,cwd):copied?coherent:short.stdout==="")&&short.stderr===""?"admitted":"unsupported";
   active="fullStatus";const full=await captureWorkspaceMergeCommand(["status"],cwd);data.fullStatus={attempt:full.attempt,capture:full.capture,admission:"unsupported"};active=null;
   if(!full.capture.complete||full.failed||full.attempt.exitCode!==0)return workspaceMergeFailure(action,data,"unsupported_readiness","Merge command completed; merge-state read failed/incomplete. Checkin readiness unknown.");
-  data.fullStatus.admission=(copied?!!pending&&admitCopiedStandardStatus(full.stdout!,pending,source,cwd):admitCleanStandardStatus(full.stdout!))&&full.stderr===""?"admitted":"unsupported";
+  data.fullStatus.admission=(merged?!!mergedPending&&admitMergedStandardStatus(full.stdout!,mergedPending,source,cwd):copied?!!pending&&admitCopiedStandardStatus(full.stdout!,pending,source,cwd):admitCleanStandardStatus(full.stdout!))&&full.stderr===""?"admitted":"unsupported";
   // No warning/unknown stderr can authorize compound checkin.
   if(apply.stderr!=="")return workspaceMergeFailure(action,data,"unsupported_readiness","Merge command completed; applying stderr is outside the admitted warning profile. Checkin paused; prior effects remain possible. Do not reapply automatically.");
   if(data.shortStatus.admission!=="admitted")return workspaceMergeFailure(action,data,"unsupported_readiness",copied?"Merge command completed; copied pending/ADD/path cardinality correlation is unadmitted (shortStatus). Checkin paused; inspect separately authorized pending evidence without reapplying merge.":"Merge command completed; shortStatus pending/warning evidence is unadmitted. Checkin paused; inspect separately authorized pending evidence without reapplying merge.");

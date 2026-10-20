@@ -1,0 +1,333 @@
+{
+  "note": "Additional bounded Windows cm 11.0.16.10468 observations. Existing sourceAdmission literal is retained for backwards contract compatibility, not a claim of exclusive producer version or family support. Adversarial mutations in tests are synthetic, not live captures. Xlinks unverified.",
+  "fixtures": [
+    {
+      "label": "18-apply-replaced",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "18-apply-replaced.json",
+        "sourceStdoutSha256": "afe806799a6f9ae1172ee77e39eba8550a02f07b89d331135389aa1cade29a9b",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "merge",
+        "/main/evidence/replace-source",
+        "--merge",
+        "--nointeractiveresolution",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__",
+        "--mergetype=try"
+      ],
+      "exitCode": 0,
+      "stdout": "__EV_S__FILE_SRC__EV_F__/fixtures/evidence/replaced.txt__EV_F__43__EV_F__44__EV_F__931__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\replaced.txt__EV_E__\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "19-merged-replaced-machine",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "19-merged-replaced-machine.json",
+        "sourceStdoutSha256": "dbf112ceef62e61c4069009ea10b1aa5df6889b8bc085ef2d713f9befe33f0dd",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "status",
+        "--machinereadable",
+        "--includeRevId",
+        "--fieldseparator=\u001f"
+      ],
+      "exitCode": 0,
+      "stdout": "STATUS\u001f43\u001fExample Repository\u001fexample@unity\r\nRP\u001fC:\\Example\\workspace\\fixtures\\evidence\\replaced.txt\u001fFalse\u001f932\u001fMerge from 44\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "19-merged-replaced-standard",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "19-merged-replaced-standard.json",
+        "sourceStdoutSha256": "838f1b3dbcf72d4d66c6675f11646b76f6ca69652de8b14d2dce3b6a4ae9097a",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "status"
+      ],
+      "exitCode": 0,
+      "stdout": "/main/evidence@Example Repository@example@unity (cs:43 - head)\r\n\r\nPending merge links\r\n    Merge from cs:44 at /main/evidence/replace-source@Example Repository@example@unity\r\n\r\nChanged\r\n    Status                      Size        Last Modified    Path                                       \r\n\r\n    Replaced (Merge from 44)    25 bytes    Just now         fixtures\\evidence\\replaced.txt    \r\n\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "20-replaced-merge-checkin",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "20-replaced-merge-checkin.json",
+        "sourceStdoutSha256": "efa59ebf214e8a19196d883da596f6d2cd5b1bb793a535e007664a64e77a2592",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "checkin",
+        "-c=test(protocol): 20-replaced-merge-checkin",
+        "--all",
+        "--applychanged",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__"
+      ],
+      "exitCode": 0,
+      "stdout": "__EV_S__CI_START__EV_E__\r\n__EV_S__STAGE__EV_F__Validating checkin data__EV_E__\r\n__EV_S__STAGE__EV_F__Uploading file data__EV_E__\r\n__EV_S__STAGE__EV_F__Confirming checkin operation__EV_E__\r\n__EV_S__STAGE__EV_F__Confirming checkin operation__EV_E__\r\n__EV_S__STAGE__EV_F____EV_E__\r\n__EV_S__CO__EV_F__C:\\Example\\workspace\\fixtures\\evidence__EV_E__\r\n__EV_S__RP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\replaced.txt__EV_E__\r\n__EV_S__CHANGESET__EV_F__cs:45@br:/main/evidence@Example Repository@example@unity (mount:'/')__EV_E__\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "28-apply-mixed",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "28-apply-mixed.json",
+        "sourceStdoutSha256": "ec3d63dac0a31452114147ad7ba34b198c7099a7d373e15c38391985119273d0",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "merge",
+        "/main/evidence/mixed-source",
+        "--merge",
+        "--nointeractiveresolution",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__",
+        "--mergetype=try"
+      ],
+      "exitCode": 0,
+      "stdout": "__EV_S__FILE_SRC__EV_F__/fixtures/evidence/replaced.txt__EV_F__44__EV_F__46__EV_F__931__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/added.txt__EV_E__\r\n__EV_S__FILE_CONFLICT__EV_F__/fixtures/evidence/changed.txt__EV_F__42__EV_F__46__EV_F__47__EV_F__930__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\added.txt__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\replaced.txt__EV_E__\r\n__EV_S__DO_MERGE__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed.txt__EV_E__\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "29-merged-mixed-machine",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "29-merged-mixed-machine.json",
+        "sourceStdoutSha256": "4a64dab4f063348565f48830ca9395e082828352f1cb150d277ceac769ca9d2a",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "status",
+        "--machinereadable",
+        "--includeRevId",
+        "--fieldseparator=\u001f"
+      ],
+      "exitCode": 0,
+      "stdout": "STATUS\u001f47\u001fExample Repository\u001fexample@unity\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\added.txt\u001fFalse\u001f944\u001fMerge from 46\r\nRP\u001fC:\\Example\\workspace\\fixtures\\evidence\\replaced.txt\u001fFalse\u001f937\u001fMerge from 46\r\nCO\u001fC:\\Example\\workspace\\fixtures\\evidence\\changed.txt\u001fFalse\u001f-1\u001fMerge from 46\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "29-merged-mixed-standard",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "29-merged-mixed-standard.json",
+        "sourceStdoutSha256": "465ce95fdb68182da7942eed68915ad0ba3084d8d63c6bd6007a25ebfbefcbae",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "status"
+      ],
+      "exitCode": 0,
+      "stdout": "/main/evidence@Example Repository@example@unity (cs:47 - head)\r\n\r\nPending merge links\r\n    Merge from cs:46 at /main/evidence/mixed-source@Example Repository@example@unity\r\n\r\nChanged\r\n    Status                                   Size         Last Modified    Path                                       \r\n\r\n    Checked-out (changed) (Merge from 46)    320 bytes    Just now         fixtures\\evidence\\changed.txt     \r\n    Replaced (Merge from 46)                  25 bytes    Just now         fixtures\\evidence\\replaced.txt    \r\n\r\nAdded\r\n    Status                          Size        Last Modified    Path                                    \r\n\r\n    Copied (new) (Merge from 46)    19 bytes    Just now         fixtures\\evidence\\added.txt    \r\n\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "30-mixed-merge-checkin",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "30-mixed-merge-checkin.json",
+        "sourceStdoutSha256": "10625e00ffe7c52b6fc967542362cd65e6cad1d2ec1d61ba767adc02775856b5",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "checkin",
+        "-c=test(protocol): 30-mixed-merge-checkin",
+        "--all",
+        "--applychanged",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__"
+      ],
+      "exitCode": 0,
+      "stdout": "__EV_S__CI_START__EV_E__\r\n__EV_S__STAGE__EV_F__Validating checkin data__EV_E__\r\n__EV_S__STAGE__EV_F__Validating checkin data__EV_E__\r\n__EV_S__STAGE__EV_F__Uploading file data__EV_E__\r\n__EV_S__STAGE__EV_F__Confirming checkin operation__EV_E__\r\n__EV_S__STAGE__EV_F____EV_E__\r\n__EV_S__CO__EV_F__C:\\Example\\workspace\\fixtures\\evidence__EV_E__\r\n__EV_S__CP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\added.txt__EV_E__\r\n__EV_S__RP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\replaced.txt__EV_E__\r\n__EV_S__CO__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed.txt__EV_E__\r\n__EV_S__CHANGESET__EV_F__cs:48@br:/main/evidence@Example Repository@example@unity (mount:'/')__EV_E__\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "38-apply-changed",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "38-apply-changed.json",
+        "sourceStdoutSha256": "e25e9df4fb60abe07a9335bde7dd04884553c58cc8bed39957f0a336225967f1",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "merge",
+        "/main/evidence/changed-source",
+        "--merge",
+        "--nointeractiveresolution",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__",
+        "--mergetype=try"
+      ],
+      "exitCode": 0,
+      "stdout": "__EV_S__FILE_CONFLICT__EV_F__/fixtures/evidence/changed.txt__EV_F__48__EV_F__49__EV_F__50__EV_F__930__EV_E__\r\n__EV_S__DO_MERGE__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed.txt__EV_E__\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "39-merged-changed-machine",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "39-merged-changed-machine.json",
+        "sourceStdoutSha256": "91653c6ce79cc759c1c5d064f66a3e0620ad9e3c6a0191148c1c1cae8778099d",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "status",
+        "--machinereadable",
+        "--includeRevId",
+        "--fieldseparator=\u001f"
+      ],
+      "exitCode": 0,
+      "stdout": "STATUS\u001f50\u001fExample Repository\u001fexample@unity\r\nCO\u001fC:\\Example\\workspace\\fixtures\\evidence\\changed.txt\u001fFalse\u001f-1\u001fMerge from 49\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "39-merged-changed-standard",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "39-merged-changed-standard.json",
+        "sourceStdoutSha256": "18f4701938367dbaee1c50a8d3ed885e13cf4418c3de9e8536f406784e418871",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "status"
+      ],
+      "exitCode": 0,
+      "stdout": "/main/evidence/changed-target@Example Repository@example@unity (cs:50 - head)\r\n\r\nPending merge links\r\n    Merge from cs:49 at /main/evidence/changed-source@Example Repository@example@unity\r\n\r\nChanged\r\n    Status                                   Size         Last Modified    Path                                      \r\n\r\n    Checked-out (changed) (Merge from 49)    336 bytes    Just now         fixtures\\evidence\\changed.txt    \r\n\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "40-changed-merge-checkin",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "40-changed-merge-checkin.json",
+        "sourceStdoutSha256": "dd324b4931119f773ec3ff182621a0b023b364edce682f7c98eb801071a93f0b",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "checkin",
+        "-c=test(protocol): 40-changed-merge-checkin",
+        "--all",
+        "--applychanged",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__"
+      ],
+      "exitCode": 0,
+      "stdout": "__EV_S__CI_START__EV_E__\r\n__EV_S__STAGE__EV_F__Validating checkin data__EV_E__\r\n__EV_S__STAGE__EV_F__Validating checkin data__EV_E__\r\n__EV_S__STAGE__EV_F__Uploading file data__EV_E__\r\n__EV_S__STAGE__EV_F__Confirming checkin operation__EV_E__\r\n__EV_S__STAGE__EV_F____EV_E__\r\n__EV_S__CO__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed.txt__EV_E__\r\n__EV_S__CHANGESET__EV_F__cs:51@br:/main/evidence/changed-target@Example Repository@example@unity (mount:'/')__EV_E__\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "53-apply-unresolved",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "53-apply-unresolved.json",
+        "sourceStdoutSha256": "92b3aac4cc5b92d907c04537fb70c5e7d649efd67b36b3170ce7c2834d50afa4",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "merge",
+        "/main/evidence/changed-source",
+        "--merge",
+        "--nointeractiveresolution",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__",
+        "--mergetype=try"
+      ],
+      "exitCode": 0,
+      "stdout": "__EV_S__FILE_CONFLICT__EV_F__/fixtures/evidence/changed.txt__EV_F__48__EV_F__49__EV_F__52__EV_F__930__EV_E__\r\n__EV_S__DO_MERGE__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed.txt__EV_E__\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "54-unresolved-machine",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "54-unresolved-machine.json",
+        "sourceStdoutSha256": "86e3161142a8442427d8fd3a64811658af7b066d06d4dceac182a54b2ce58912",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "status",
+        "--machinereadable",
+        "--includeRevId",
+        "--fieldseparator=\u001f"
+      ],
+      "exitCode": 0,
+      "stdout": "STATUS\u001f52\u001fExample Repository\u001fexample@unity\r\nCO\u001fC:\\Example\\workspace\\fixtures\\evidence\\changed.txt\u001fFalse\u001f-1\u001fNO_MERGES\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "54-unresolved-standard",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "54-unresolved-standard.json",
+        "sourceStdoutSha256": "92085aa275fadea9a9e68289bc6b1a24fe1a4d5947ca6f28c0572a35909efd3f",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "status"
+      ],
+      "exitCode": 0,
+      "stdout": "/main/evidence/conflict-target@Example Repository@example@unity (cs:52 - head)\r\n\r\nPending merge links\r\n    Merge from cs:49 at /main/evidence/changed-source@Example Repository@example@unity\r\n\r\nChanged\r\n    Status                     Size         Last Modified    Path                                      \r\n\r\n    Checked-out (unchanged)    337 bytes    Just now         fixtures\\evidence\\changed.txt    \r\n\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "62-native-unresolved-checkin",
+      "provenance": {
+        "kind": "sanitized-live-producer-candidate",
+        "client": "Windows cm 11.0.16.10468",
+        "sourceReceipt": "62-native-unresolved-checkin.json",
+        "sourceStdoutSha256": "32c6255ac9b4245b4cc709086ede63e882cd959b89e5b2a8279b8cc8cc3c4eca",
+        "transforms": "Workspace/repository/server/branch/path tokens substituted; XML numeric cloud alias remains distinct from standard unity alias. IDs/timestamps/framing/ordering unchanged."
+      },
+      "argv": [
+        "checkin",
+        "-c=test(protocol): negative unresolved control",
+        "--all",
+        "--applychanged",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__"
+      ],
+      "exitCode": 1,
+      "stdout": "__EV_S__CI_START__EV_E__\r\n__EV_S__STAGE__EV_F____EV_E__\r\n",
+      "stderr": "Error: Checkin operation cannot be started because there is a merge in progress: Finish it before checkin the changes. In progress merge: Merge from cset 49\r\n"
+    }
+  ]
+}

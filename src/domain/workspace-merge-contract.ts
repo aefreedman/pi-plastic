@@ -1,3 +1,4 @@
+import { parseMergedApply, type MergedDeclaration } from "./merged-workspace";
 import type { WorkspaceMergeAttempt, WorkspaceMergeCapture } from "../execution/workspace-merge-command";
 export type { WorkspaceMergeAttempt, WorkspaceMergeCapture } from "../execution/workspace-merge-command";
 export type MergeAction = "merge" | "finalize-merge";
@@ -6,9 +7,9 @@ export const safeMergeText = (v: unknown): v is string => typeof v === "string" 
 export type MergeStage = { attempt: WorkspaceMergeAttempt; capture: WorkspaceMergeCapture | null; admission: "not-observed" | "unsupported" | "admitted" };
 export type WorkspaceMergeData = {
  intendedArgv: readonly string[]; workingDirectory: string | null; requestedSource: string | null; strategy: MergeStrategy | null; cherrypicking: boolean | null; forced: boolean | null; previewRequested: boolean | null; outputFormatRequested: "text" | "json" | null;
- apply: MergeStage; shortStatus: MergeStage; fullStatus: MergeStage; pendingReadMode: "short" | "copied-machine";
+ apply: MergeStage; shortStatus: MergeStage; fullStatus: MergeStage; pendingReadMode: "short" | "copied-machine" | "merged-machine";
  commandCompleted: boolean; observedWorkspaceIdentity: null; observedSourceIdentity: null; observedFinalizedMetadata: null; observedPreservation: null; observedPendingItems: null;
- fileConflictCount: number | null; protocol: "not-observed" | "already-connected" | "file-conflict" | "apply-add" | "apply-add-copied" | "unsupported";
+ fileConflictCount: number | null; protocol: "not-observed" | "already-connected" | "file-conflict" | "apply-add" | "apply-add-copied" | "merged-candidate" | "unsupported";
  checkinReadiness: "unknown" | "blocked" | "supported-no-unresolved-signals"; verification: "unverified"; effect: "not-attempted" | "not-proven" | "uncertain";
 };
 type Header = { schemaVersion: 1; action: MergeAction; provenance: { source: "plastic"; producer: "@aefree/pi-plastic"; contentTrust: "external" }; completeness: { capture: "complete" | "incomplete" | "unknown"; projection: true }; data: WorkspaceMergeData };
@@ -19,7 +20,9 @@ export function buildWorkspaceMergeArgv(source: string, strategy: MergeStrategy,
  if(cherry)result.push("--cherrypicking");if(forced)result.push("--forced");return result;
 }
 /** Narrow observed CM profile. Unknown records/text are not missing-conflict proof. */
-export function admitWorkspaceMergeOutput(text: string, token: string): { protocol: WorkspaceMergeData["protocol"]; fileConflictCount: number | null; copiedPaths: string[]; addedPaths: string[] } {
+export function admitWorkspaceMergeOutput(text: string, token: string): { protocol: WorkspaceMergeData["protocol"]; fileConflictCount: number | null; copiedPaths: string[]; addedPaths: string[]; declarations?: MergedDeclaration[] } {
+ const declarations = parseMergedApply(text, token);
+ if (declarations?.some(d => d.status !== "CP")) return { protocol: "merged-candidate", fileConflictCount: declarations.filter(d => d.status === "CO").length, copiedPaths: [], addedPaths: [], declarations };
  const start=token+"S__",end=token+"E__",field=token+"F__";let rest=text,count=0,conflicts=0,connected=0,adds=0; const copiedPaths:string[]=[], addedPaths:string[]=[];
  while(rest.trim()!==""){
   if(++count>256)return {protocol:"unsupported",fileConflictCount:null,copiedPaths:[],addedPaths:[]};const s=rest.indexOf(start),e=rest.indexOf(end,s+start.length);
