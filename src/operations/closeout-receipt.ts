@@ -3,6 +3,7 @@ import { parseSwitchTarget, parseSwitchLoadedBranch, compareSwitchTarget, parseS
 import { checkinSafeComment, checkinSafeValue } from "../domain/checkin-contract";
 import { admitCleanStandardStatus } from "../domain/workspace-merge-contract";
 import { parseCopiedPending } from "../domain/copied-merge";
+import { parseMergedPending, admitMergedStandardStatus, type MergedPending } from "../domain/merged-workspace";
 import { cmWhereEquals } from "../domain/branches";
 import { buildCloseoutParentArgv, CLOSEOUT_STAGE_NAMES, closeoutChildEffect, closeoutCaptures, type CloseoutData, type CloseoutReceipt, type CloseoutRequest, type CloseoutStageName, type CloseoutRead, type CloseoutStage } from "../domain/closeout-contract";
 import { captureWorkspaceMergeCommand, emptyWorkspaceMergeAttempt } from "../execution/workspace-merge-command";
@@ -29,7 +30,7 @@ export async function assembleCloseoutReceipt(input:unknown):Promise<CloseoutRec
  };
  const push=(s:CloseoutStage)=>{if(data.stages.length>=16)throw Error();data.stages.push(s);data.unattemptedStages=data.unattemptedStages.filter(n=>n!==s.name);};
  const read=async(name:CloseoutStageName,argv:string[])=>{stage=name;const s:CloseoutRead={argv:[...argv],attempt:{...emptyWorkspaceMergeAttempt(),state:"unknown"},capture:null,admission:"unsupported",branch:null,parentPath:null,emptyParentResult:false,summary:null};push({name,kind:"read",result:s});const o=await captureWorkspaceMergeCommand([...argv],data.requested!.workdir);s.attempt=o.attempt;s.capture=o.capture;const success=o.capture.complete&&!o.failed&&o.attempt.state==="started"&&o.attempt.terminal==="observed"&&o.attempt.exitCode===0&&!o.attempt.aborted&&!o.attempt.timedOut&&o.stderr===""&&o.stdout!==null;return {s,o,success};};
- const loaded=async(name:CloseoutStageName,verify=false)=>{const {s,o,success}=await read(name,["status"]);if(success){s.branch=parseSwitchLoadedBranch(o.stdout!);if(s.branch)s.admission="admitted";}if(!s.branch)return false;if(verify){data.targetVerification=compareSwitchTarget(s.branch,data.targetBranch!);if(data.targetVerification==="unverified")return false;}return true;};
+ const loaded=async(name:CloseoutStageName,verify=false,mergedPending?:MergedPending|null)=>{const {s,o,success}=await read(name,["status"]);if(success){s.branch=parseSwitchLoadedBranch(o.stdout!);if(s.branch&&(!mergedPending||admitMergedStandardStatus(o.stdout!,mergedPending,data.sourceBranch!,data.requested!.workdir)))s.admission="admitted";else s.branch=null;}if(!s.branch)return false;if(verify){data.targetVerification=compareSwitchTarget(s.branch,data.targetBranch!);if(data.targetVerification==="unverified")return false;}return true;};
  const pending=async(name:"pending-before"|"pending-final")=>{const {s,o,success}=await read(name,[...switchPendingArgv]);if(success){const p=parseSwitchPending(o.stdout!,data.requested!.workdir);if(p.summary){s.admission="admitted";s.summary=p.summary;}}return s.summary;};
  try{
   const submitted=input&&typeof input==="object"&&!Array.isArray(input)?Object.freeze({...input}):input;admitRequest(submitted);const cwd=submitted.workdir??process.cwd();if(!safeSwitchValue(cwd)||!safeSwitchValue(resolve(cwd)))return finish("failed","invalid_request","Closeout needs a bounded workdir.");data.requested={source:submitted.source??null,target:submitted.target??null,message:submitted.message??null,cardRef:submitted.cardRef??null,strategy:submitted.strategy??"auto",updateTarget:submitted.updateTarget??true,includePrivate:submitted.includePrivate??false,preflight:submitted.preflight??false,outputFormat:submitted.format??"text",workdir:cwd};
@@ -60,9 +61,13 @@ export async function assembleCloseoutReceipt(input:unknown):Promise<CloseoutRec
   if(data.requested.updateTarget){stage="update";childEntered=true;const updated=await assembleUpdateReceipt({workdir:cwd});push({name:"update",kind:"update",result:updated});childEntered=false;if(!updated.ok)return finish("failed","child_failed");}
   if(!await loaded("loaded-before-merge",true))return finish("failed","target_unverified");
   stage="merge";childEntered=true;const merged=await assembleWorkspaceMergeReceipt("merge",{source:data.sourceBranch!,strategy:data.requested.strategy,workdir:cwd});push({name:"merge",kind:"merge",result:merged});childEntered=false;if(!merged.ok)return finish("failed","child_failed");
-  const copiedReady=merged.data.protocol==="apply-add-copied";
-  const ready=await read("readiness",copiedReady?[...switchPendingArgv]:["status"]);if(!ready.success||ready.o.stderr!==""||!(copiedReady?!!parseCopiedPending(ready.o.stdout!,cwd):admitCleanStandardStatus(ready.o.stdout!)))return finish("failed","observation_failed","Independent post-merge readiness is outside the admitted profile; no checkin permitted. Prior effects remain possible.");ready.s.admission="admitted";
-  if(!await loaded("loaded-before-checkin",true))return finish("failed","target_unverified");
+  const copiedReady=merged.data.protocol==="apply-add-copied",mergedReady=merged.data.protocol==="merged-candidate";
+  const ready=await read("readiness",copiedReady||mergedReady?[...switchPendingArgv]:["status"]);
+  const mergedPending=mergedReady&&ready.success?parseMergedPending(ready.o.stdout!,cwd):null;
+  if(!ready.success||ready.o.stderr!==""||!(mergedReady?!!mergedPending:copiedReady?!!parseCopiedPending(ready.o.stdout!,cwd):admitCleanStandardStatus(ready.o.stdout!)))return finish("failed","observation_failed","Independent post-merge readiness is outside the admitted profile; no checkin permitted. Prior effects remain possible.");ready.s.admission="admitted";
+  // The independent machine snapshot is not readiness proof by itself: the next
+  // full status must still correlate its source link, namespace and resolved rows.
+  if(!await loaded("loaded-before-checkin",true,mergedPending))return finish("failed","target_unverified");
   const checkinArgs={message:data.checkinMessage,includeAll:true,includePrivate:data.requested.includePrivate,workdir:cwd};
   stage="checkin-preflight";childEntered=true;const preview=await assembleCheckinReceipt({...checkinArgs,preflight:true});push({name:"checkin-preflight",kind:"checkin",result:preview});childEntered=false;if(!preview.ok)return finish("failed","child_failed");
   stage="checkin";childEntered=true;const checked=await assembleCheckinReceipt(checkinArgs);push({name:"checkin",kind:"checkin",result:checked});childEntered=false;data.createdChangeset=checked.data.createdChangeset;if(!checked.ok)return finish("failed","child_failed");

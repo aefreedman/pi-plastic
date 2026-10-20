@@ -58,7 +58,7 @@ export function validateCloseoutOutput(value:unknown):value is CloseoutReceipt {
  for(const [index,s] of stages.entries()) {
   if(s.kind==="read") {
    if(!validateRead(s))return false;
-   if(s.name==="readiness"){const merge=stages.slice(0,index).find(x=>x.kind==="merge");if(!merge||merge.kind!=="merge"||!same(s.result.argv,merge.result.data.protocol==="apply-add-copied"?[...switchPendingArgv]:["status"]))return false;}
+   if(s.name==="readiness"){const merge=stages.slice(0,index).find(x=>x.kind==="merge");if(!merge||merge.kind!=="merge"||!same(s.result.argv,["apply-add-copied","merged-candidate"].includes(merge.result.data.protocol)?[...switchPendingArgv]:["status"]))return false;}
    if(s.name==="parent"){if(!d.sourceBranch||!same(s.result.argv,buildCloseoutParentArgv(d.sourceBranch)))return false;const src=parseSwitchTarget(d.sourceBranch)!;if(s.result.parentPath&&(s.result.parentPath!==src.branch.slice(0,src.branch.lastIndexOf("/"))||!s.result.capture?.stdoutBytes))return false;if(s.result.emptyParentResult&&s.result.capture?.stdoutBytes!==0)return false;if(index<stages.length-1&&(s.result.emptyParentResult||!s.result.parentPath||stages[index+1].name!=="pending-before"))return false;}
    if(index<stages.length-1&&s.result.admission!=="admitted")return false;
    if(s.name.startsWith("loaded-")&&s.name!=="loaded-before"&&s.result.branch){if(!d.targetBranch)return false;lastVerification=compareSwitchTarget(s.result.branch,d.targetBranch);if(index<stages.length-1&&lastVerification==="unverified")return false;}

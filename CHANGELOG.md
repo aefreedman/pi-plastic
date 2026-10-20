@@ -7,6 +7,13 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Fixed
+
+- Admit observed behind-head branch headers for switching and relative branch creation without treating branch head as loaded content.
+- Support observed binary and CO/CP/RP XML status records while retaining whole-document completeness, original status codes and unavailable base-revision identity.
+- Correlate observed automatic resolved replacement/text/mixed merges across applying records, machine pending and source-linked full status before checkin readiness. Revalidate independent closeout observations, keep unresolved text merges stopped before checkin, and never replay uncertain mutations.
+- Admit native RP checkin item events from the captured successful root profile; unknown framing, multiple changesets and unproven Xlink identity remain unsupported.
+
 ## [0.8.3] - 2026-10-13
 
 ### Fixed
