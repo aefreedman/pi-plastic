@@ -7,6 +7,12 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.8.4] - 2026-10-20
+
+### Changed
+
+- Validate against exact Pi 1.3.0 development dependencies; retain manifest-derived installed-version checks.
+
 ### Fixed
 
 - Admit observed behind-head branch headers for switching and relative branch creation without treating branch head as loaded content.
