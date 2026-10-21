@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { mkdtemp, writeFile, rm, mkdir, symlink } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, mkdir, symlink, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { readFileSync } from "node:fs";
@@ -26,7 +26,10 @@ assert.equal(analysisParsed.hasConflict, true); assert.deepEqual(analysisParsed.
 for (const text of [analysisNative.stdout.replace("APPLY__EV_F__RM", "APPLY__EV_F__UNKNOWN"), analysisNative.stdout.replace("/fixtures/evidence/new/Widget2.cs", "relative")]) {
     const bad = parseServerMergeOutput(text, seps, "analyze"); assert(bad.malformed || bad.unknownOperations.length > 0);
 }
-const root = await mkdtemp(join(tmpdir(), "pi-server-real-"));
+// Hosted TMPDIR may traverse macOS /var aliases or Windows short names.
+// Positive inputs must satisfy the production canonical-path guard; keep the
+// explicit alias negative below to prove the guard itself is not relaxed.
+const root = await realpath(await mkdtemp(join(tmpdir(), "pi-server-real-")));
 const json = join(root, "resolution.json"), result = join(root, "result.txt");
 const path = "/fixtures/evidence/changed1.txt";
 const mapping = () => ({ resolutions: [{ path, resultFile: result }] });
@@ -64,7 +67,7 @@ for (const count of [500, 501]) {
 assert.equal(parseServerMergeOutput(native.stdout, { ...seps, start: "" }).malformed, true);
 try {
     await writeFile(result, "reviewed synthetic result\n"); await writeFile(json, JSON.stringify(mapping()));
-    let r = await invoke(); assert.equal(r.dto.outcome, "completed"); assert.equal(r.dto.data.parse.resolvedConflictsVerified, 1); assert.equal(r.dto.data.createdChangeset.id, "61"); assert(r.calls[1].includes("-c=Reviewed\r\nserver result"));
+    let r = await invoke(); assert.equal(r.dto.outcome, "completed", JSON.stringify(r.dto)); assert.equal(r.dto.data.parse.resolvedConflictsVerified, 1); assert.equal(r.dto.data.createdChangeset.id, "61"); assert(r.calls[1].includes("-c=Reviewed\r\nserver result"));
     const actualAnalysis = await invoke({ output: analysisNative.stdout }, { source: input.source, target: input.target, mode: "analyze" }); assert.equal(actualAnalysis.dto.outcome, "analyzed"); assert.equal(actualAnalysis.dto.data.parse.conflictsObserved, 1);
     for (const api of ["registered", "core"] as const) for (const format of ["text", "json"]) { const v = await invoke({ api }, { ...input, format }); assert.match(v.text, /61/); }
     for (const mutate of [
