@@ -58,9 +58,9 @@ export async function executeDiffOutput(args:unknown){
     const json=(args as {format?:unknown})?.format==="json";
     let text=JSON.stringify(dto);
     if(!json){
-        if("data"in dto)text=dto.mode==="workspace"?"## Workspace Diff\n"+(dto.ok?"":"Partial failure: "+dto.error.code+"\n")+JSON.stringify(dto.data.counts)+"\nPrivate excluded: "+dto.data.excludedPrivate+"; unmatched paths: "+dto.data.unmatched.length+"\n"+dto.data.outcomes.map(o=>o.path+": "+o.status+(o.status==="compared"?"\n"+(o.comparison.excerpt?.text??o.comparison.status):o.status==="unavailable"?" ("+o.error.code+")":"")).join("\n\n"):"## Diff\n"+dto.data.status+"\n"+(dto.data.excerpt?.text??"");
+        if("data"in dto)text=dto.mode==="workspace"?"## Workspace Diff\n"+(dto.ok?"":"Partial failure: "+dto.error.code+"\n")+JSON.stringify(dto.data.counts)+"\nPrivate excluded: "+dto.data.excludedPrivate+"; unmatched paths: "+dto.data.unmatched.length+"\n"+dto.data.outcomes.map(o=>o.path+": "+o.status+(o.status==="compared"?"\n"+(o.comparison.excerpt?.text??o.comparison.status):o.status==="unavailable"?" ("+o.error.code+"/"+o.error.stage+"): "+o.error.message:"")).join("\n\n"):"## Diff\n"+dto.data.status+"\n"+(dto.data.excerpt?.text??"");
         else text=dto.error.message;
     }
-    if(text.length>24000)text=json?JSON.stringify({action:"diff",mode:dto.mode,ok:dto.ok,note:"Presentation omitted; use structuredContent for the bounded producer observation."}):text.slice(0,23920)+"\n[Presentation truncated; inspect the structured projection/completeness fields.]";
+    if(text.length>24000)text=json?JSON.stringify({action:"diff",mode:dto.mode,ok:dto.ok,...(!dto.ok?{error:dto.error}:{}),...(dto.mode==="workspace"&&"data"in dto?{counts:dto.data.counts,failures:dto.data.outcomes.flatMap((o,index)=>o.status==="unavailable"?[{index,error:o.error}]:[])}:{}),note:"Presentation omitted; use structuredContent for the bounded producer observation. Failure indices refer only to returned outcomes."}):text.slice(0,23920)+"\n[Presentation truncated; inspect the structured projection/completeness fields.]";
     return {content:[{type:"text" as const,text}],details:{},structuredContent:dto,isError:!dto.ok};
 }

@@ -17,10 +17,23 @@ export type DiffRequest = { workdir?:string;format?:"text"|"json";maxChars?:numb
     {mode:"workspace";paths:string[];allPending?:never;includePrivate?:never;maxFiles?:number} |
     {mode:"workspace";allPending:true;paths?:never;includePrivate?:boolean;maxFiles?:number}
 );
+const baseMessages = {
+    "fileinfo-command": "Loaded-base fileinfo observation failed. No baseline was selected; inspect command/capture state before another attempt.",
+    "fileinfo-profile": "Loaded-base fileinfo XML is unsupported or malformed. Retain sanitized producer evidence; no baseline was guessed.",
+    "fileinfo-path": "Loaded-base fileinfo path does not match the requested workspace path. No baseline was selected.",
+    "fileinfo-type": "Loaded-base fileinfo item type is unsupported. No baseline was selected.",
+    "deletion-state": "Loaded deletion metadata conflicts with pending status. No empty baseline was substituted.",
+    "ls-command": "Loaded-base ls observation failed. No baseline was selected; inspect command/capture state before another attempt.",
+    "ls-profile": "Loaded-base ls XML is unsupported or malformed. Retain sanitized producer evidence; no baseline was guessed.",
+    "ls-path": "Loaded-base tree path does not match the inspected path. No baseline was selected.",
+    "revision-mismatch": "Loaded-base changeset/hash observations disagree. No baseline was selected; workspace changes may have displaced the observation.",
+    "ownership-mismatch": "Loaded-base repository/server identity is inconsistent. Alias equivalence is unverified. No baseline was selected.",
+} as const;
+type BaseReason = keyof typeof baseMessages;
 export class ConsolidatedDiffError extends Error {
-    constructor(readonly code:string,readonly stage:string) { super("The requested diff could not be verified."); }
+    constructor(readonly code:string,readonly stage:string,readonly reason?:BaseReason) { super("The requested diff could not be verified."); }
 }
-const fail=(code:string,stage:string):never=>{throw new ConsolidatedDiffError(code,stage);};
+const fail=(code:string,stage:string,reason?:BaseReason):never=>{throw new ConsolidatedDiffError(code,stage,reason);};
 const aborted=()=>{if(getActiveAbortSignal()?.aborted)fail("aborted","comparison");};
 const safe=(s:unknown,max:number):s is string=>typeof s==="string"&&s.length>0&&s.length<=max&&s.trim()===s&&!/[\u0000-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(s);
 export function validateDiffRequest(input:unknown):asserts input is DiffRequest {
@@ -76,21 +89,32 @@ function comparison(observation:DiffRevisionsObservation,left:DiffSide,right:Dif
 const side=(origin:DiffSide["origin"],bytes:Buffer,path:string|null,selector:string|null,identity:LoadedIdentity|null=null):DiffSide=>({origin,path,selector,identity,bytes:bytes.length,binary:isBinaryContent(bytes)});
 async function pending(cwd:string):Promise<DiffPendingSnapshot>{try{return parseDiffPending(await xmlCommand(["status","--xml","--encoding=utf-8","--fullpaths","--iscochanged"],cwd,"status"));}catch(e){if(e instanceof ConsolidatedDiffError)throw e;return fail("malformed_output","status");}}
 async function base(path:string,cwd:string,snapshot:DiffPendingSnapshot,item:DiffPendingItem|null):Promise<{selector:string;identity:LoadedIdentity;hash:string;algorithm:"md5"|"sha1"}>{
+    let phase:"fileinfo-profile"|"ls-profile"="fileinfo-profile";
     try {
         const info=parseLoadedFileInfo(await xmlCommand(["fileinfo",path,"--fields=ClientPath,ServerPath,RevisionChangeset,Hash,RepSpec,Status,Type","--xml","--encoding=utf-8"],cwd,"base"));
-        if(key(info.clientPath)!==key(path)||!["txt","bin","file"].includes(info.type.toLowerCase()))return fail("base_unavailable","base");
+        if(key(info.clientPath)!==key(path))return fail("base_unavailable","base","fileinfo-path");
+        if(!["txt","bin","file"].includes(info.type.toLowerCase()))return fail("base_unavailable","base","fileinfo-type");
         // DE removes live-tree membership/RepSpec. Deliberately inspect the
         // frozen loaded root tree, never retry a failed live-tree lookup or
         // guess a parent owning repository. Require loaded changeset/hash match.
         const deleted=item?.code==="DE";
-        if(deleted&&info.status!=="deleted")return fail("base_changed","base");
+        if(deleted&&info.status!=="deleted")return fail("base_changed","base","deletion-state");
         const query=deleted?["ls",info.serverPath,"--tree=cs:"+snapshot.changeset+"@"+snapshot.repository+"@"+snapshot.server,"--xml","--encoding=utf-8"]:["ls",path,"--xml","--encoding=utf-8"];
+        phase="ls-profile";
         const row=parseLoadedLs(await xmlCommand(query,cwd,"base"));
-        if((deleted?row.path!==info.serverPath:key(row.path)!==key(path))||row.changeset!==info.changeset||row.hash!==info.hash||!deleted&&info.repSpec!==row.repository+"@"+row.server)return fail("base_changed","base");
+        if(deleted?row.path!==info.serverPath:key(row.path)!==key(path))return fail("base_changed","base","ls-path");
+        if(row.changeset!==info.changeset||row.hash!==info.hash)return fail("base_changed","base","revision-mismatch");
+        if(!deleted&&info.repSpec!==row.repository+"@"+row.server)return fail("base_changed","base","ownership-mismatch");
         const selector="revid:"+row.revisionId+"@rep:"+row.repository+"@repserver:"+row.server;
         if(!validDiffRevisionsSelector(selector))return fail("invalid_selector","base");
         return {selector,identity:{revisionId:row.revisionId,changeset:row.changeset,repository:row.repository,server:row.server},hash:row.hash,algorithm:row.algorithm};
-    }catch(e){if(e instanceof ConsolidatedDiffError)throw e;return fail("base_unavailable","base");}
+    }catch(e){
+        if(e instanceof ConsolidatedDiffError){
+            if(e.code==="command_failed")return fail(e.code,e.stage,phase==="fileinfo-profile"?"fileinfo-command":"ls-command");
+            throw e;
+        }
+        return fail("base_unavailable","base",phase);
+    }
 }
 async function fileComparison(args:DiffRequest&{mode:"file"},cwd:string,root:string,snapshot:DiffPendingSnapshot|null,item:DiffPendingItem|null):Promise<Comparison>{
     const path=resolve(cwd,args.path);if(!contains(root,path))return fail("outside_workspace","selection");
@@ -111,7 +135,7 @@ async function fileComparison(args:DiffRequest&{mode:"file"},cwd:string,root:str
     } finally {await fs.rm(temp,{recursive:true,force:true}).catch(()=>fail("cleanup_failed","cleanup"));}
 }
 export type DiffOutcome={path:string;sourcePath:string|null;kind:string;status:"compared";comparison:Comparison}|{path:string;sourcePath:string|null;kind:string;status:"skipped-directory"}|{path:string;sourcePath:string|null;kind:string;status:"unavailable";error:{code:string;stage:string;message:string}};
-export function diffError(e:unknown){const r=e as {code?:unknown;stage?:unknown};const codes=new Set(["invalid_request","invalid_selector","workspace_unavailable","outside_workspace","base_unavailable","base_changed","malformed_output","command_failed","aborted","cleanup_failed","materialization_failed","materialization_limit","invalid_utf8","capture_incomplete","output_overflow","missing_file","unsupported_file","file_limit","file_changed","read_failed"]);return {code:typeof r?.code==="string"&&codes.has(r.code)?r.code:"comparison_failed",stage:typeof r?.stage==="string"&&["input","selection","status","base","left","right","comparison","cleanup","producer"].includes(r.stage)?r.stage:"comparison",message:"The requested diff could not be verified."};}
+export function diffError(e:unknown){const r=e as {code?:unknown;stage?:unknown};const codes=new Set(["invalid_request","invalid_selector","workspace_unavailable","outside_workspace","base_unavailable","base_changed","malformed_output","command_failed","aborted","cleanup_failed","materialization_failed","materialization_limit","invalid_utf8","capture_incomplete","output_overflow","missing_file","unsupported_file","file_limit","file_changed","read_failed"]);return {code:typeof r?.code==="string"&&codes.has(r.code)?r.code:"comparison_failed",stage:typeof r?.stage==="string"&&["input","selection","status","base","left","right","comparison","cleanup","producer"].includes(r.stage)?r.stage:"comparison",message:e instanceof ConsolidatedDiffError&&e.reason?baseMessages[e.reason]:r?.code==="materialization_limit"?"Historical file exceeds the 4 MiB materialization limit. maxChars controls output only; no empty baseline was substituted.":"The requested diff could not be verified."};}
 export async function assembleConsolidatedDiff(input:unknown){
     validateDiffRequest(input);const args=input;aborted();
     const header={schemaVersion:1 as const,action:"diff" as const,mode:args.mode,provenance:{source:"plastic" as const,producer:"@aefree/pi-plastic" as const,contentTrust:"external" as const}};
