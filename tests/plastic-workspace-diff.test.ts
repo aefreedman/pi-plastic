@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { promises as fs } from "node:fs";
+import { promises as fs, readFileSync } from "node:fs";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, basename } from "node:path";
@@ -92,6 +92,13 @@ try{
   }
  }
  p=await invoke({mode:"workspace",workdir:inner,paths:["."]});assert(!p.ok);assert.equal(p.error.code,"invalid_request","readable nearest root cannot be selected as disguised whole workspace");
+ const observed = JSON.parse(readFileSync(new URL("./fixtures/plastic-real-loaded-base-metadata.json",import.meta.url),"utf8")).fixtures as Array<{label:string;stdout:string}>;
+ const observedInfo=parseLoadedFileInfo(Buffer.from(observed.find(f=>f.label==="supplement-fileinfo-fields-xml")!.stdout));
+ const observedLs=parseLoadedLs(Buffer.from(observed.find(f=>f.label==="supplement-ls-xml")!.stdout));
+ assert.equal(observedInfo.changeset,"53");assert.equal(observedLs.changeset,"53");assert.equal(observedLs.revisionId,"979");assert.equal(observedInfo.hash,observedLs.hash);assert.equal(observedInfo.repSpec,observedLs.repository+"@"+observedLs.server);assert.equal(observedInfo.clientPath,observedLs.path);
+ // Synthetic malformed derivatives are not live producer observations.
+ assert.throws(()=>parseLoadedLs(Buffer.from(observed.find(f=>f.label==="supplement-ls-xml")!.stdout.replace("<RevId>979</RevId>","<RevId>979.5</RevId>"))));
+ assert.throws(()=>parseLoadedFileInfo(Buffer.from(observed.find(f=>f.label==="supplement-fileinfo-fields-xml")!.stdout.replace("</FileInfo>","<Unexpected>private</Unexpected></FileInfo>"))));
  const nativeLstat=fs.lstat;
  for(const target of [join(inner,".plastic"),innerConfig]){
   fs.lstat=(async(candidate:any,...args:any[])=>{const stat=await Reflect.apply(nativeLstat,fs,[candidate,...args]);if(String(candidate)===target)stat.isSymbolicLink=()=>true;return stat;}) as typeof fs.lstat;

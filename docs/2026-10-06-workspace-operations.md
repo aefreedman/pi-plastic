@@ -59,9 +59,9 @@ Even complete exit 0 cannot establish restored bytes, preservation or zero pendi
 plastic_checkin(paths=["Assets/Example.txt"], message="Implement feature", includeAll=false, includePrivate=false)
 ```
 
-Inspect the declared selection defaults before omitting paths or enabling broad/private scope. `preflight=true` reads pending scope once and does not mutate; it is not a zero-command plan. `updateAfter` remains blocked before dispatch.
+Inspect the declared selection defaults before omitting paths or enabling broad/private scope. `preflight=true` reads pending scope and any required merge-readiness observation without mutation; it is not a zero-command plan. `updateAfter` remains blocked before dispatch.
 
-The admitted Windows CM 11 source profile covers STATUS/pending and nonce-framed CI_START/STAGE/CO/AD/DE/MV/CHANGESET records, plus the narrow copied-path CP extension. Original Unicode, decimal-string changeset IDs, explicit branch prefixes and complete emitted server tails are preserved.
+The admitted Windows CM 11 source profile covers STATUS/pending and nonce-framed CI_START/STAGE/CO/AD/DE/MV/CP/RP/CHANGESET records. [Merged selection and readiness](2026-10-21-observed-workflow-profiles.md#multi-file-workspace-merges-and-checkins) additionally correlate resolved source metadata, disjoint private exclusions and structural parent-directory events; partial merged selection/private inclusion remain unsupported. Original Unicode, decimal-string changeset IDs, explicit branch prefixes and complete emitted server tails are preserved.
 
 Only one admitted root changeset on successful complete capture supports `changeset-created`. Empty output/exit 0 alone does not. Unknown/malformed/full-tail records, incomplete capture and invalid UTF-8 fail before projection.
 

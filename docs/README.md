@@ -15,6 +15,7 @@ This is the public manual shipped with the package. Start with a task, then read
 | Find branches, workspaces, shelvesets, or review IDs | [Discovery](2026-10-06-discovery.md) |
 | Add/undo/check in files, switch branches, create/delete a branch | [Workspace operations](2026-10-06-workspace-operations.md) |
 | Choose workspace merge versus server merge versus closeout | [Merging](2026-10-06-merging.md#choose-a-route) |
+| Understand observed multi-file, reviewed-server and inferred-move profiles | [Observed workflow profiles](2026-10-21-observed-workflow-profiles.md) |
 | Review local/historical changes or generate a patch | [Diffs and patches](2026-10-06-diffs-and-patches.md) |
 | Save/apply/delete a shelf or manage a review | [Shelvesets and reviews](2026-10-06-shelvesets-and-reviews.md) |
 | Understand display, footer, or ignore/cloak behavior | [Integrations](2026-10-06-integrations.md) |

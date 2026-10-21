@@ -1,0 +1,50 @@
+{
+  "note": "Exact intentionally sanitized Windows cm 11.0.16.10484 metadata observations from a clean loaded cs66. Revision changeset53 and file revision979 are not loaded changeset66. Not a reproduction of historical loaded-base rejection. Adversarial derivatives belong in tests, not producer provenance.",
+  "fixtures": [
+    {
+      "label": "supplement-fileinfo-fields-xml",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox supplementary exact metadata argv capture",
+        "rawStdoutSha256": "0e3b4ddf90691dd18ac94f9c0a8b060f26922e618772376bf513757450f69dba",
+        "sanitizer": "supplement-metadata.cjs identity substitutions only"
+      },
+      "argv": [
+        "fileinfo",
+        "C:\\Example\\workspace\\fixtures\\evidence\\ordinary.asset",
+        "--fields=ClientPath,ServerPath,RevisionChangeset,Hash,RepSpec,Status,Type",
+        "--xml",
+        "--encoding=utf-8"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<FileInfos>\r\n  <FileInfo>\r\n    <ClientPath>C:\\Example\\workspace\\fixtures\\evidence\\ordinary.asset</ClientPath>\r\n    <ServerPath>/fixtures/evidence/ordinary.asset</ServerPath>\r\n    <RevisionChangeset>53</RevisionChangeset>\r\n    <Status>controlled</Status>\r\n    <Type>txt</Type>\r\n    <Hash>UO88OIrZANdeG2KMMZ108Q==</Hash>\r\n    <RepSpec>Example Repository@example@unity</RepSpec>\r\n  </FileInfo>\r\n</FileInfos>\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "supplement-ls-xml",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox supplementary exact metadata argv capture",
+        "rawStdoutSha256": "8b9d14f339412230f910485395934f939542529ce9abeba3edadfbb9d427a2a6",
+        "sanitizer": "supplement-metadata.cjs identity substitutions only"
+      },
+      "argv": [
+        "ls",
+        "C:\\Example\\workspace\\fixtures\\evidence\\ordinary.asset",
+        "--xml",
+        "--encoding=utf-8"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<LsResults>\r\n  <LsItems>\r\n    <LsItem>\r\n      <Status>Controlled</Status>\r\n      <Name>ordinary.asset</Name>\r\n      <CurrentPath>C:\\Example\\workspace\\fixtures\\evidence\\ordinary.asset</CurrentPath>\r\n      <WkPath>fixtures\\evidence\\ordinary.asset</WkPath>\r\n      <Size>82</Size>\r\n      <FormattedSize>82 bytes</FormattedSize>\r\n      <Type>txt</Type>\r\n      <Changeset>53</Changeset>\r\n      <Repository>rep:Example Repository@example@unity</Repository>\r\n      <Owner>author@example.invalid</Owner>\r\n      <Checkout />\r\n      <BrId>843</BrId>\r\n      <RevId>979</RevId>\r\n      <ParentRevId>-1</ParentRevId>\r\n      <ItemId>992</ItemId>\r\n      <RepId>11318160</RepId>\r\n      <Server>example@unity</Server>\r\n      <SymlinkTarget />\r\n      <Hash>UO88OIrZANdeG2KMMZ108Q==</Hash>\r\n      <HashAlgorithm>MD5</HashAlgorithm>\r\n      <Chmod>NOT_DEFINED</Chmod>\r\n      <Branch>/main/evidence</Branch>\r\n      <Guid>5463607b-050c-43aa-af3c-8bf4e1c7ea22</Guid>\r\n      <ItemGuid>67d44e1c-0882-47f3-8b63-64d277e02c95</ItemGuid>\r\n      <Date>2026-10-21T09:07:28-04:00</Date>\r\n    </LsItem>\r\n  </LsItems>\r\n</LsResults>\r\n",
+      "stderr": ""
+    }
+  ]
+}
