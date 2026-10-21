@@ -10,6 +10,34 @@ const pendingArgv = ["status", "--machinereadable", "--includeRevId", "--fieldse
 const summary = (items: PendingItem[], cwd: string): CheckinSummary => { const { privatePaths: _, ...s } = summarizePendingItems(items, cwd); return s; };
 const normal = (o: CheckinCommandObservation) => o.capture.complete && !o.failed && o.attempt.state === "started" && o.attempt.terminal === "observed" && o.attempt.exitCode !== null && !o.attempt.aborted && !o.attempt.timedOut;
 const success = (o: CheckinCommandObservation) => normal(o) && o.attempt.exitCode === 0 && o.capture.stderrBytes === 0;
+// Inspect section/row markers, never words embedded in a branch or filename.
+// Default status can omit unchanged checkouts, so a valid header-only body is
+// allowed; unfamiliar sections/metadata still cannot establish ordinary state.
+function ordinaryStatusBodyAdmitted(text: string): boolean {
+    const shapes = {
+        Changed: { header: /^    Status +Size +Last Modified +Path *$/, label: "(?:Changed|Checked-out \\((?:changed|unchanged)\\))" },
+        Added: { header: /^    Status +Size +Last Modified +Path *$/, label: "(?:Added|Private)" },
+        Deleted: { header: /^    Status +Size +Path *$/, label: "(?:Deleted|Locally deleted|Removed)" },
+        Moved: { header: /^    Status +Size +Similarity +Path *$/, label: "(?:Moved|Moved locally)" },
+    };
+    let section: keyof typeof shapes | null = null, needsHeader = false;
+    const seen = new Set<string>();
+    for (const line of text.split(/\r?\n/).slice(1)) {
+        if (!line.trim()) continue;
+        if (line.length > 4096 || /[\u0000-\u001f\u007f-\u009f]/.test(line)) return false;
+        if (Object.hasOwn(shapes, line)) {
+            if (needsHeader || seen.has(line)) return false;
+            seen.add(line); section = line as keyof typeof shapes; needsHeader = true; continue;
+        }
+        if (!section) return false;
+        const shape = shapes[section];
+        if (needsHeader) { if (!shape.header.test(line)) return false; needsHeader = false; continue; }
+        // A status-label annotation is metadata, unlike a parenthesis in the
+        // later path cell. Unknown annotations (including Merge from) fail.
+        if (new RegExp(`^    ${shape.label} +\\(`).test(line) || !new RegExp(`^    ${shape.label} {2,}.+$`).test(line)) return false;
+    }
+    return !needsHeader;
+}
 function validateRequest(input: unknown): asserts input is CheckinRequest {
     if (!input || typeof input !== "object" || Array.isArray(input)) throw Error("Invalid bounded checkin input.");
     const r = input as Record<string, unknown>;
@@ -79,7 +107,7 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
             const source = /^    Merge from cs:[1-9][0-9]{0,19} at (.+)\r?$/m.exec(o.stdout ?? "")?.[1];
             const ready = loaded && loaded.repository === before.repository && loaded.server === before.server && (merged
                 ? !!source && admitMergedStandardStatus(o.stdout!, merged, source, cwd)
-                : !/pending merge links|merge in progress|conflict/i.test(o.stdout ?? ""));
+                : ordinaryStatusBodyAdmitted(o.stdout ?? ""));
             if (!ready) return finish("unsupported", "merge_readiness_unadmitted", "pending", "Merge source/resolution metadata could not be admitted; no checkin was dispatched.");
             s.evidence = "admitted";
         }

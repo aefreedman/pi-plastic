@@ -16,7 +16,7 @@ const row = (code = "CH", file = path) => [code, file, "False", code === "PR" ||
 const checkedOutRow = (file = path) => ["CO", file, "False", "-1", "NO_MERGES"].join(us) + "\r\n";
 const payload = "cs:9007199254740997@br:/main/café-é-日本-😀@Example Repository@example@unity (mount:'/')";
 const input = { message: "Fixture résumé é 日本語 😀", workdir: cwd, paths: [name] };
-type Scenario = { mode?: string; native?: string; private?: boolean; recoveryFail?: boolean; afterFail?: boolean; addFail?: boolean; retryFail?: boolean; fallback?: boolean; pending?: string; preabort?: boolean; launch?: "sync" | "async"; lateError?: boolean; decoded?: boolean; abort?: boolean; timeout?: boolean; ignoreTerm?: boolean; code?: number | null; signal?: string; stderr?: string; scopeMany?: boolean; noSpawn?: boolean; streamError?: boolean; payload?: string };
+type Scenario = { fullStatus?: string; mode?: string; native?: string; private?: boolean; recoveryFail?: boolean; afterFail?: boolean; addFail?: boolean; retryFail?: boolean; fallback?: boolean; pending?: string; preabort?: boolean; launch?: "sync" | "async"; lateError?: boolean; decoded?: boolean; abort?: boolean; timeout?: boolean; ignoreTerm?: boolean; code?: number | null; signal?: string; stderr?: string; scopeMany?: boolean; noSpawn?: boolean; streamError?: boolean; payload?: string };
 async function invoke(scenario: Scenario = {}, args: any = input, core = false, registered?: any) {
     const calls: string[][] = [], children: any[] = [], timers = new Set<any>(), controller = new AbortController();
     let reads = 0, checkins = 0;
@@ -32,7 +32,7 @@ async function invoke(scenario: Scenario = {}, args: any = input, core = false, 
             let out = "", err = "", code: number | null = 0;
             if (argv[0] === "status") {
                 if (!argv.includes("--machinereadable")) {
-                    out = `/main/café-é-日本-😀@Example Repository@example@unity (cs:9007199254740993 - head)\r\n\r\n`;
+                    out = scenario.fullStatus ?? `/main/café-é-日本-😀@Example Repository@example@unity (cs:9007199254740993 - head)\r\n\r\n`;
                 } else {
                 reads++; out = header;
                 if (reads === 1) out += scenario.pending ?? (scenario.private ? row("PR") : scenario.fallback ? row("LD") : row());
@@ -115,6 +115,17 @@ for (const args of [{ ...input, message: "x".repeat(4097) }, { ...input, message
 for (const pending of ["", "UNKNOWN", row(), row("CO"), row("CH").replace("NO_MERGES", "other"), row("CH").replace(path, path + "?"), row("CH").replace(path, path + "\uFFFD"), row("CH").replace("9007199254740995", "1.5"), row("CH").replace("False", "False\x1fEXTRA")]) { r = await invoke({ pending: pending === "" ? "" : pending }); if (pending === "") assert.equal(r.dto.error.code, "NO_PENDING_PATHS"); else if (pending === row()) assert(r.dto.ok); else assert.equal(r.dto.outcome, "unsupported"); }
 for (const s of [{ mode: "empty" }, { mode: "bom" }, { noSpawn: true }, { streamError: true }, { mode: "unknown" }, { mode: "extra" }, { mode: "duplicate" }, { mode: "mount" }, { mode: "repository" }, { mode: "bare" }, { mode: "tail" }, { mode: "overflow" }, { mode: "stderrOverflow" }, { mode: "records" }, { mode: "invalidUtf8" }, { code: null }, { signal: "SIGTERM" }, { lateError: true }, { decoded: true }, { abort: true }, { timeout: true }, { timeout: true, ignoreTerm: true }, { stderr: "PRIVATE_PATH diagnostic" }, { code: 1 }] as Scenario[]) { r = await invoke(s); assert.equal(r.dto.outcome, "uncertain"); assert.equal(r.calls.filter(c => c[0] === "checkin").length, 1); assert.equal(r.dto.data.createdChangeset, null); }
 for (const launch of ["sync", "async"] as const) { r = await invoke({ launch }); assert.equal(r.dto.data.effect, "not-attempted"); assert.equal(r.dto.data.steps[1].attempt.state, "not-started"); }
+// Identity/path words are not merge-state markers. These full-status shapes
+// are synthetic regressions, not additional producer captures.
+const ordinaryBranch="/main/conflict-fix",ordinaryFile="ConflictResolver.cs";
+const ordinaryHeader=`${ordinaryBranch}@Example Repository@example@unity (cs:9007199254740993 - head)\r\n`;
+const ordinaryFull=ordinaryHeader+`\r\nChanged\r\n    Status                        Size        Last Modified    Path\r\n    Checked-out (changed)    12 bytes    Just now    ${ordinaryFile}\r\n`;
+for(const preflight of [false,true]){
+    r=await invoke({pending:checkedOutRow(cwd+"\\"+ordinaryFile),fullStatus:ordinaryFull,payload:payload.replace("/main/café-é-日本-😀",ordinaryBranch)},{message:"Ordinary checkout",workdir:cwd,includeAll:true,preflight});assert(r.dto.ok,"conflict in a valid branch/file name must not block ordinary CO");assert.equal(r.calls.filter(c=>c[0]==="checkin").length,preflight?0:1);
+}
+for(const suffix of ["Pending merge links\r\n    Merge from cs:43 at /main/source@Example Repository@example@unity\r\n","Merge in progress\r\n","Unresolved conflicts\r\n","Unexpected metadata\r\n"]){
+    r=await invoke({pending:checkedOutRow(),fullStatus:ordinaryHeader+suffix},{message:"Unknown checkout state",workdir:cwd,includeAll:true});assert.equal(r.dto.outcome,"unsupported");assert.equal(r.calls.filter(c=>c[0]==="checkin").length,0);
+}
 // General CO admission: unrelated checkouts must not block a selected CH path,
 // and selected checkouts must retain their requested scope without invented bases.
 const unrelatedCheckout = cwd + "\\unrelated-checked-out.txt";

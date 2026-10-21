@@ -28,13 +28,16 @@ export function parseMergedApply(text: string, token: string): MergedDeclaration
     }
     if (!declarations.length || declarations.length !== actions.length || new Set(declarations.map(d => d.path.toLowerCase())).size !== declarations.length || new Set(actions.map(a => copiedPathKey(a.path))).size !== actions.length) return null;
     // Absolute workspace scope is established by the pending observation below.
-    const result: MergedDeclaration[] = [];
-    for (const d of declarations) {
-        const matches = actions.filter(a => a.path.toLowerCase().endsWith(d.path.replaceAll("/", "\\").toLowerCase()) && a.status === (d.status === "CO" ? "merge" : d.status === "DE" ? "delete" : "copy"));
+    const paired = new Map<string, MergedDeclaration>(), remaining = new Set(actions);
+    // Pair the most specific repository paths first: /a.txt must not consume
+    // /dir/a.txt's action. Exact cwd-relative equality is still required below
+    // by correlateMergedApply before any readiness can be admitted.
+    for (const d of [...declarations].sort((a, b) => b.path.length - a.path.length)) {
+        const matches = [...remaining].filter(a => a.path.toLowerCase().endsWith(d.path.replaceAll("/", "\\").toLowerCase()) && a.status === (d.status === "CO" ? "merge" : d.status === "DE" ? "delete" : "copy"));
         if (matches.length !== 1) return null;
-        result.push({ ...d, actionPath: matches[0].path });
+        remaining.delete(matches[0]); paired.set(d.path, { ...d, actionPath: matches[0].path });
     }
-    return new Set(result.map(d => copiedPathKey(d.actionPath))).size === actions.length ? result : null;
+    return remaining.size === 0 ? declarations.map(d => paired.get(d.path)!) : null;
 }
 export function parseMergedPending(text: string, cwd: string): MergedPending | null {
     const lines = text.split(/\r?\n/); if (lines.at(-1) === "") lines.pop();

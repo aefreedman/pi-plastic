@@ -15,6 +15,12 @@ const get = (label: string) => fixtures.find(f => f.label === label)!.stdout;
 const cwd = "C:\\Example\\workspace", token = "__EV_";
 const separators = { start: token + "S__", end: token + "E__", field: token + "F__" };
 // All mutations below are synthetic adversarial derivatives of sanitized captures.
+const frame=(op:string,...fields:string[])=>separators.start+[op,...fields].join(separators.field)+separators.end+"\r\n";
+const repeatedNames=frame("FILE_SRC","/a.txt","1","2","3")+frame("FILE_SRC","/dir/a.txt","1","2","4")+frame("DO_COPIED",cwd+"\\a.txt")+frame("DO_COPIED",cwd+"\\dir\\a.txt");
+const repeatedPending=parseMergedPending("STATUS\x1f42\x1fExample Repository\x1fexample@unity\r\n"+["\\a.txt","\\dir\\a.txt"].map((p,i)=>["RP",cwd+p,"False",String(100+i),"Merge from 43"].join("\x1f")+"\r\n").join(""),cwd)!;
+const repeatedDeclarations=parseMergedApply(repeatedNames,token);assert(repeatedDeclarations,"nested repeated basenames must pair bijectively");assert(correlateMergedApply(repeatedDeclarations,repeatedPending,cwd));
+const foreignDeclarations=parseMergedApply(repeatedNames.replace(cwd+"\\a.txt","C:\\Other\\a.txt"),token);assert(!foreignDeclarations||!correlateMergedApply(foreignDeclarations,repeatedPending,cwd));
+assert(!parseMergedApply(repeatedNames+frame("DO_COPIED",cwd+"\\elsewhere\\a.txt"),token),"extra suffix-compatible action is not a pairing");
 for (const [applyLabel, pendingLabel, fullLabel, checkinLabel, sourceLeaf] of [
     ["089-apply-files", "090-files-merged-machine", "090-files-merged-full", "091-files-merge-checkin", "files-source"],
     ["023-apply-mixed", "024-merged-machine", "024-merged-full", "027-merge-native-checkin", "source"],

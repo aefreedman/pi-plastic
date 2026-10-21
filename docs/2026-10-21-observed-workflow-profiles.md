@@ -19,7 +19,7 @@ Framing, decimal tokens, byte/record bounds and unique canonical paths remain st
 
 **FILE_CONFLICT + DO_MERGE and exit zero do not prove resolution.** Independent unresolved experiments emitted those same records and a pending source link, without explicit in-progress text. Their CO/NO_MERGES rows and unchanged full-status rows stop before checkin. Failed/unknown observations never authorize replay or automatic finalization.
 
-Standalone checkin now performs an additional merge-readiness read when required. Ordinary CO also needs native link-state observation because the unresolved control uses CO/-1/NO_MERGES. A preflight can therefore perform more than one read. Native checkin events must cover the merged controlled rows; extra CO events are admitted only for strict in-workspace structural ancestor directories, not arbitrary extra files. A single exact root branch/repository/server changeset and complete success capture are still required.
+Standalone checkin now performs an additional merge-readiness read when required. Ordinary CO also needs native link-state observation because the unresolved control uses CO/-1/NO_MERGES. A preflight can therefore perform more than one read. Ordinary checkout state is recognized through supported section/row markers, not words such as “conflict” embedded in a branch or filename; unknown sections/annotations still stop. Native checkin events must cover the merged controlled rows; extra CO events are admitted only for strict in-workspace structural ancestor directories, not arbitrary extra files. A single exact root branch/repository/server changeset and complete success capture are still required.
 
 ### Private and partial selection
 

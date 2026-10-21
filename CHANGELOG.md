@@ -12,6 +12,7 @@ and this project follows semantic versioning for public package releases.
 - Correlate realistic repeated/mixed merged paths, added/deleted directories and KB/MB display through standalone checkin and compound closeout. Preserve unresolved controls, exact root identity, structural parent events and explicit disjoint private exclusions without retrying mutations.
 - Admit captured reviewed result-file server ADD/RM profiles with exact target spelling, stable bounded input hashes and candidate/terminal distinction; retain sanitized unknown-operation classes and permit bounded CR/LF comments.
 - Observe inferred local moves with fractional similarity and separate validated source/destination paths, without authorizing renames or widening mutation selection.
+- Pair nested repeated merge basenames bijectively before exact workspace correlation, and inspect ordinary checkout state structurally rather than treating words in branch/file names as conflict markers.
 - Explain patch backend/selector/output failures and loaded-base diff rejection stages without raw diagnostic leakage; retain bounded failure summaries in large JSON presentations and clarify the existing 4 MiB input limit.
 
 ## [0.8.4] - 2026-10-20
