@@ -7,6 +7,8 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.8.5] - 2026-10-21
+
 ### Fixed
 
 - Correlate realistic repeated/mixed merged paths, added/deleted directories and KB/MB display through standalone checkin and compound closeout. Preserve unresolved controls, exact root identity, structural parent events and explicit disjoint private exclusions without retrying mutations.
