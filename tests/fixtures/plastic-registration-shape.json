@@ -709,7 +709,7 @@
         },
         "message": {
           "type": "string",
-          "description": "Required for apply; omit in analyze mode. Bounded nonempty comment, no editor fallback.",
+          "description": "Required for apply; omit in analyze mode. Bounded nonempty comment; CR/LF allowed, other controls rejected. No editor fallback.",
           "minimum": 1
         },
         "mode": {
