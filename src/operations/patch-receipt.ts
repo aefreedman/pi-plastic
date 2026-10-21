@@ -39,7 +39,7 @@ export function patchFailure(d: PatchData, code: Extract<PatchReceipt,{ok:false}
     return {...header(d),ok:false,outcome:["started","unknown"].includes(d.attempt.state)&&!d.artifact?"uncertain":"failed",error:{code,message}};
 }
 export async function assemblePatchReceipt(args: unknown): Promise<PatchReceipt> {
-    const d=emptyPatchData();let stage: string|null=null;let entered=false;let failure: {code:Extract<PatchReceipt,{ok:false}>["error"]["code"];message:string}|null=null;
+    const d=emptyPatchData();let stage: string|null=null;let setupStage:"backend"|"selector"|"output"="backend";let entered=false;let failure: {code:Extract<PatchReceipt,{ok:false}>["error"]["code"];message:string}|null=null;
     try {
         if (!args||typeof args!=="object"||Array.isArray(args)||Object.keys(args).some(k=>!["source","destination","output","toolPath","clean","integration","workdir","preflight","format"].includes(k)))
             return patchFailure(d,"invalid_request","Use declared bounded patch controls only.");
@@ -49,11 +49,13 @@ export async function assemblePatchReceipt(args: unknown): Promise<PatchReceipt>
         d.requested=r;d.publication=r.output===null?"not-requested":"not-published";
         const toolPath=resolvePatchToolPath(r.toolPath??undefined);
         if (!validPatchText(toolPath)) throw new Error("Invalid patch backend.");
+        setupStage="selector";
         const branch=await resolvePatchBranchSpecs({source:r.source,...(r.destination===null?{}:{destination:r.destination})},r.workdir);
         const v={source:branch.source,destination:branch.destination??null,toolPath,output:r.output===null?null:isAbsolute(r.output)?r.output:resolve(r.workdir,r.output)};
         if ([v.source,v.destination,v.toolPath,v.output].some(s=>s!==null&&(s.length>8192||/[\u0000-\u001f\u007f-\u009f]/.test(s)))) throw new Error("Resolved patch controls exceed limits.");
         d.resolved=v;d.intendedArgv=patchReceiptArgv(r,v);
         if (r.preflight) return {...header(d),ok:true,outcome:"preflight"};
+        setupStage="output";
         if (v.output!==null) await ensurePatchOutputDoesNotExist(v.output);
         stage=await fs.mkdtemp(join(v.output===null?tmpdir():resolve(v.output,".."),".pi-plastic-patch-"));
         const staged=join(stage,"patch-output");
@@ -77,7 +79,12 @@ export async function assemblePatchReceipt(args: unknown): Promise<PatchReceipt>
         }
     } catch {
         if (entered&&d.capture===null) {d.attempt={...emptyWorkspaceMergeAttempt(),state:"unknown"};d.effect="unverified";}
-        failure={code:entered?"producer_failed":"setup_failed",message:entered?"Patch observation failed; earlier observed effects remain recorded, no automatic retry.":"Patch setup unavailable. Verify exact selector repository, backend and new output parent; no command was dispatched."};
+        const setupMessages={
+            backend:"Patch backend unavailable. Set PI_PLASTIC_PATCH_EXECUTABLE to a verified non-GUI GNU-compatible executable, or pass toolPath. No command was dispatched.",
+            selector:"Patch selector repository could not be verified. Use an exact qualified br:/branch@repository@server selector. No command was dispatched.",
+            output:"Patch output is unavailable or already exists. Use a new filename in an existing writable parent directory. No command was dispatched.",
+        };
+        failure={code:entered?"producer_failed":"setup_failed",message:entered?"Patch observation failed; earlier observed effects remain recorded, no automatic retry.":setupMessages[setupStage]};
     } finally {
         if (stage!==null) {
             if (entered&&(d.attempt.state==="unknown"||d.attempt.state==="started")&&(d.attempt.terminal!=="observed"||d.attempt.aborted||d.attempt.timedOut)) {d.cleanup="retained";d.retainedStagingDirectory=stage;}
