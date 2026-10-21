@@ -1,5 +1,5 @@
 import { DOMParser, type Element } from "@xmldom/xmldom";
-import type { MachineReadableStatusItem, MachineReadableStatusSummary } from "./pending";
+import { statusObservationPathKey, statusObservationPathRoot, type MachineReadableStatusItem, type MachineReadableStatusSummary } from "./pending";
 
 import { STATUS_XML_LIMITS } from "../execution/status-xml-limits";
 export { STATUS_XML_LIMITS } from "../execution/status-xml-limits";
@@ -13,11 +13,12 @@ export class StatusXmlError extends Error {
 }
 function invalid(): never { throw new StatusXmlError(); }
 function limit(): never { throw new StatusXmlError("output_overflow"); }
-const kinds = { CH: "changed", CO: "changed", CP: "added", RP: "changed", AD: "added", DE: "deleted", LD: "deleted", MV: "moved", PR: "private" } as const;
+const kinds = { CH: "changed", CO: "changed", CP: "added", RP: "changed", AD: "added", DE: "deleted", LD: "deleted", MV: "moved", LM: "moved", PR: "private" } as const;
 const fields = new Set(["Type", "TypeVerbose", "Path", "OldPath", "PrintableMovedPath", "MergesInfo", "SimilarityPerUnit", "Similarity", "Size", "PrintableSize", "PrintableLastModified", "RevisionType", "LastModified"]);
 const isAbsolute = (path: string): boolean => path.startsWith("/") || /^[A-Za-z]:\\/.test(path) || /^\\\\[^\\]+\\[^\\]+\\/.test(path);
 const identity = (value: string): string => {
     if (!value || value.length > STATUS_XML_LIMITS.path || !isAbsolute(value) || /[\u0000-\u001f\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(value) || (process.platform === "win32" && value.includes("?"))) invalid();
+    if (!statusObservationPathKey(value)) invalid();
     return value;
 };
 
@@ -107,13 +108,26 @@ export function parseStatusXml(bytes: Uint8Array): { output: string; items: XmlS
         if (!/^en[A-Za-z0-9]+$/.test(revisionType)) invalid();
         const supportedType = revisionType === "enDirectory" || revisionType === "enTextFile" || revisionType === "enBinaryFile";
         if (supportedStatus && (kind === "moved") !== Boolean(oldPath)) invalid();
-        if (oldPath && identity(oldPath) === path) invalid();
-        if (seen.has(path)) invalid();
-        seen.add(path);
+        if (oldPath) identity(oldPath);
+        const keys = [path, ...(oldPath ? [oldPath] : [])].map(value => statusObservationPathKey(value)!);
+        if (new Set(keys).size !== keys.length || keys.some(key => seen.has(key))) invalid();
+        for (const key of keys) seen.add(key);
+        let similarity: number | undefined;
+        if (statusCode === "LM") {
+            if (statusObservationPathRoot(path) !== statusObservationPathRoot(oldPath)) invalid();
+            const perUnit = leaf(row.get("SimilarityPerUnit"));
+            if (perUnit.length > 64 || !/^(?:0(?:\.[0-9]+)?|1(?:\.0+)?)$/.test(perUnit)) invalid();
+            similarity = Number(perUnit);
+            // Rounded display is neither the identity nor an exact equality check on the fraction.
+            if (row.has("Similarity")) {
+                const display = leaf(row.get("Similarity"));
+                if (display.length > 64 || !/^(?:100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)%$/.test(display)) invalid();
+            }
+        }
         // Validate the entire document before reporting unsupported profiles: a later unsafe
         // identity/structure must not be masked by an earlier unadmitted record.
         if (!supportedStatus || !supportedType) { unsupported = true; continue; }
-        items.push({ statusCode: statusCode as keyof typeof kinds, kind: kind!, path, isDirectory: revisionType === "enDirectory", ...(oldPath ? { sourcePath: oldPath } : {}) });
+        items.push({ statusCode: statusCode as keyof typeof kinds, kind: kind!, path, isDirectory: revisionType === "enDirectory", ...(oldPath ? { sourcePath: oldPath } : {}), ...(similarity !== undefined ? { similarity } : {}) });
     }
     if (unsupported) throw new StatusXmlError("unsupported_source");
     const summary: MachineReadableStatusSummary = { totalPending: items.length, added: 0, changed: 0, moved: 0, deleted: 0, private: 0, other: 0, tracked: 0 };

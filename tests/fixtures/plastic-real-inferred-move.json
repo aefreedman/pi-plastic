@@ -1,0 +1,69 @@
+{
+  "note": "Exact intentionally sanitized synthetic cm observations. Identity substitutions only; adversarial derivatives in tests are not native captures. One Windows client build only.",
+  "fixtures": [
+    {
+      "label": "032-inferred-move-full",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "fb9fe4e4f5d9bb0cb851eebf9c46dbc08808369fa1144132006d156fbf1fae89",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--all"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "/main/evidence/moves@Example Repository@example@unity (cs:56 - head)\r\n\r\nMoved\r\n    Status           Size        Similarity    Path                                                                                                               \r\n\r\n    Moved locally    12.41 KB    98%           fixtures\\evidence\\move-origin.txt -> fixtures\\evidence\\move-destination.txt    \r\n\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "032-inferred-move-machine",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "f1cd71905e82d81262b753ce207b7b147629fdd96c421ac3082ab757e92c4232",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--machinereadable",
+        "--includeRevId",
+        "--fieldseparator=\u001f"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "STATUS\u001f56\u001fExample Repository\u001fexample@unity\r\nLM\u001f98.02%\u001fC:\\Example\\workspace\\fixtures\\evidence\\move-origin.txt\u001fC:\\Example\\workspace\\fixtures\\evidence\\move-destination.txt\u001fFalse\u001f978\u001fNO_MERGES\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "032-inferred-move-xml",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "b1bc35c7f80731ec4ae0a1b09a57f0f5e88c6bbf6f409e262edee54c735a496d",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--xml",
+        "--encoding=utf-8",
+        "--fullpaths"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<StatusOutput>\r\n  <WorkspaceStatus>\r\n    <Status>\r\n      <RepSpec>\r\n        <Server>example-numeric@cloud</Server>\r\n        <Name>Example Repository</Name>\r\n      </RepSpec>\r\n      <Changeset>56</Changeset>\r\n    </Status>\r\n  </WorkspaceStatus>\r\n  <WkConfigType>Branch</WkConfigType>\r\n  <WkConfigName>/main/evidence/moves@Example Repository@example-numeric@cloud</WkConfigName>\r\n  <Changes>\r\n    <Change>\r\n      <Type>LM</Type>\r\n      <TypeVerbose>Moved locally</TypeVerbose>\r\n      <Path>C:\\Example\\workspace\\fixtures\\evidence\\move-destination.txt</Path>\r\n      <OldPath>C:\\Example\\workspace\\fixtures\\evidence\\move-origin.txt</OldPath>\r\n      <PrintableMovedPath>C:\\Example\\workspace\\fixtures\\evidence\\move-origin.txt -&gt; C:\\Example\\workspace\\fixtures\\evidence\\move-destination.txt</PrintableMovedPath>\r\n      <MergesInfo />\r\n      <SimilarityPerUnit>0.9801980198019802</SimilarityPerUnit>\r\n      <Similarity>98%</Similarity>\r\n      <Size>12712</Size>\r\n      <PrintableSize>12.41 KB</PrintableSize>\r\n      <PrintableLastModified />\r\n      <RevisionType>enTextFile</RevisionType>\r\n      <LastModified>0001-01-01T00:00:00</LastModified>\r\n    </Change>\r\n  </Changes>\r\n</StatusOutput>\r\n",
+      "stderr": ""
+    }
+  ]
+}

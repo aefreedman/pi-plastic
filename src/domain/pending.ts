@@ -14,6 +14,8 @@ export type PendingItem = {
     revisionId?: string;
     sourceWorkspacePath?: string;
     baseRepository?: string;
+    /** Observation-only fraction in [0, 1]; producer precision is transport-specific. */
+    similarity?: number;
 };
 
 export type PendingItemSummary = {
@@ -35,6 +37,8 @@ export type MachineReadableStatusItem = {
     isDirectory: boolean;
     revisionId?: string;
     sourcePath?: string;
+    /** Observation-only fraction in [0, 1], never rename authorization. */
+    similarity?: number;
 };
 
 export type MachineReadableStatusSummary = Omit<PendingItemSummary, "privatePaths">;
@@ -185,11 +189,29 @@ export const parseMachineReadablePendingItems = (output: string, cwd: string): P
 export const hasStatusPathDecodingLoss = (path: string, platform: NodeJS.Platform = process.platform): boolean =>
     path.includes("\uFFFD") || (platform === "win32" && path.includes("?"));
 
+// Observation-only lexical identities. Never use these diagnostics as mutation admission.
+export const statusObservationPathKey = (value: string): string | null => {
+    if (!value || value.length > 4096 || /[\u0000-\u001f\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(value)) return null;
+    const path = value.replace(/\\/g, "/");
+    if (!/^(?:\/|[A-Za-z]:\/)/.test(path) || path.split("/").some(part => part === "." || part === "..")) return null;
+    const windows = /^[A-Za-z]:\//.test(path) || path.startsWith("//");
+    const tail = path.slice(path.startsWith("//") ? 2 : windows ? 3 : 1);
+    if (tail.includes("//") || (windows && (/[<>:"|?*]/.test(tail) || tail.split("/").some(part => /[. ]$/.test(part))))) return null;
+    if (path.startsWith("//") && !/^\/\/[^/]+\/[^/]+\//.test(path)) return null;
+    const key = windows ? path.toLowerCase() : path;
+    return key.length > (windows ? 3 : 1) ? key.replace(/\/$/, "") : key;
+};
+export const statusObservationPathRoot = (value: string): string => {
+    const path = value.replace(/\\/g, "/").toLowerCase();
+    return path.match(/^[a-z]:/)?.[0] ?? (path.startsWith("//") ? path.split("/").slice(0, 4).join("/") : "/");
+};
+
 // Diagnostics deliberately leave the legacy selection parser unchanged for mutation/diff consumers.
 export const diagnoseMachineReadablePendingItems = (output: string, cwd: string, platform: NodeJS.Platform = process.platform) =>
 {
     const diagnostics = { valid: 0, blank: 0, header: 0, unsupported: 0, malformed: 0, ambiguousLegacyMove: 0 };
     const pendingItems: PendingItem[] = [];
+    const seen = new Set<string>();
     for (const rawLine of output.split(/\r?\n/))
     {
         const line = rawLine.trim();
@@ -198,7 +220,32 @@ export const diagnoseMachineReadablePendingItems = (output: string, cwd: string,
         if (fields[0] === "STATUS" && fields.length === 4 && /^\d+$/.test(fields[1]) && fields[2] && fields[3]) { diagnostics.header++; continue; }
         if (/^STATUS \d+ \S+ \S+$/.test(line)) { diagnostics.header++; continue; }
         if (fields[0] === "STATUS" || line.startsWith("STATUS ")) { diagnostics.malformed++; continue; }
+        // Inferred moves are observed separately; legacy mutation/diff selection is unchanged.
+        if (fields[0] === "LM") {
+            const [, percent, source, destination, directory, revision, metadata] = fields;
+            const sourceKey = statusObservationPathKey(source ?? "");
+            const destinationKey = statusObservationPathKey(destination ?? "");
+            const validPercent = (percent?.length ?? 0) <= 64 && /^(?:100(?:\.0+)?|[0-9]{1,2}(?:\.[0-9]+)?)%$/.test(percent ?? "");
+            if (fields.length !== 7 || !validPercent || !sourceKey || !destinationKey || sourceKey === destinationKey ||
+                statusObservationPathRoot(source) !== statusObservationPathRoot(destination) ||
+                seen.has(sourceKey) || seen.has(destinationKey) || (directory !== "True" && directory !== "False") ||
+                !/^[1-9][0-9]{0,19}$/.test(revision ?? "") || metadata !== "NO_MERGES" ||
+                [source, destination].some(path => hasStatusPathDecodingLoss(path, platform))) {
+                diagnostics.malformed++; continue;
+            }
+            seen.add(sourceKey); seen.add(destinationKey);
+            pendingItems.push({ statusCode: "LM", kind: "moved", workspacePath: destination,
+                normalizedPath: toNormalizedAbsolutePath(destination, cwd), comparisonKey: toPathComparisonKey(destination, cwd),
+                isDirectory: directory === "True", revisionId: revision, sourceWorkspacePath: source, similarity: Number(percent.slice(0, -1)) / 100 });
+            diagnostics.valid++; continue;
+        }
         const items = parseMachineReadablePendingItems(line, cwd);
+        for (const item of items) {
+            for (const path of [item.workspacePath, item.sourceWorkspacePath].filter((path): path is string => path !== undefined)) {
+                const key = statusObservationPathKey(path);
+                if (key) { if (seen.has(key)) diagnostics.malformed++; seen.add(key); }
+            }
+        }
         pendingItems.push(...items);
         if (items.length) {
             diagnostics.valid++;
@@ -239,6 +286,7 @@ export const toMachineReadableStatusItems = (pendingItems: PendingItem[]): Machi
         isDirectory: item.isDirectory,
         ...(item.revisionId ? { revisionId: item.revisionId } : {}),
         ...(item.sourceWorkspacePath ? { sourcePath: item.sourceWorkspacePath } : {}),
+        ...(item.similarity !== undefined ? { similarity: item.similarity } : {}),
     }));
 
 export const toMachineReadableStatusSummary = (pendingItems: PendingItem[], cwd: string): MachineReadableStatusSummary =>

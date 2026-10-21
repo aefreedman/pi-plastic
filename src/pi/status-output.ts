@@ -25,15 +25,17 @@ const item = object({
     path: Type.String({ minLength: 1, maxLength: 4096, pattern: statusPathPattern }), isDirectory: Type.Boolean(),
     revisionId: Type.Optional(Type.String({ minLength: 1, maxLength: 128, pattern: "^[0-9]+$" })),
     sourcePath: Type.Optional(Type.String({ minLength: 1, maxLength: 4096, pattern: statusPathPattern })),
+    similarity: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
 });
 const xmlCount = Type.Integer({ minimum: 0, maximum: 20000 });
 const xmlSummary = { totalPending: xmlCount, added: xmlCount, changed: xmlCount, moved: xmlCount, deleted: xmlCount, other: Type.Literal(0), private: xmlCount, tracked: xmlCount };
 const xmlPathPattern = `^(?:/|[A-Za-z]:\\\\|\\\\\\\\)[^\\u0000-\\u001f${process.platform === "win32" ? "?" : ""}]*$`;
 const xmlItem = object({
-    statusCode: Type.Union([Type.Literal("CH"), Type.Literal("CO"), Type.Literal("CP"), Type.Literal("RP"), Type.Literal("AD"), Type.Literal("DE"), Type.Literal("LD"), Type.Literal("MV"), Type.Literal("PR")]),
+    statusCode: Type.Union([Type.Literal("CH"), Type.Literal("CO"), Type.Literal("CP"), Type.Literal("RP"), Type.Literal("AD"), Type.Literal("DE"), Type.Literal("LD"), Type.Literal("MV"), Type.Literal("LM"), Type.Literal("PR")]),
     kind: Type.Union([Type.Literal("added"), Type.Literal("changed"), Type.Literal("moved"), Type.Literal("deleted"), Type.Literal("private")]),
     path: Type.String({ minLength: 1, maxLength: 4096, pattern: xmlPathPattern }), isDirectory: Type.Boolean(),
     sourcePath: Type.Optional(Type.String({ minLength: 1, maxLength: 4096, pattern: xmlPathPattern })),
+    similarity: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
 });
 export const statusOutputSchema = Type.Union([
     object({ ...common, schemaVersion: Type.Literal(2), ok: Type.Literal(true), data: object({
@@ -72,18 +74,49 @@ const envelope = { schemaVersion: 1, action: "status", provenance } as const;
 type StatusErrorCode = Extract<StatusOutput, { ok: false; schemaVersion: 1 }>["error"]["code"];
 const errorOutput = (code: StatusErrorCode, message: string, schemaVersion: 1 | 2 = 1): StatusOutput => ({ ...envelope, schemaVersion, ok: false, completeness: { read: "incomplete", capture: "unknown", projection: false }, error: { code, message } });
 
+// Independent DTO trust-boundary validation mirrors the observation identity rules.
+const statusObservationPathKey = (value: string): string | null => {
+    if (!value || value.length > 4096 || /[\u0000-\u001f\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(value)) return null;
+    const path = value.replace(/\\/g, "/");
+    if (!/^(?:\/|[A-Za-z]:\/)/.test(path) || path.split("/").some(part => part === "." || part === "..")) return null;
+    const windows = /^[A-Za-z]:\//.test(path) || path.startsWith("//");
+    const tail = path.slice(path.startsWith("//") ? 2 : windows ? 3 : 1);
+    if (tail.includes("//") || (windows && (/[<>:"|?*]/.test(tail) || tail.split("/").some(part => /[. ]$/.test(part))))) return null;
+    if (path.startsWith("//") && !/^\/\/[^/]+\/[^/]+\//.test(path)) return null;
+    const key = windows ? path.toLowerCase() : path;
+    return key.length > (windows ? 3 : 1) ? key.replace(/\/$/, "") : key;
+};
+const statusObservationPathRoot = (value: string): string => {
+    const path = value.replace(/\\/g, "/").toLowerCase();
+    return path.match(/^[a-z]:/)?.[0] ?? (path.startsWith("//") ? path.split("/").slice(0, 4).join("/") : "/");
+};
+
 export function validateStatusOutput(value: unknown, schemaVersion: 1 | 2 = 1): StatusOutput {
     if (!Check(statusOutputSchema, value)) return errorOutput("invalid_producer_data", "Status producer data did not match the output contract.", schemaVersion);
     const checked = value as StatusOutput;
+    if (checked.ok && checked.data.mode === "machine") {
+        const invalidMove = checked.data.items.some(row => {
+            if (row.statusCode !== "LM") return row.similarity !== undefined;
+            const destination = statusObservationPathKey(row.path);
+            const source = statusObservationPathKey(row.sourcePath ?? "");
+            return row.kind !== "moved" || row.similarity === undefined || !source || !destination || source === destination ||
+                statusObservationPathRoot(row.path) !== statusObservationPathRoot(row.sourcePath ?? "") || !/^[1-9][0-9]{0,19}$/.test(row.revisionId ?? "");
+        });
+        if (invalidMove) return errorOutput("invalid_producer_data", "Status producer data did not match the output contract.", schemaVersion);
+    }
     if (checked.ok && checked.data.mode === "xml") {
         const data = checked.data;
         const { parsed, returned, omitted, excluded, overCap } = data.itemCount;
         const seen = new Set<string>();
-        const kinds = { CH: "changed", CO: "changed", CP: "added", RP: "changed", AD: "added", DE: "deleted", LD: "deleted", MV: "moved", PR: "private" };
+        const kinds = { CH: "changed", CO: "changed", CP: "added", RP: "changed", AD: "added", DE: "deleted", LD: "deleted", MV: "moved", LM: "moved", PR: "private" };
         const invalidRows = data.items.some(row => {
             const unsafe = (path: string) => /[\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(path);
-            const invalid = unsafe(row.path) || (row.sourcePath !== undefined && unsafe(row.sourcePath)) || row.kind !== kinds[row.statusCode] || (row.kind === "moved") !== Boolean(row.sourcePath) || row.sourcePath === row.path || seen.has(row.path);
-            seen.add(row.path); return invalid;
+            const invalid = unsafe(row.path) || (row.sourcePath !== undefined && unsafe(row.sourcePath)) || row.kind !== kinds[row.statusCode] || (row.kind === "moved") !== Boolean(row.sourcePath) || row.sourcePath === row.path;
+            const keys = [row.path, ...(row.sourcePath ? [row.sourcePath] : [])].map(statusObservationPathKey);
+            const invalidIdentity = keys.some(key => !key || seen.has(key)) || new Set(keys).size !== keys.length;
+            for (const key of keys) if (key) seen.add(key);
+            const invalidSimilarity = row.statusCode === "LM" ? row.similarity === undefined || statusObservationPathRoot(row.path) !== statusObservationPathRoot(row.sourcePath ?? "") : row.similarity !== undefined;
+            return invalid || invalidIdentity || invalidSimilarity;
         });
         if (data.summary.added + data.summary.changed + data.summary.deleted + data.summary.moved + data.summary.private + data.summary.other !== parsed || data.summary.other !== 0 || data.summary.tracked !== parsed - data.summary.private || invalidRows || returned !== data.items.length || parsed !== data.parse.records || parsed !== data.summary.totalPending || omitted !== parsed - returned || excluded !== 0 || overCap !== omitted || checked.completeness.read !== "complete" || checked.completeness.capture !== "complete" || checked.completeness.projection !== (returned === parsed)) return errorOutput("invalid_producer_data", "Status producer data did not match the output contract.", 2);
     }
@@ -110,6 +143,7 @@ export function projectStatusOutput(observation: StatusObservation, maxItems = 1
             statusCode: row.statusCode, kind: row.kind, path: row.workspacePath, isDirectory: row.isDirectory,
             ...(row.revisionId !== undefined ? { revisionId: row.revisionId } : {}),
             ...(row.sourceWorkspacePath !== undefined ? { sourcePath: row.sourceWorkspacePath } : {}),
+            ...(row.similarity !== undefined ? { similarity: row.similarity } : {}),
         })).filter(row => Check(item, row));
         const items = eligible.slice(0, maxItems);
         const excluded = pendingItems.length - eligible.length;
