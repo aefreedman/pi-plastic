@@ -1,10 +1,12 @@
-import { randomBytes } from "node:crypto";
+import { lstat, open, realpath } from "node:fs/promises";
+import { resolve } from "node:path";
+import { randomBytes, createHash } from "node:crypto";
 import { assertAbsoluteResolutionPath, inspectResolutionFile } from "../domain/server-merge-resolutions";
 import { getActiveAbortSignal } from "../execution/context";
 import { captureServerMergeCommand } from "../execution/server-merge-command";
 import { tool } from "../tool-definition";
 import { outputFormatArg, formatServerMergeResult } from "../presentation/results";
-import { parseServerMergeOutput } from "../domain/merge-output";
+import { isSafeServerMergePath, parseServerMergeOutput } from "../domain/merge-output";
 import { emptyMergeAttempt, splitServerBranch, type MergeReceipt, type MergeReceiptData, type ServerMergeRequest } from "../domain/server-merge-contract";
 export { splitServerBranch };
 export type { MergeReceipt } from "../domain/server-merge-contract";
@@ -14,7 +16,7 @@ export const SERVER_MERGE_OUTPUT_LIMIT = 32768, SERVER_MERGE_HELP_TIMEOUT_MS = 3
 export const serverMergeControlPattern = /[\u0000-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 export const serverMergeCapabilityTokens = ["--to", "--merge", "--nointeractiveresolution", "--machinereadable", "--startlineseparator", "--endlineseparator", "--fieldseparator"];
 export function assertSafeServerMergeValue(name: string, value: string): string {
-    if (typeof value !== "string" || !value.trim() || value.length > 4096 || serverMergeControlPattern.test(value)) throw new ServerMergeInputError(`${name} must be non-empty, bounded and free of control/malformed characters.`);
+    if (typeof value !== "string" || !value.trim() || value.length > 4096 || (name === "message" ? /[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(value) : serverMergeControlPattern.test(value))) throw new ServerMergeInputError(`${name} must be non-empty, bounded and free of unsupported controls or malformed Unicode; only comments may contain CR/LF.`);
     return value.trim();
 }
 export function parseQualifiedServerBranch(name: string, value: string): QualifiedServerBranch {
@@ -40,6 +42,41 @@ export function validateServerMergeRequest(input: unknown): asserts input is Ser
     if (s.repository !== t.repository || s.server !== t.server) throw new ServerMergeInputError("source and target must identify the same exact repository and server.");
     if (s.branch === t.branch) throw new ServerMergeInputError("source and target must identify different branches.");
 }
+// Only the observed resultFile-only candidate closeout uses this bounded snapshot.
+// It verifies caller inputs, not the bytes stored by the server; callers still own
+// immutability during dispatch and point-in-time races remain possible.
+type ResolutionSnapshot = { digest: string; paths: string[] };
+async function snapshotResolutionInputs(path: string): Promise<ResolutionSnapshot> {
+    const bounded = async (path: string, cap: number): Promise<Buffer> => {
+        const st = await lstat(path);
+        const lexical = resolve(path), physical = await realpath(path);
+        const key = (s: string) => process.platform === "win32" ? s.toLowerCase() : s;
+        if (!st.isFile() || st.isSymbolicLink() || key(lexical) !== key(physical) || st.size > cap) throw Error("invalid");
+        const handle = await open(path, "r");
+        try {
+            const before = await handle.stat();
+            if (!before.isFile() || before.dev !== st.dev || before.ino !== st.ino || before.size !== st.size || before.mtimeMs !== st.mtimeMs || before.ctimeMs !== st.ctimeMs) throw Error("unstable");
+            const bytes = Buffer.alloc(cap + 1); let length = 0;
+            while (length < bytes.length) { const r = await handle.read(bytes, length, bytes.length - length, null); if (!r.bytesRead) break; length += r.bytesRead; }
+            const after = await handle.stat(), final = await lstat(path);
+            if (length > cap || length !== before.size || after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs || final.isSymbolicLink() || final.ino !== before.ino || final.dev !== before.dev || final.size !== before.size || final.mtimeMs !== before.mtimeMs || final.ctimeMs !== before.ctimeMs) throw Error("unstable");
+            return bytes.subarray(0, length);
+        } finally { await handle.close(); }
+    };
+    const bytes = await bounded(path, 1024 * 1024);
+    const json = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    if (!Array.isArray(json.resolutions) || json.resolutions.length > 500) throw Error("invalid");
+    const hash = createHash("sha256").update(bytes), paths: string[] = [], keys = new Set<string>();
+    let remaining = 4 * 1024 * 1024;
+    for (const entry of json.resolutions) {
+        if (typeof entry.path !== "string" || !isSafeServerMergePath(entry.path) || keys.has(entry.path.toLowerCase()) || typeof entry.resultFile !== "string" || Object.keys(entry).some(k => !["path", "resultFile"].includes(k))) throw Error("invalid");
+        assertAbsoluteResolutionPath(entry.resultFile);
+        keys.add(entry.path.toLowerCase()); paths.push(entry.path);
+        const result = await bounded(entry.resultFile, remaining); remaining -= result.length;
+        hash.update(createHash("sha256").update(result).digest());
+    }
+    return { digest: hash.digest("hex"), paths };
+}
 export async function assembleServerMergeReceipt(input: unknown): Promise<MergeReceipt> {
     const data: MergeReceiptData = { mode: "apply", resolutionsFile: null, unlistedConflictPolicy: null, requestedIdentity: null, command: null, capability: { state: "not-checked", missingTokens: [] }, attempt: emptyMergeAttempt(), capture: { help: null, merge: null }, parse: null, observedChangesets: [], conflictPaths: [], counts: { changesetsReturned: 0, changesetsOmitted: 0, conflictsReturned: 0, conflictsOmitted: 0 }, createdChangeset: null, effect: "not-attempted", serverAliasEquivalence: "unverified", mergeLinkIdentity: "unverified", xlinkEffects: "unverified", wouldRun: false, remoteAnalysis: "not-performed" };
     const completeness: MergeReceipt["completeness"] = { capture: "unknown", projection: true };
@@ -54,6 +91,7 @@ export async function assembleServerMergeReceipt(input: unknown): Promise<MergeR
         }
         return dto;
     };
+    let resolutionSnapshot: ResolutionSnapshot | null = null;
     let stage: "input" | "help" | "merge" = "input";
     try {
         validateServerMergeRequest(input);
@@ -63,6 +101,10 @@ export async function assembleServerMergeReceipt(input: unknown): Promise<MergeR
         if (input.fileConflictsResolutionsFile !== undefined) {
             try { data.resolutionsFile = await inspectResolutionFile(input.fileConflictsResolutionsFile); }
             catch (error) { throw new ServerMergeInputError(error instanceof Error && /^(Invalid resolution entry|Resolutions|Resolution)/.test(error.message) ? error.message : "Resolutions file or a result file is unavailable or invalid."); }
+        }
+        if (data.resolutionsFile && data.resolutionsFile.resultFiles === data.resolutionsFile.entries && !data.unlistedConflictPolicy) {
+            try { resolutionSnapshot = await snapshotResolutionInputs(data.resolutionsFile.path); }
+            catch { throw new ServerMergeInputError("Resolution result inputs must be stable regular nonsymlink files with canonical unique conflict paths and at most 4 MiB aggregate result bytes."); }
         }
         const seps = createServerMergeSeparators();
         const command = ["merge", source.raw, `--to=${target.raw}`, ...(data.mode === "apply" ? ["--merge", `-c=${assertSafeServerMergeValue("message", input.message!)}`] : []), ...(data.resolutionsFile ? [`--fileconflictsresolutionsfile=${data.resolutionsFile.path}`] : []), ...(data.unlistedConflictPolicy ? [data.unlistedConflictPolicy === "source" ? "--keepsource" : "--keepdestination"] : []), "--nointeractiveresolution", "--machinereadable", `--startlineseparator=${seps.start}`, `--endlineseparator=${seps.end}`, `--fieldseparator=${seps.field}`];
@@ -81,7 +123,7 @@ export async function assembleServerMergeReceipt(input: unknown): Promise<MergeR
         if (data.resolutionsFile) {
             try {
                 const current = await inspectResolutionFile(data.resolutionsFile.path);
-                if (current.sha256 !== data.resolutionsFile.sha256) throw new Error("changed");
+                if (current.sha256 !== data.resolutionsFile.sha256 || resolutionSnapshot && (await snapshotResolutionInputs(data.resolutionsFile.path)).digest !== resolutionSnapshot.digest) throw new Error("changed");
             } catch { return finish("failed", "input", "invalid_request", "Resolution inputs changed or became unavailable before merge dispatch."); }
         }
         stage = "merge";
@@ -89,16 +131,24 @@ export async function assembleServerMergeReceipt(input: unknown): Promise<MergeR
         completeness.capture = obs.capture.complete ? "complete" : "incomplete";
         if (obs.attempt.state === "not-attempted" || obs.attempt.state === "not-started") return finish("failed", "merge", obs.attempt.aborted ? "aborted" : "launch_failed");
         const parsed = parseServerMergeOutput(obs.stdout ?? "", seps, data.mode);
-        const paths = parsed.records.filter(r => r.operation === "FILE_CONFLICT" && r.fields.length === 6 && r.fields[1]!.length <= 4096 && !serverMergeControlPattern.test(r.fields[1]!)).map(r => r.fields[1]!);
-        data.parse = { records: parsed.records.length, malformed: parsed.malformed, unknownOperations: parsed.unknownOperations.length, changesetsObserved: parsed.changesets.length, conflictsObserved: paths.length, warningsObserved: parsed.warningsObserved };
+        const paths = parsed.records.filter(r => r.operation === "FILE_CONFLICT" && r.fields.length === 6 && isSafeServerMergePath(r.fields[1]!)).map(r => r.fields[1]!);
+        data.parse = { records: parsed.records.length, malformed: parsed.malformed, unknownOperations: parsed.unknownOperations.length, changesetsObserved: parsed.changesets.length, conflictsObserved: paths.length, warningsObserved: parsed.warningsObserved, unknownOperationClasses: parsed.unknownOperations, resolvedConflictsVerified: 0 };
         // One aggregate evidence budget, not one budget per collection.
         data.observedChangesets = parsed.changesets.slice(0, 100); data.conflictPaths = paths.slice(0, 100 - data.observedChangesets.length);
         data.counts = { changesetsReturned: data.observedChangesets.length, changesetsOmitted: parsed.changesets.length - data.observedChangesets.length, conflictsReturned: data.conflictPaths.length, conflictsOmitted: paths.length - data.conflictPaths.length };
         if (data.counts.changesetsOmitted || data.counts.conflictsOmitted) completeness.projection = false;
-        const matching = parsed.changesets.filter(c => c.branch === target.branch && c.repository === target.repository && c.mount === "/");
+        const matching = parsed.changesets.filter(c => c.branch === target.branch && c.repository === target.repository && c.server === target.server && c.mount === "/");
+        let resolvedCandidates = false;
+        if (resolutionSnapshot && parsed.hasConflict && data.resolutionsFile) {
+            try {
+                const current = await snapshotResolutionInputs(data.resolutionsFile.path);
+                resolvedCandidates = current.digest === resolutionSnapshot.digest && paths.length === resolutionSnapshot.paths.length && new Set(paths).size === paths.length && paths.every(p => resolutionSnapshot!.paths.includes(p));
+            } catch { /* Changed/unavailable inputs retain effect uncertainty. */ }
+        }
+        if (resolvedCandidates) data.parse.resolvedConflictsVerified = paths.length;
         // Emitted server aliases are kept verbatim. Matching uses dispatch context,
         // not an invented equivalence between requested and emitted server names.
-        const ambiguous = !obs.capture.complete || obs.failed || obs.attempt.aborted || obs.attempt.timedOut || obs.attempt.terminal !== "observed" || obs.attempt.exitCode === null || parsed.malformed || parsed.unknownOperations.length > 0 || parsed.changesets.length > 1 || parsed.changesets.length > 0 && matching.length !== 1 || parsed.hasConflict && parsed.changesets.length > 0 || parsed.isAlreadyConnected && (parsed.changesets.length > 0 || parsed.hasConflict);
+        const ambiguous = !obs.capture.complete || obs.failed || obs.attempt.aborted || obs.attempt.timedOut || obs.attempt.terminal !== "observed" || obs.attempt.exitCode === null || parsed.malformed || parsed.unknownOperations.length > 0 || parsed.changesets.length > 1 || parsed.changesets.length > 0 && matching.length !== 1 || parsed.hasConflict && parsed.changesets.length > 0 && !resolvedCandidates || parsed.isAlreadyConnected && (parsed.changesets.length > 0 || parsed.hasConflict);
         if (data.mode === "analyze") {
             if (!ambiguous && obs.attempt.exitCode === 0 && !obs.capture.stderrBytes && !parsed.changesets.length && parsed.records.length > 0) {
                 data.remoteAnalysis = "performed";
@@ -107,7 +157,7 @@ export async function assembleServerMergeReceipt(input: unknown): Promise<MergeR
             const reason = parsed.malformed ? "Malformed server analysis framing or fields." : parsed.unknownOperations.length ? "Unsupported server analysis operation or subtype." : "Server conflict analysis could not be verified.";
             return finish("uncertain", "merge", "uncertain", reason + " No applying command was requested.");
         }
-        if (!ambiguous && obs.attempt.exitCode === 0 && !obs.capture.stderrBytes && matching.length === 1 && !parsed.hasConflict && !parsed.isAlreadyConnected) { data.createdChangeset = matching[0]!; return finish("completed", "merge"); }
+        if (!ambiguous && obs.attempt.exitCode === 0 && !obs.capture.stderrBytes && matching.length === 1 && (!parsed.hasConflict || resolvedCandidates) && !parsed.isAlreadyConnected) { data.createdChangeset = matching[0]!; return finish("completed", "merge"); }
         if (!ambiguous && obs.attempt.exitCode === 0 && !obs.capture.stderrBytes && parsed.isAlreadyConnected && !parsed.changesets.length && !parsed.hasConflict) return finish("no-op", "merge");
         if (!ambiguous && obs.attempt.exitCode !== 0 && parsed.hasConflict && !parsed.changesets.length) return finish("conflict", "merge", "conflict");
         return finish("uncertain", "merge", "uncertain");
@@ -121,11 +171,12 @@ export async function assembleServerMergeReceipt(input: unknown): Promise<MergeR
 export async function presentServerMergeReceipt(dto: MergeReceipt, format: "text" | "json" = "text"): Promise<string> {
     const title = dto.outcome === "no-op" ? "No-op" : dto.outcome[0]!.toUpperCase() + dto.outcome.slice(1);
     const text = dto.outcome === "preflight" ? `## Server Merge Preflight\n\n- Would run: yes\n- Remote analysis: not performed\n- Command argv: ${JSON.stringify(dto.data.command)}` : dto.outcome === "analyzed" ? `## Server Merge Analysis\n\n- Read-only: no applying merge requested\n- File conflicts observed: ${dto.data.parse?.conflictsObserved ?? "unknown"}\n${dto.data.conflictPaths.map(path => "- " + path).join("\n")}\n- Conflicts omitted: ${dto.data.counts.conflictsOmitted}\n- Discard CHG warnings observed: ${dto.data.parse?.warningsObserved ?? "unknown"} (content equality unverified)\n- Point-in-time evidence only; no contributor content retrieved.` : `## Server Merge ${title}\n\n${dto.data.createdChangeset ? "- Created target changeset: cs:" + dto.data.createdChangeset.id + "\n" : ""}- Effect: ${dto.data.effect}\n- Server alias equivalence, merge-link identity and Xlink effects: unverified\n${dto.ok ? "" : "- " + dto.error.message + "\n- Do not retry automatically; inspect server state if an attempt may have started."}`;
-    const rendered = await formatServerMergeResult(format, dto.outcome, text, dto.data);
+    const diagnostics = `\n- Unsupported operation classes: ${dto.data.parse?.unknownOperationClasses.join(", ") || "none"}\n- Conflict candidates with verified result inputs: ${dto.data.parse?.resolvedConflictsVerified ?? 0} (not independent server-byte verification)`;
+    const rendered = await formatServerMergeResult(format, dto.outcome, text + diagnostics, dto.data);
     return rendered.length <= 24000 ? rendered : JSON.stringify({ action: dto.action, outcome: dto.outcome, ok: dto.ok, note: "Presentation omitted; use the registered tool structuredContent for the bounded receipt." });
 }
 export const mergeBranches = tool({
     description: "Inspect server merge conflicts with mode=analyze, then apply reviewed per-file JSON resolutions without a workspace or UI. Server aliases, merge links and Xlink effects remain unverified.",
-    args: { source: tool.schema.string().min(1).describe("Fully qualified source branch; branch/repository may not contain @; full server tail retained."), target: tool.schema.string().min(1).describe("Fully qualified distinct target in the same exact requested repository/server."), message: tool.schema.string().min(1).optional().describe("Required for apply; omit in analyze mode. Bounded nonempty comment, no editor fallback."), mode: tool.schema.enum(["apply", "analyze"]).optional().describe("Default apply creates a merge changeset. Analyze performs read-only remote conflict discovery without --merge; not command-only preflight."), fileConflictsResolutionsFile: tool.schema.string().min(1).optional().describe("Apply only: absolute existing UTF-8 JSON file with resolutions entries (exact conflict path plus keep or absolute readable resultFile). Inputs must remain immutable until completion."), unlistedConflictPolicy: tool.schema.enum(["source", "destination"]).optional().describe("Apply only: explicitly keep this contributor for conflicts absent from the JSON. Omit to retain noninteractive default behavior; never selected automatically."), preflight: tool.schema.boolean().optional().describe("Render intent only, zero commands; does not analyze remote conflicts."), format: outputFormatArg },
+    args: { source: tool.schema.string().min(1).describe("Fully qualified source branch; branch/repository may not contain @; full server tail retained."), target: tool.schema.string().min(1).describe("Fully qualified distinct target in the same exact requested repository/server."), message: tool.schema.string().min(1).optional().describe("Required for apply; omit in analyze mode. Bounded nonempty comment; CR/LF allowed, other controls rejected. No editor fallback."), mode: tool.schema.enum(["apply", "analyze"]).optional().describe("Default apply creates a merge changeset. Analyze performs read-only remote conflict discovery without --merge; not command-only preflight."), fileConflictsResolutionsFile: tool.schema.string().min(1).optional().describe("Apply only: absolute existing UTF-8 JSON file with resolutions entries (exact conflict path plus keep or absolute readable resultFile). Inputs must remain immutable until completion."), unlistedConflictPolicy: tool.schema.enum(["source", "destination"]).optional().describe("Apply only: explicitly keep this contributor for conflicts absent from the JSON. Omit to retain noninteractive default behavior; never selected automatically."), preflight: tool.schema.boolean().optional().describe("Render intent only, zero commands; does not analyze remote conflicts."), format: outputFormatArg },
     async execute(args) { const dto = await assembleServerMergeReceipt(args); if (!dto.ok && dto.error.stage === "input") throw new Error(dto.error.message); return presentServerMergeReceipt(dto, args.format); },
 });

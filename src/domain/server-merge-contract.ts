@@ -13,7 +13,7 @@ export type MergeReceiptData = {
     capability: { state: "not-checked" | "advertised" | "missing" | "unavailable"; missingTokens: string[] };
     attempt: MergeAttempt;
     capture: { help: MergeCapture | null; merge: MergeCapture | null };
-    parse: { records: number; malformed: boolean; unknownOperations: number; changesetsObserved: number; conflictsObserved: number; warningsObserved: number } | null;
+    parse: { records: number; malformed: boolean; unknownOperations: number; changesetsObserved: number; conflictsObserved: number; warningsObserved: number; unknownOperationClasses: string[]; resolvedConflictsVerified: number } | null;
     observedChangesets: ServerChangeset[];
     conflictPaths: string[];
     counts: { changesetsReturned: number; changesetsOmitted: number; conflictsReturned: number; conflictsOmitted: number };

@@ -1,0 +1,57 @@
+[
+  {
+    "label": "071-server-analyze",
+    "provenance": {
+      "client": "11.0.16.10484",
+      "platform": "Windows",
+      "source": "live synthetic sandbox capture",
+      "rawStdoutSha256": "0db3c898e9a6f548d814ceb100f7940499f66d4e81609ae0b900084f2b4437b8",
+      "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+    },
+    "argv": [
+      "merge",
+      "br:/main/evidence/server-source@Example Repository@example@unity",
+      "--to=br:/main/evidence/server-target@Example Repository@example@unity",
+      "--nointeractiveresolution",
+      "--machinereadable",
+      "--startlineseparator=__EV_S__",
+      "--endlineseparator=__EV_E__",
+      "--fieldseparator=__EV_F__"
+    ],
+    "cwd": "C:\\Example\\workspace",
+    "exit": 0,
+    "signal": null,
+    "error": null,
+    "stdout": "__EV_S__FILE_SRC__EV_F__/fixtures/evidence/replace1.txt__EV_F__54__EV_F__59__EV_F__996__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/server-added__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/server-added/note.txt__EV_E__\r\n__EV_S__APPLY__EV_F__RM__EV_F__/fixtures/evidence/new/Widget2.cs__EV_E__\r\n__EV_S__FILE_CONFLICT__EV_F__/fixtures/evidence/changed1.txt__EV_F__56__EV_F__59__EV_F__60__EV_F__988__EV_E__\r\n",
+    "stderr": ""
+  },
+  {
+    "label": "073-server-apply",
+    "provenance": {
+      "client": "11.0.16.10484",
+      "platform": "Windows",
+      "source": "live synthetic sandbox capture",
+      "rawStdoutSha256": "779fe1635773f053f635d4206cca416ebb3bd4fb20c8bc7e1699ee1f4a827da1",
+      "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+    },
+    "argv": [
+      "merge",
+      "br:/main/evidence/server-source@Example Repository@example@unity",
+      "--to=br:/main/evidence/server-target@Example Repository@example@unity",
+      "--merge",
+      "--nointeractiveresolution",
+      "--fileconflictsresolutionsfile=C:\\Evidence/server-resolutions.json",
+      "-c=test(evidence): reviewed synthetic server merge",
+      "--machinereadable",
+      "--startlineseparator=__EV_S__",
+      "--endlineseparator=__EV_E__",
+      "--fieldseparator=__EV_F__"
+    ],
+    "cwd": "C:\\Example\\workspace",
+    "exit": 0,
+    "signal": null,
+    "error": null,
+    "stdout": "__EV_S__FILE_SRC__EV_F__/fixtures/evidence/replace1.txt__EV_F__54__EV_F__59__EV_F__996__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/server-added__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/server-added/note.txt__EV_E__\r\n__EV_S__APPLY__EV_F__RM__EV_F__/fixtures/evidence/new/Widget2.cs__EV_E__\r\n__EV_S__FILE_CONFLICT__EV_F__/fixtures/evidence/changed1.txt__EV_F__56__EV_F__59__EV_F__60__EV_F__988__EV_E__\r\n__EV_S__CHANGESET__EV_F__cs:61@/main/evidence/server-target@Example Repository@example@unity (mount:'/')__EV_E__\r\n",
+    "stderr": ""
+  }
+]

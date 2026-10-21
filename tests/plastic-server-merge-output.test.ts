@@ -23,7 +23,7 @@ async function invoke(scenario: Scenario = {}, input: any = args) {
             if (argv[0] === "help") { c.stdout.end(scenario.helpMissing ? "other syntax" : serverMergeCapabilityTokens.join(" ")); c.stderr.end(); c.emit("close", scenario.helpFail ? 1 : 0, null); return; }
             const sep = (name: string) => argv.find(a => a.startsWith(name + "="))!.slice(name.length + 1);
             const record = (op: string, fields: string[]) => sep("--startlineseparator") + [op, ...fields].join(sep("--fieldseparator")) + sep("--endlineseparator") + "\r\n";
-            const cs = record("CHANGESET", ["cs:9007199254740993@/target 日本-é-😀@Example Repository@example-org@unity (mount:'/')"]);
+            const cs = record("CHANGESET", ["cs:9007199254740993@/target 日本-é-😀@Example Repository@example-org@cloud (mount:'/')"]);
             let out = scenario.mode === "no-op" ? record("STATUS", ["ALREADY_CONNECTED", "No merges detected"]) : scenario.mode === "conflict" ? record("FILE_CONFLICT", ["/日本😀.txt", "1", "2", "3", "4"]) : cs;
             if (scenario.mode === "mixed") out = Array.from({length:100},(_,i)=>record("FILE_CONFLICT",["/mixed-"+i+".txt","1","2","3","4"])).join("")+cs;
             if (scenario.mode === "projection") out = Array.from({ length: 101 }, (_, i) => record("FILE_CONFLICT", ["/" + i + "-" + "日本😀".repeat(20), "1", "2", "3", "4"])).join("");
@@ -49,7 +49,7 @@ async function invoke(scenario: Scenario = {}, input: any = args) {
     return { dto, calls, result };
 }
 assert.deepEqual(parseQualifiedServerBranch("source", args.source), { raw: args.source, branch: "/source", repository: "Example Repository", server: "example-org@cloud" });
-let { dto, calls } = await invoke(); assert(dto.ok); assert.equal(dto.outcome, "completed"); assert.equal(dto.data.createdChangeset.id, "9007199254740993"); assert.equal(dto.data.createdChangeset.server, "example-org@unity"); assert.equal(dto.data.requestedIdentity.server, "example-org@cloud"); assert.equal(dto.data.serverAliasEquivalence, "unverified"); assert.equal(calls.length, 2);
+let { dto, calls } = await invoke(); assert(dto.ok); assert.equal(dto.outcome, "completed"); assert.equal(dto.data.createdChangeset.id, "9007199254740993"); assert.equal(dto.data.createdChangeset.server, "example-org@cloud"); assert.equal(dto.data.requestedIdentity.server, "example-org@cloud"); assert.equal(dto.data.serverAliasEquivalence, "unverified"); assert.equal(calls.length, 2);
 for (const format of ["text", "json"]) { const r = await invoke({}, { ...args, preflight: true, format }); assert.equal(r.calls.length, 0); assert.equal(r.dto.outcome, "preflight"); }
 for (const input of [{ ...args, workdir: "/wrong" }, { ...args, extra: true }, { ...args, source: "br:/source@repo@bad@extra@cloud" }, { ...args, message: "x".repeat(4097) }, { ...args, message: "bad\uD800" }, { ...args, preflight: "true" }]) { const r = await invoke({}, input); assert.equal(r.calls.length, 0); assert.equal(r.dto.error.code, "invalid_request"); }
 for (const s of [{ launch: "sync" }, { launch: "async" }, { helpFail: true }, { helpMissing: true }] as Scenario[]) { const r = await invoke(s); assert(!r.dto.ok); assert.equal(r.dto.data.effect, "not-attempted"); if (s.launch) assert.equal(r.dto.data.attempt.state, "not-started"); else assert.equal(r.calls.length, 1); }

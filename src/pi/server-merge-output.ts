@@ -18,7 +18,7 @@ const data = {
     command: nullable(Type.Array(str(8192), { maxItems: 16 })),
     capability: object({ state: enumOf(["not-checked", "advertised", "missing", "unavailable"]), missingTokens: Type.Array(str(64), { maxItems: 9 }) }),
     attempt, capture: object({ help: nullable(capture), merge: nullable(capture) }),
-    parse: nullable(object({ records: uint(500), malformed: Type.Boolean(), unknownOperations: uint(500), changesetsObserved: uint(500), conflictsObserved: uint(500), warningsObserved: uint(500) })),
+    parse: nullable(object({ records: uint(500), malformed: Type.Boolean(), unknownOperations: uint(500), changesetsObserved: uint(500), conflictsObserved: uint(500), warningsObserved: uint(500), unknownOperationClasses: Type.Array(enumOf(["unsupported-operation", "APPLY/unsupported-subtype", "DIS_OP_WARN/unsupported-subtype"]), { maxItems: 3, uniqueItems: true }), resolvedConflictsVerified: uint(500) })),
     observedChangesets: Type.Array(changeset, { maxItems: 100 }), conflictPaths: Type.Array(str(), { maxItems: 100 }),
     counts: object({ changesetsReturned: uint(100), changesetsOmitted: uint(500), conflictsReturned: uint(100), conflictsOmitted: uint(500) }),
     serverAliasEquivalence: Type.Literal("unverified"), mergeLinkIdentity: Type.Literal("unverified"), xlinkEffects: Type.Literal("unverified"), wouldRun: Type.Boolean(), remoteAnalysis: enumOf(["not-performed", "performed"]),
@@ -38,7 +38,13 @@ export function validateServerMergeOutput(value: unknown): value is MergeReceipt
     const dto = value as MergeReceipt, d = dto.data, a = d.attempt, p = d.parse;
     const safeText = (s: string) => !/[\u0000-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(s);
     for (const cs of [...d.observedChangesets, ...(d.createdChangeset ? [d.createdChangeset] : [])]) if (!splitServerBranch("br:" + cs.branch + "@" + cs.repository + "@" + cs.server) || ![cs.branch, cs.repository, cs.server, cs.mount].every(safeText)) return false;
-    if (!d.conflictPaths.every(s => s.startsWith("/") && safeText(s))) return false;
+    const canonicalPath = (s: string) => s.length > 1 && s.startsWith("/") && safeText(s) && !s.includes(String.fromCharCode(92)) && s.split("/").slice(1).every(part => !!part && part !== "." && part !== ".." && !/[. ]$/.test(part));
+    if (!d.conflictPaths.every(canonicalPath)) return false;
+    const safeComment = (s: string) => s.length <= 4096 && !!s.trim() && safeText(s.replace(/[\r\n]/g, ""));
+    if (d.command?.some(s => s.startsWith("-c=") ? !safeComment(s.slice(3)) : !safeText(s))) return false;
+    if (d.requestedIdentity && !Object.values(d.requestedIdentity).every(safeText)) return false;
+    if (p && (p.conflictsObserved + p.changesetsObserved > p.records || p.resolvedConflictsVerified > 0 && new Set(d.conflictPaths.map(s => s.toLowerCase())).size !== d.conflictPaths.length)) return false;
+    if (p && (p.unknownOperationClasses.length !== p.unknownOperations || p.resolvedConflictsVerified > p.conflictsObserved || p.resolvedConflictsVerified > 0 && (d.mode !== "apply" || !d.resolutionsFile || d.unlistedConflictPolicy !== null || d.resolutionsFile.keepSource !== 0 || d.resolutionsFile.keepDestination !== 0 || d.resolutionsFile.resultFiles !== p.resolvedConflictsVerified || d.resolutionsFile.entries !== p.resolvedConflictsVerified))) return false;
     if (p && (p.warningsObserved > p.records || d.mode === "apply" && p.warningsObserved > 0 && ["completed", "no-op", "conflict"].includes(dto.outcome))) return false;
     if (!p && (d.observedChangesets.length || d.conflictPaths.length || Object.values(d.counts).some(Boolean))) return false;
     if (dto.completeness.capture === "complete" && !(d.capture.merge?.complete ?? d.capture.help?.complete)) return false;
@@ -60,7 +66,9 @@ export function validateServerMergeOutput(value: unknown): value is MergeReceipt
     if (c.changesetsReturned + c.conflictsReturned > 100) return false;
     if (c.changesetsReturned !== d.observedChangesets.length || c.conflictsReturned !== d.conflictPaths.length || p && (c.changesetsReturned + c.changesetsOmitted !== p.changesetsObserved || c.conflictsReturned + c.conflictsOmitted !== p.conflictsObserved)) return false;
     if ((c.changesetsOmitted || c.conflictsOmitted) && dto.completeness.projection) return false;
-    if (dto.outcome === "completed" && (a.exitCode !== 0 || !d.requestedIdentity || !d.createdChangeset || d.createdChangeset.branch !== d.requestedIdentity.branch || d.createdChangeset.repository !== d.requestedIdentity.repository || d.createdChangeset.mount !== "/" || p?.changesetsObserved !== 1 || p.conflictsObserved !== 0)) return false;
+    if (dto.outcome === "completed" && (a.exitCode !== 0 || !d.requestedIdentity || !d.createdChangeset || d.createdChangeset.branch !== d.requestedIdentity.branch || d.createdChangeset.repository !== d.requestedIdentity.repository || d.createdChangeset.server !== d.requestedIdentity.server || d.createdChangeset.mount !== "/" || p?.changesetsObserved !== 1 || p.conflictsObserved !== p.resolvedConflictsVerified)) return false;
+    if (["completed", "no-op", "analyzed"].includes(dto.outcome) && d.capture.merge?.stderrBytes) return false;
+    if (dto.outcome === "completed" && (!d.command || d.command[0] !== "cm" || d.command[1] !== "merge" || d.command[2] !== d.requestedIdentity?.source || !d.command.includes("--to=" + d.requestedIdentity?.target) || !d.command.includes("--merge") || !d.command.includes("--nointeractiveresolution") || !d.command.some(a => a.startsWith("-c=") && a.slice(3).trim()) || !d.wouldRun || d.capability.state !== "advertised" || d.capability.missingTokens.length > 0 || !d.capture.help?.complete || d.capture.help.stderrBytes || dto.completeness.capture !== "complete" || d.resolutionsFile && !d.command.includes("--fileconflictsresolutionsfile=" + d.resolutionsFile.path) || p?.resolvedConflictsVerified && d.command.some(a => a === "--keepsource" || a === "--keepdestination") || !d.observedChangesets.some(c => c.id === d.createdChangeset?.id && c.branch === d.createdChangeset.branch && c.repository === d.createdChangeset.repository && c.server === d.createdChangeset.server && c.mount === d.createdChangeset.mount))) return false;
     if (dto.outcome === "no-op" && (a.exitCode !== 0 || p?.changesetsObserved !== 0 || p.conflictsObserved !== 0)) return false;
     if (dto.outcome === "conflict" && (a.exitCode === 0 || p?.changesetsObserved !== 0 || !p.conflictsObserved)) return false;
     for (const cap of [d.capture.help, d.capture.merge]) if (cap && (cap.stdoutRetainedBytes > cap.stdoutBytes || cap.stderrRetainedBytes > cap.stderrBytes || cap.complete && (!cap.validUtf8 || cap.truncated))) return false;

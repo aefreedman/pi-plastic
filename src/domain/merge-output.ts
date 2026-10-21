@@ -197,6 +197,8 @@ export const summarizeMergeOutput = (output: string): MergeOutputSummary =>
     };
 };
 
+export const isSafeServerMergePath = (path: string): boolean => path.length > 1 && path.length <= 4096 && path.startsWith("/") && !path.includes(String.fromCharCode(92)) && !/[\u0000-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(path) && path.split("/").slice(1).every(part => !!part && part !== "." && part !== ".." && !/[. ]$/.test(part));
+
 export type ServerMergeRecord = {
     operation: string;
     fields: string[];
@@ -216,6 +218,9 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
 {
     const records: ServerMergeRecord[] = [];
     const unknownOperations = new Set<string>();
+    if (Buffer.byteLength(output, "utf8") > 65536 || Object.values(separators).some(s => !s || s.length > 128) || new Set(Object.values(separators)).size !== 3) {
+        return { records, malformed: true, unknownOperations: [], changesets: [], isAlreadyConnected: false, hasConflict: false, warningsObserved: 0 };
+    }
     let malformed = false;
     let cursor = 0;
 
@@ -224,14 +229,14 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
         const start = output.indexOf(separators.start, cursor);
         if (start < 0)
         {
-            if (output.slice(cursor).trim() !== "")
+            if (!/^[\r\n]*$/.test(output.slice(cursor)))
             {
                 malformed = true;
             }
             break;
         }
         const prefix = output.slice(cursor, start);
-        if (prefix.trim() !== "")
+        if (!/^[\r\n]*$/.test(prefix))
         {
             malformed = true;
         }
@@ -261,7 +266,7 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
                 records.push({ operation, fields });
                 if (!["FILE_SRC", "CHANGESET", "STATUS", "FILE_CONFLICT", "APPLY", "DIS_OP_WARN"].includes(operation))
                 {
-                    unknownOperations.add(operation);
+                    unknownOperations.add("unsupported-operation");
                 }
             }
         }
@@ -269,6 +274,16 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
     }
 
     const changesets: ServerChangeset[] = [];
+    const paths = new Set<string>();
+    for (let i = 0; i < records.length; i++) {
+        const r = records[i]!;
+        if (r.operation === "CHANGESET" && i !== records.length - 1 || r.operation === "STATUS" && records.length !== 1) malformed = true;
+        const path = r.operation === "APPLY" || r.operation === "DIS_OP_WARN" ? r.fields[2] : ["FILE_SRC", "FILE_CONFLICT"].includes(r.operation) ? r.fields[1] : undefined;
+        if (path !== undefined) {
+            if (!isSafeServerMergePath(path) || paths.has(path.toLowerCase())) malformed = true;
+            paths.add(path.toLowerCase());
+        }
+    }
     const decimal = (s: string) => /^(0|[1-9][0-9]{0,19})$/.test(s);
     const safe = (s: string) => s.length <= 4096 && !/[\u0000-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(s);
     let isAlreadyConnected = false;
@@ -287,18 +302,18 @@ export const parseServerMergeOutput = (output: string, separators: { start: stri
             case "APPLY":
             case "DIS_OP_WARN":
             {
-                // Only captured analysis profiles are supported. CHG is an observed
+                // APPLY profiles are mode-specific. CHG is an observed analysis
                 // discard warning, not proof of identical contributor content.
                 const subtype = record.fields[1]!;
-                const supported = record.operation === "APPLY" ? ["ADD", "FSPROT"].includes(subtype) : subtype === "CHG";
+                const supported = record.operation === "APPLY" ? (mode === "apply" ? ["ADD", "RM"] : ["ADD", "RM", "FSPROT"]).includes(subtype) : mode === "analyze" && subtype === "CHG";
                 const validFields = record.fields.length === 3 && record.fields[2]!.startsWith("/") && safe(record.fields[2]!);
                 if (!validFields)
                 {
                     malformed = true;
                 }
-                if (!supported || mode !== "analyze")
+                if (!supported)
                 {
-                    unknownOperations.add(record.operation + "/" + subtype);
+                    unknownOperations.add(record.operation + "/unsupported-subtype");
                 }
                 else if (record.operation === "DIS_OP_WARN" && validFields)
                 {
