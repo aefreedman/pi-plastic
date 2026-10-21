@@ -1,3 +1,6 @@
+import { win32 } from "node:path";
+import { admitMergedStandardStatus, correlateMergedCheckin } from "../domain/merged-workspace";
+import { parseSwitchLoadedBranch } from "../domain/switch-contract";
 import { randomBytes } from "node:crypto";
 import { buildFallbackScopePaths } from "../domain/paths";
 import { summarizePendingItems, resolveCheckinPaths, filterPendingItemsByScope, selectPrivatePathsForAutoAdd, type PendingItem } from "../domain/pending";
@@ -66,6 +69,21 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         const before = await read("pending-before");
         if (!before) return finish("unsupported", "pending_source_unadmitted", "pending", "Pending selection could not be admitted; no mutation was dispatched.");
         data.pendingBefore = summary(before.items, cwd);
+        const merged = before.merged;
+        let loaded: ReturnType<typeof parseSwitchLoadedBranch> = null;
+        // CO/-1/NO_MERGES also occurs during an unresolved merge. Read the
+        // native link state before any checkin, including standalone/preflight.
+        if (merged || before.items.some(i => i.statusCode === "CO")) {
+            const { o, s } = await record("merge-readiness", ["status"]);
+            loaded = success(o) ? parseSwitchLoadedBranch(o.stdout ?? "") : null;
+            const source = /^    Merge from cs:[1-9][0-9]{0,19} at (.+)\r?$/m.exec(o.stdout ?? "")?.[1];
+            const ready = loaded && loaded.repository === before.repository && loaded.server === before.server && (merged
+                ? !!source && admitMergedStandardStatus(o.stdout!, merged, source, cwd)
+                : !/pending merge links|merge in progress|conflict/i.test(o.stdout ?? ""));
+            if (!ready) return finish("unsupported", "merge_readiness_unadmitted", "pending", "Merge source/resolution metadata could not be admitted; no checkin was dispatched.");
+            s.evidence = "admitted";
+        }
+        if (merged && input.includePrivate) return finish("unsupported", "merged_private_scope", "pending", "Merged checkin does not admit private inclusion; leave unrelated private work excluded.");
         let includedAbsolute: string[] = [], scoped = before.items, apply = input.applyChanged ?? false;
         if (input.paths?.length) {
             const r = resolveCheckinPaths(input.paths, before.items, cwd);
@@ -74,20 +92,33 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
             scoped = filterPendingItemsByScope(before.items, includedAbsolute);
             if (!data.includedPaths.length) return finish("failed", "NO_PENDING_PATHS", "pending", "None of the provided checkin paths have admitted pending changes.");
         }
+        if (merged) {
+            data.excludedPaths.push(...before.items.filter(i => i.kind === "private").map(i => ({ path: i.workspacePath, reason: "Unrelated private work excluded from merged checkin (includePrivate=false)." })));
+            scoped = scoped.filter(i => i.kind !== "private");
+            if (merged.privateRows.length) {
+                // Do not rely on workspace-wide --all selection in the presence
+                // of private work. These directories are proven disjoint above.
+                data.includedPaths = merged.rows.map(r => win32.relative(cwd, r.path));
+            }
+            // All merged controlled rows must remain selected. Partial merge
+            // checkins and directory scopes overlapping private rows are unproven.
+            if (scoped.length !== merged.rows.length) return finish("unsupported", "merged_partial_scope", "pending", "All correlated merged controlled paths must be selected.");
+        }
         const nonce = randomBytes(16).toString("hex"), seps = { start: `__PI_CI_START_${nonce}__`, end: `__PI_CI_END_${nonce}__`, field: `__PI_CI_FIELD_${nonce}__` };
         const command = (paths: string[], force: boolean) => ["checkin", `-c=${input.message}`, ...(input.includeAll ? ["--all"] : []), ...(force ? ["--applychanged"] : []), ...(input.includePrivate ? ["--private"] : []), ...paths, "--machinereadable", `--startlineseparator=${seps.start}`, `--endlineseparator=${seps.end}`, `--fieldseparator=${seps.field}`];
         const initial = command(data.includedPaths, apply); data.command = ["cm", ...initial]; data.wouldRun = true;
         if (input.preflight) return finish("preflight");
         const attempt = async (name: "initial-checkin" | "private-retry" | "fallback-checkin", argv: string[]) => {
             const { o, s } = await record(name, argv), p = parseCheckinEvidence(o.stdout ?? "", seps); s.records = p.records;
-            const admitted = p.admitted && p.changesets.every(c => c.repository === before.repository);
+            const mergedEvents = !merged || correlateMergedCheckin(p.events, merged, cwd);
+            const admitted = p.admitted && mergedEvents && p.changesets.every(c => c.repository === before.repository && c.server === before.server && (!loaded || c.branch === loaded.branch));
             if (admitted && normal(o)) {
                 s.evidence = "admitted";
                 data.itemEvents.push(...p.events); data.observedChangesets.push(...p.changesets);
             }
             if (success(o) && admitted && p.changesets.length === 1) { created = p.changesets[0]; s.changeset = created; s.effect = "changeset-created"; }
             // Only genuine complete native failure without a created record may drive the existing recovery policy.
-            const retryEligible = normal(o) && admitted && o.attempt.exitCode !== 0 && p.changesets.length === 0;
+            const retryEligible = !merged && normal(o) && admitted && o.attempt.exitCode !== 0 && p.changesets.length === 0;
             return { completed: !!s.changeset, retryEligible, message: retryEligible ? o.stderr ?? "" : "" };
         };
         stage = "checkin";

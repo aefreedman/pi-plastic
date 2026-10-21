@@ -38,7 +38,9 @@ for (const [applyLabel, pendingLabel, fullLabel, checkinLabel, sourceLeaf] of [
     for (const bad of [apply + apply, "noise" + apply, apply.replace("DO_", "UNKNOWN_"), apply.replace("/fixtures/", "/../fixtures/"), apply.replace("C:\\Example", "C:\\Other"), apply.replace("__EV_F__43", "__EV_F__043"), apply.slice(0, -12)]) {
         if (bad !== apply) { const d = parseMergedApply(bad, token); assert(!d || !correlateMergedApply(d, pending, cwd)); }
     }
-    for (const bad of [machine + machine.split("\r\n")[1] + "\r\n", machine.replace("Merge from ", "Unknown "), machine.replace("False", "True"), machine.replace("C:\\Example", "C:\\Other"), machine.replace("\\fixtures\\", "\\..\\fixtures\\"), machine.replace("Merge from ", "Merge from 0"), machine + "CO\x1fC:\\Example\\workspace\\local.txt\x1fFalse\x1f-1\x1fNO_MERGES\r\n"]) assert.equal(parseMergedPending(bad, cwd), null);
+    for (const bad of [machine + machine.split("\r\n")[1] + "\r\n", machine.replace("Merge from ", "Unknown "), machine.replace("C:\\Example", "C:\\Other"), machine.replace("\\fixtures\\", "\\..\\fixtures\\"), machine.replace("Merge from ", "Merge from 0"), machine + "CO\x1fC:\\Example\\workspace\\local.txt\x1fFalse\x1f-1\x1fNO_MERGES\r\n"]) assert.equal(parseMergedPending(bad, cwd), null);
+    const wrongDirectory = parseMergedPending(machine.replace("False", "True"), cwd);
+    assert(!wrongDirectory || !admitMergedStandardStatus(full, wrongDirectory, source, cwd));
     for (const bad of [full + "Merge in progress\r\n", full + full, full.replace(" at /main/evidence/", " at /main/other/"), full.replace("example@unity", "example@cloud"), full.replace("Changed", "Unknown"), full.replace("Merge from cs:", "Merge from cs:0"), full.replace("(Merge from ", "(Merge from 0"), full.replace("fixtures\\evidence", "fixtures\\other"), full.replace("    Merge from cs:", "Pending merge links\r\n    Merge from cs:")]) assert(!admitMergedStandardStatus(bad, pending, source, cwd));
     assert(!admitMergedStandardStatus(full, pending, source.replace("@unity", "@cloud"), cwd));
     for (const bad of [native + native, native.replace("__EV_S__RP", "__EV_S__UNKNOWN"), native + "noise", native.replace("mount:'/'", "mount:'/xlink'")]) {
@@ -52,6 +54,7 @@ for (const [applyLabel, pendingLabel, fullLabel, checkinLabel, sourceLeaf] of [
                 calls.push([...args]); const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), kill() { return false; } });
                 queueMicrotask(() => {
                     child.emit("spawn"); let out = checked ? machine.split("\r\n")[0] + "\r\n" : machine, err = "";
+                    if (args[0] === "status" && !args.includes("--machinereadable")) out = full;
                     if (args[0] === "checkin") {
                         checked = true; out = native;
                         for (const [key, old] of [["--startlineseparator", "__EV_S__"], ["--endlineseparator", "__EV_E__"], ["--fieldseparator", "__EV_F__"]]) out = out.replaceAll(old, args.find(a => a.startsWith(key + "="))!.slice(key.length + 1));
@@ -92,7 +95,7 @@ for (const [applyLabel, pendingLabel, fullLabel, checkinLabel, sourceLeaf] of [
             assert.equal(calls.filter(c => c[0] === "merge").length, 1); assert(!calls.some(c => c[0] === "checkin"));
             if (mode !== "success") { assert.equal(r.structuredContent.data.effect, "uncertain"); assert.equal(r.structuredContent.data.checkinReadiness, "unknown"); }
             else {
-                for (const mutate of [(d: any) => d.data.pendingReadMode = "short", (d: any) => d.data.fileConflictCount = 2, (d: any) => d.data.shortStatus.admission = "unsupported", (d: any) => d.data.checkinReadiness = "blocked"]) {
+                for (const mutate of [(d: any) => d.data.pendingReadMode = "short", (d: any) => d.data.fileConflictCount = 129, (d: any) => d.data.shortStatus.admission = "unsupported", (d: any) => d.data.checkinReadiness = "blocked"]) {
                     const forged = structuredClone(r.structuredContent); mutate(forged); assert(!validateWorkspaceMergeOutput(forged));
                 }
             }

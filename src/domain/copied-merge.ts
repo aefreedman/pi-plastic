@@ -34,7 +34,7 @@ export function admitCopiedStandardStatus(text: string, pending: CopiedPending, 
     if (!link || link[1] !== pending.mergeChangeset || !linked || linked.branch !== requested.branch || linked.repository !== pending.repository || linked.server !== pending.server || requested.repository !== null && (requested.repository !== linked.repository || requested.server !== linked.server)) return false;
     const remaining = new Set(pending.paths.map(p => win32.relative(cwd, p)));
     for (const row of lines.slice(5)) {
-        const candidates = [...remaining].filter(path => new RegExp(`^    Copied \\(new\\) \\(Merge from ${pending.mergeChangeset}\\) {2,}[0-9]+ bytes {2,}[^\\r\\n\\x00-\\x1f\\x7f]{1,128}? {2,}${escape(path)} *$`).test(row));
+        const candidates = [...remaining].filter(path => new RegExp(`^    Copied \\(new\\) \\(Merge from ${pending.mergeChangeset}\\) {2,}[0-9]{1,20}(?:\\.[0-9]{1,8})? (?:bytes|KB|MB) {2,}[^\\r\\n\\x00-\\x1f\\x7f]{1,128}? {2,}${escape(path)} *$`).test(row));
         if (candidates.length !== 1) return false;
         remaining.delete(candidates[0]);
     }

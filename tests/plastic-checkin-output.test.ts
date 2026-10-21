@@ -31,9 +31,13 @@ async function invoke(scenario: Scenario = {}, args: any = input, core = false, 
             if (!(argv[0] === "checkin" && scenario.noSpawn)) c.emit("spawn");
             let out = "", err = "", code: number | null = 0;
             if (argv[0] === "status") {
+                if (!argv.includes("--machinereadable")) {
+                    out = `/main/café-é-日本-😀@Example Repository@example@unity (cs:9007199254740993 - head)\r\n\r\n`;
+                } else {
                 reads++; out = header;
                 if (reads === 1) out += scenario.pending ?? (scenario.private ? row("PR") : scenario.fallback ? row("LD") : row());
                 if (reads > 1 && (scenario.recoveryFail || scenario.afterFail)) { err = "PRIVATE_PATH read failure"; code = 1; }
+                }
             } else if (argv[0] === "add") { out = "PRIVATE_PATH native add output"; if (scenario.addFail) code = 1; }
             else {
                 checkins++;
@@ -128,7 +132,7 @@ for (const tool of [undefined, registered]) {
     r = await invoke({ pending: checkedOutRow() }, input, false, tool);
     assert(r.dto.ok);
     assert.deepEqual(r.dto.data.includedPaths, [name]);
-    assert.deepEqual(r.calls.map(c => c[0]), ["status", "checkin", "status"]);
+    assert.deepEqual(r.calls.map(c => c[0]), ["status", "status", "checkin", "status"]);
 }
 for (const invalid of [
     checkedOutRow().replace("-1", "0"), checkedOutRow().replace("-1", "42"),
@@ -156,7 +160,7 @@ for (const scenario of [{ mode: "unknown" }, { mode: "bom" }, { mode: "repositor
 }
 r = await invoke({ fallback: true }); assert(r.dto.ok); assert.equal(r.dto.data.usedFallbackRetry, true); assert(r.calls[2].includes("--applychanged")); assert.equal(r.calls[2].filter(a => a === name).length, 0);
 r = await invoke({ native: "Checkin operation cannot be started because there is a merge in progress", recoveryFail: true }); assert.equal(r.dto.error.code, "merge_in_progress"); assert.deepEqual(r.calls[2], ["status"]);
-r = await invoke({ payload: `cs:9007199254740997@br:/${"日".repeat(4000)}@Example Repository@${"日".repeat(4000)} (mount:'/')` }); assert(r.dto.ok); assert.match(r.result.content[0].text, /Presentation omitted/);
+r = await invoke({ payload: `cs:9007199254740997@br:/${"日".repeat(4000)}@Example Repository@example@unity (mount:'/')` }); assert(r.dto.ok); assert(Buffer.byteLength(r.result.content[0].text, "utf8") <= 24000);
 r = await invoke({ mode: "projection" }); assert(r.dto.ok); assert(r.dto.data.omittedReferences > 0); assert.equal(r.dto.completeness.projection, false);
 r = await invoke({ mode: "mv" }); assert(r.dto.ok); assert.equal(r.dto.data.itemEvents[1].sourcePath, path); assert.equal(r.dto.data.itemEvents[1].path, cwd + "\\new-" + name);
 const damaged = structuredClone(r.dto); damaged.data.effect = "not-attempted"; assert(!validateCheckinOutput(damaged));

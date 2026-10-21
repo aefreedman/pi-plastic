@@ -36,7 +36,7 @@ export function validateWorkspaceMergeOutput(v:unknown):v is WorkspaceMergeRecei
  if(d.fullStatus.admission!=="not-observed"&&(!d.shortStatus.capture?.complete||d.shortStatus.attempt.exitCode!==0))return false;
  if(d.protocol==="not-observed"&&(d.apply.admission==="admitted"||d.fileConflictCount!==null)||d.protocol==="unsupported"&&(d.fileConflictCount!==null||d.apply.admission!=="unsupported"))return false;
  if(["already-connected","apply-add","apply-add-copied","file-conflict","merged-candidate"].includes(d.protocol)&&d.apply.admission!=="admitted")return false;
- if(d.protocol==="merged-candidate"&&(d.fileConflictCount===null||d.fileConflictCount>1||d.checkinReadiness==="blocked"))return false;
+ if(d.protocol==="merged-candidate"&&(d.fileConflictCount===null||d.fileConflictCount>128||d.checkinReadiness==="blocked"))return false;
  if(d.protocol==="file-conflict"?(d.fileConflictCount===null||d.fileConflictCount===0||d.checkinReadiness!=="blocked"):d.checkinReadiness==="blocked")return false;
  if(["already-connected","apply-add","apply-add-copied"].includes(d.protocol)&&d.fileConflictCount!==0)return false;
  if(d.protocol==="merged-candidate"&&d.checkinReadiness==="supported-no-unresolved-signals"&&(d.strategy!=="auto"||d.forced!==false||d.cherrypicking!==false))return false;

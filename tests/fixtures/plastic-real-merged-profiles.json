@@ -1,0 +1,454 @@
+{
+  "note": "Intentionally sanitized live synthetic Windows cm evidence; identity substitutions only. Negative test mutations are not native captures. Client scope is one observed build, not runtime-version evidence.",
+  "fixtures": [
+    {
+      "label": "001-version",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "4842e3267462d7ccf19d1df1b958e6df9a162b5163f3cc3347bf2b66b3a4c183",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "version"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "11.0.16.10484\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "023-apply-mixed",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "5c6b30d33cf3beec20bc079b5e2e99848b9dc2840b986dbde17cf305944e79b7",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "merge",
+        "/main/evidence/source",
+        "--merge",
+        "--nointeractiveresolution",
+        "--mergetype=try",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "__EV_S__FILE_SRC__EV_F__/fixtures/evidence/large.txt__EV_F__53__EV_F__54__EV_F__990__EV_E__\r\n__EV_S__FILE_SRC__EV_F__/fixtures/evidence/replace1.txt__EV_F__53__EV_F__54__EV_F__996__EV_E__\r\n__EV_S__FILE_SRC__EV_F__/fixtures/evidence/replace2.txt__EV_F__53__EV_F__54__EV_F__997__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/new__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/new/Widget1.cs__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/new/Widget1.cs.meta__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/new/Widget2.cs__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/new/Widget2.cs.meta__EV_E__\r\n__EV_S__APPLY__EV_F__RM__EV_F__/fixtures/evidence/removed-dir__EV_E__\r\n__EV_S__APPLY__EV_F__RM__EV_F__/fixtures/evidence/removed.txt__EV_E__\r\n__EV_S__FILE_CONFLICT__EV_F__/fixtures/evidence/changed1.txt__EV_F__53__EV_F__54__EV_F__55__EV_F__988__EV_E__\r\n__EV_S__FILE_CONFLICT__EV_F__/fixtures/evidence/changed2.txt__EV_F__53__EV_F__54__EV_F__55__EV_F__989__EV_E__\r\n__EV_S__DO_DELETED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\removed.txt__EV_E__\r\n__EV_S__DO_DELETED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\removed-dir__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\Widget1.cs__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\Widget1.cs.meta__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\Widget2.cs__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\Widget2.cs.meta__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\large.txt__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\replace1.txt__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\replace2.txt__EV_E__\r\n__EV_S__DO_MERGE__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed1.txt__EV_E__\r\n__EV_S__DO_MERGE__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed2.txt__EV_E__\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "024-merged-full",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "692cc62b7938711abadf006c503fe1b8cdcc14a3fa4a823198c2e4ca51d0e6d8",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--all"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "/main/evidence@Example Repository@example@unity (cs:55 - head)\r\n\r\nPending merge links\r\n    Merge from cs:54 at /main/evidence/source@Example Repository@example@unity\r\n\r\nChanged\r\n    Status                                   Size        Last Modified    Path                                                \r\n\r\n    Checked-out (changed) (Merge from 54)    53.04 KB    Just now         fixtures\\evidence\\changed1.txt    \r\n    Checked-out (changed) (Merge from 54)    53.04 KB    Just now         fixtures\\evidence\\changed2.txt    \r\n    Replaced (Merge from 54)                  1.54 MB    Just now         fixtures\\evidence\\large.txt       \r\n    Replaced (Merge from 54)                 56.16 KB    Just now         fixtures\\evidence\\replace1.txt    \r\n    Replaced (Merge from 54)                 56.16 KB    Just now         fixtures\\evidence\\replace2.txt    \r\n\r\nDeleted\r\n    Status                     Size        Path                                               \r\n\r\n    Removed (Merge from 54)                fixtures\\evidence\\removed-dir    \r\n    Removed (Merge from 54)    18 bytes    fixtures\\evidence\\removed.txt    \r\n\r\nAdded\r\n    Status                          Size           Last Modified    Path                                                       \r\n\r\n    Copied (new) (Merge from 54)                   Just now         fixtures\\evidence\\new                    \r\n    Copied (new) (Merge from 54)    52.25 KB       Just now         fixtures\\evidence\\new\\Widget1.cs         \r\n    Copied (new) (Merge from 54)       60 bytes    Just now         fixtures\\evidence\\new\\Widget1.cs.meta    \r\n    Copied (new) (Merge from 54)    52.25 KB       Just now         fixtures\\evidence\\new\\Widget2.cs         \r\n    Copied (new) (Merge from 54)       60 bytes    Just now         fixtures\\evidence\\new\\Widget2.cs.meta    \r\n\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "024-merged-machine",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "5a368ec79426fe765e35fc132c1e5fb22d436ecf8618ea493638628c111008ed",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--machinereadable",
+        "--includeRevId",
+        "--fieldseparator=\u001f"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "STATUS\u001f55\u001fExample Repository\u001fexample@unity\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\u001fTrue\u001f1012\u001fMerge from 54\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\\Widget2.cs.meta\u001fFalse\u001f1002\u001fMerge from 54\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\\Widget2.cs\u001fFalse\u001f1001\u001fMerge from 54\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\\Widget1.cs.meta\u001fFalse\u001f1000\u001fMerge from 54\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\\Widget1.cs\u001fFalse\u001f999\u001fMerge from 54\r\nRP\u001fC:\\Example\\workspace\\fixtures\\evidence\\replace2.txt\u001fFalse\u001f983\u001fMerge from 54\r\nRP\u001fC:\\Example\\workspace\\fixtures\\evidence\\replace1.txt\u001fFalse\u001f982\u001fMerge from 54\r\nRP\u001fC:\\Example\\workspace\\fixtures\\evidence\\large.txt\u001fFalse\u001f977\u001fMerge from 54\r\nCO\u001fC:\\Example\\workspace\\fixtures\\evidence\\changed2.txt\u001fFalse\u001f-1\u001fMerge from 54\r\nCO\u001fC:\\Example\\workspace\\fixtures\\evidence\\changed1.txt\u001fFalse\u001f-1\u001fMerge from 54\r\nDE\u001fC:\\Example\\workspace\\fixtures\\evidence\\removed-dir\u001fTrue\u001f994\u001fMerge from 54\r\nDE\u001fC:\\Example\\workspace\\fixtures\\evidence\\removed.txt\u001fFalse\u001f981\u001fMerge from 54\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "025-standard-default",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "692cc62b7938711abadf006c503fe1b8cdcc14a3fa4a823198c2e4ca51d0e6d8",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "/main/evidence@Example Repository@example@unity (cs:55 - head)\r\n\r\nPending merge links\r\n    Merge from cs:54 at /main/evidence/source@Example Repository@example@unity\r\n\r\nChanged\r\n    Status                                   Size        Last Modified    Path                                                \r\n\r\n    Checked-out (changed) (Merge from 54)    53.04 KB    Just now         fixtures\\evidence\\changed1.txt    \r\n    Checked-out (changed) (Merge from 54)    53.04 KB    Just now         fixtures\\evidence\\changed2.txt    \r\n    Replaced (Merge from 54)                  1.54 MB    Just now         fixtures\\evidence\\large.txt       \r\n    Replaced (Merge from 54)                 56.16 KB    Just now         fixtures\\evidence\\replace1.txt    \r\n    Replaced (Merge from 54)                 56.16 KB    Just now         fixtures\\evidence\\replace2.txt    \r\n\r\nDeleted\r\n    Status                     Size        Path                                               \r\n\r\n    Removed (Merge from 54)                fixtures\\evidence\\removed-dir    \r\n    Removed (Merge from 54)    18 bytes    fixtures\\evidence\\removed.txt    \r\n\r\nAdded\r\n    Status                          Size           Last Modified    Path                                                       \r\n\r\n    Copied (new) (Merge from 54)                   Just now         fixtures\\evidence\\new                    \r\n    Copied (new) (Merge from 54)    52.25 KB       Just now         fixtures\\evidence\\new\\Widget1.cs         \r\n    Copied (new) (Merge from 54)       60 bytes    Just now         fixtures\\evidence\\new\\Widget1.cs.meta    \r\n    Copied (new) (Merge from 54)    52.25 KB       Just now         fixtures\\evidence\\new\\Widget2.cs         \r\n    Copied (new) (Merge from 54)       60 bytes    Just now         fixtures\\evidence\\new\\Widget2.cs.meta    \r\n\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "026-with-private-full",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "f5cf4d7a56f5bc6eaf5112672ee619d03876c840b59e209573ddd1729168f303",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--all"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "/main/evidence@Example Repository@example@unity (cs:55 - head)\r\n\r\nPending merge links\r\n    Merge from cs:54 at /main/evidence/source@Example Repository@example@unity\r\n\r\nChanged\r\n    Status                                   Size        Last Modified    Path                                                \r\n\r\n    Checked-out (changed) (Merge from 54)    53.04 KB    Just now         fixtures\\evidence\\changed1.txt    \r\n    Checked-out (changed) (Merge from 54)    53.04 KB    Just now         fixtures\\evidence\\changed2.txt    \r\n    Replaced (Merge from 54)                  1.54 MB    Just now         fixtures\\evidence\\large.txt       \r\n    Replaced (Merge from 54)                 56.16 KB    Just now         fixtures\\evidence\\replace1.txt    \r\n    Replaced (Merge from 54)                 56.16 KB    Just now         fixtures\\evidence\\replace2.txt    \r\n\r\nDeleted\r\n    Status                     Size        Path                                               \r\n\r\n    Removed (Merge from 54)                fixtures\\evidence\\removed-dir    \r\n    Removed (Merge from 54)    18 bytes    fixtures\\evidence\\removed.txt    \r\n\r\nAdded\r\n    Status                          Size           Last Modified    Path                                                       \r\n\r\n    Copied (new) (Merge from 54)                   Just now         fixtures\\evidence\\new                    \r\n    Copied (new) (Merge from 54)    52.25 KB       Just now         fixtures\\evidence\\new\\Widget1.cs         \r\n    Copied (new) (Merge from 54)       60 bytes    Just now         fixtures\\evidence\\new\\Widget1.cs.meta    \r\n    Copied (new) (Merge from 54)    52.25 KB       Just now         fixtures\\evidence\\new\\Widget2.cs         \r\n    Copied (new) (Merge from 54)       60 bytes    Just now         fixtures\\evidence\\new\\Widget2.cs.meta    \r\n    Private                                        Just now         unrelated-private                                 \r\n    Private                            33 bytes    Just now         unrelated-private.txt                             \r\n    Private                            30 bytes    Just now         unrelated-private\\note.txt                        \r\n\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "026-with-private-machine",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "e14266bbe7e4ca9883d94b197e9f1c174c9f573244e1e85500ec8de16d17fdab",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--machinereadable",
+        "--includeRevId",
+        "--fieldseparator=\u001f"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "STATUS\u001f55\u001fExample Repository\u001fexample@unity\r\nPR\u001fC:\\Example\\workspace\\unrelated-private.txt\u001fFalse\u001f-1\u001fNO_MERGES\r\nPR\u001fC:\\Example\\workspace\\unrelated-private\u001fTrue\u001f-1\u001fNO_MERGES\r\nPR\u001fC:\\Example\\workspace\\unrelated-private\\note.txt\u001fFalse\u001f-1\u001fNO_MERGES\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\u001fTrue\u001f1012\u001fMerge from 54\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\\Widget2.cs.meta\u001fFalse\u001f1002\u001fMerge from 54\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\\Widget2.cs\u001fFalse\u001f1001\u001fMerge from 54\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\\Widget1.cs.meta\u001fFalse\u001f1000\u001fMerge from 54\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\\Widget1.cs\u001fFalse\u001f999\u001fMerge from 54\r\nRP\u001fC:\\Example\\workspace\\fixtures\\evidence\\replace2.txt\u001fFalse\u001f983\u001fMerge from 54\r\nRP\u001fC:\\Example\\workspace\\fixtures\\evidence\\replace1.txt\u001fFalse\u001f982\u001fMerge from 54\r\nRP\u001fC:\\Example\\workspace\\fixtures\\evidence\\large.txt\u001fFalse\u001f977\u001fMerge from 54\r\nCO\u001fC:\\Example\\workspace\\fixtures\\evidence\\changed2.txt\u001fFalse\u001f-1\u001fMerge from 54\r\nCO\u001fC:\\Example\\workspace\\fixtures\\evidence\\changed1.txt\u001fFalse\u001f-1\u001fMerge from 54\r\nDE\u001fC:\\Example\\workspace\\fixtures\\evidence\\removed-dir\u001fTrue\u001f994\u001fMerge from 54\r\nDE\u001fC:\\Example\\workspace\\fixtures\\evidence\\removed.txt\u001fFalse\u001f981\u001fMerge from 54\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "027-merge-native-checkin",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "04d08c1bbd9e9972ec3dd7901d4cb5e9397b55818d6496bed2113818c46701bd",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "checkin",
+        "-c=test(evidence): 027-merge-native-checkin",
+        "--all",
+        "--applychanged",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "__EV_S__CI_START__EV_E__\r\n__EV_S__STAGE__EV_F__Validating checkin data__EV_E__\r\n__EV_S__STAGE__EV_F__Validating checkin data__EV_E__\r\n__EV_S__STAGE__EV_F__Uploading file data__EV_E__\r\n__EV_S__STAGE__EV_F__Confirming checkin operation__EV_E__\r\n__EV_S__STAGE__EV_F____EV_E__\r\n__EV_S__CO__EV_F__C:\\Example\\workspace\\fixtures\\evidence__EV_E__\r\n__EV_S__DE__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\removed.txt__EV_E__\r\n__EV_S__DE__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\removed-dir__EV_E__\r\n__EV_S__CP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new__EV_E__\r\n__EV_S__CP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\Widget1.cs__EV_E__\r\n__EV_S__CP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\Widget1.cs.meta__EV_E__\r\n__EV_S__CP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\Widget2.cs__EV_E__\r\n__EV_S__CP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\Widget2.cs.meta__EV_E__\r\n__EV_S__RP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\large.txt__EV_E__\r\n__EV_S__RP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\replace1.txt__EV_E__\r\n__EV_S__RP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\replace2.txt__EV_E__\r\n__EV_S__CO__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed1.txt__EV_E__\r\n__EV_S__CO__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed2.txt__EV_E__\r\n__EV_S__CHANGESET__EV_F__cs:56@br:/main/evidence@Example Repository@example@unity (mount:'/')__EV_E__\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "028-after-checkin-full",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "25e7516d46d8321bff4881bbd82f62e2fbade92460078ad80c3fb83ece7292fc",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--all"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "/main/evidence@Example Repository@example@unity (cs:56 - head)\r\n\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "028-after-checkin-machine",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "7ea48d1056fe5063583bf390159cdca6cd60d344ab07ca5b2b22a9f57278123d",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--machinereadable",
+        "--includeRevId",
+        "--fieldseparator=\u001f"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "STATUS\u001f56\u001fExample Repository\u001fexample@unity\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "047-apply-unresolved",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "dc248ffa7ef5461cb3c0dbcd9be84512341b400fe4dae0790439212a160c0320",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "merge",
+        "/main/evidence/conflict-source",
+        "--merge",
+        "--nointeractiveresolution",
+        "--mergetype=try",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "__EV_S__FILE_CONFLICT__EV_F__/fixtures/evidence/changed1.txt__EV_F__56__EV_F__57__EV_F__58__EV_F__988__EV_E__\r\n__EV_S__FILE_CONFLICT__EV_F__/fixtures/evidence/changed2.txt__EV_F__56__EV_F__57__EV_F__58__EV_F__989__EV_E__\r\n__EV_S__DO_MERGE__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed1.txt__EV_E__\r\n__EV_S__DO_MERGE__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed2.txt__EV_E__\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "048-unresolved-full",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "0bb481fc91e51af61cb3585d6321ff146bd46792569118231d3e1777ec351ba2",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--all"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "/main/evidence/conflict-target@Example Repository@example@unity (cs:58 - head)\r\n\r\nPending merge links\r\n    Merge from cs:57 at /main/evidence/conflict-source@Example Repository@example@unity\r\n\r\nChanged\r\n    Status                     Size        Last Modified    Path                                                \r\n\r\n    Checked-out (unchanged)    53.05 KB    Just now         fixtures\\evidence\\changed1.txt    \r\n    Checked-out (unchanged)    53.05 KB    Just now         fixtures\\evidence\\changed2.txt    \r\n\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "048-unresolved-machine",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "9493a5aa3dab16588b4134a83587c73ab1f27188c54fd67bd1e9c8fad15c976e",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--machinereadable",
+        "--includeRevId",
+        "--fieldseparator=\u001f"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "STATUS\u001f58\u001fExample Repository\u001fexample@unity\r\nCO\u001fC:\\Example\\workspace\\fixtures\\evidence\\changed2.txt\u001fFalse\u001f-1\u001fNO_MERGES\r\nCO\u001fC:\\Example\\workspace\\fixtures\\evidence\\changed1.txt\u001fFalse\u001f-1\u001fNO_MERGES\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "049-unresolved-checkin-negative",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "32c6255ac9b4245b4cc709086ede63e882cd959b89e5b2a8279b8cc8cc3c4eca",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "checkin",
+        "-c=test(evidence): intentional unresolved negative",
+        "--all",
+        "--applychanged",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 1,
+      "signal": null,
+      "error": null,
+      "stdout": "__EV_S__CI_START__EV_E__\r\n__EV_S__STAGE__EV_F____EV_E__\r\n",
+      "stderr": "Error: Checkin operation cannot be started because there is a merge in progress: Finish it before checkin the changes. In progress merge: Merge from cset 57\r\n"
+    },
+    {
+      "label": "089-apply-files",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "42c0ad7b343fa7b426abd3ac151804b8614de668a70b7e928759fa210884bcf3",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "merge",
+        "/main/evidence/files-source",
+        "--merge",
+        "--nointeractiveresolution",
+        "--mergetype=try",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "__EV_S__FILE_SRC__EV_F__/fixtures/evidence/replace1.txt__EV_F__54__EV_F__62__EV_F__996__EV_E__\r\n__EV_S__FILE_SRC__EV_F__/fixtures/evidence/replace2.txt__EV_F__54__EV_F__62__EV_F__997__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/new/More1.cs__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/new/More1.cs.meta__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/new/More2.cs__EV_E__\r\n__EV_S__APPLY__EV_F__ADD__EV_F__/fixtures/evidence/new/More2.cs.meta__EV_E__\r\n__EV_S__FILE_CONFLICT__EV_F__/fixtures/evidence/changed1.txt__EV_F__56__EV_F__62__EV_F__63__EV_F__988__EV_E__\r\n__EV_S__FILE_CONFLICT__EV_F__/fixtures/evidence/changed2.txt__EV_F__56__EV_F__62__EV_F__63__EV_F__989__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\More1.cs__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\More1.cs.meta__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\More2.cs__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\More2.cs.meta__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\replace1.txt__EV_E__\r\n__EV_S__DO_COPIED__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\replace2.txt__EV_E__\r\n__EV_S__DO_MERGE__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed1.txt__EV_E__\r\n__EV_S__DO_MERGE__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed2.txt__EV_E__\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "090-files-merged-full",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "1c6165ffbf1fbc07072a137003549bc455a6d86454329478b43277f306e20210",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--all"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "/main/evidence/files-target@Example Repository@example@unity (cs:63 - head)\r\n\r\nPending merge links\r\n    Merge from cs:62 at /main/evidence/files-source@Example Repository@example@unity\r\n\r\nChanged\r\n    Status                                   Size        Last Modified    Path                                                \r\n\r\n    Checked-out (changed) (Merge from 62)    53.05 KB    Just now         fixtures\\evidence\\changed1.txt    \r\n    Checked-out (changed) (Merge from 62)    53.05 KB    Just now         fixtures\\evidence\\changed2.txt    \r\n    Replaced (Merge from 62)                 60.84 KB    Just now         fixtures\\evidence\\replace1.txt    \r\n    Replaced (Merge from 62)                 60.84 KB    Just now         fixtures\\evidence\\replace2.txt    \r\n\r\nAdded\r\n    Status                          Size           Last Modified    Path                                                     \r\n\r\n    Copied (new) (Merge from 62)    56.93 KB       Just now         fixtures\\evidence\\new\\More1.cs         \r\n    Copied (new) (Merge from 62)       60 bytes    Just now         fixtures\\evidence\\new\\More1.cs.meta    \r\n    Copied (new) (Merge from 62)    56.93 KB       Just now         fixtures\\evidence\\new\\More2.cs         \r\n    Copied (new) (Merge from 62)       60 bytes    Just now         fixtures\\evidence\\new\\More2.cs.meta    \r\n\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "090-files-merged-machine",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "8a40244c2ae3c50490baab59e10491355058e76e8626d541ad3b44f6dbd80777",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--machinereadable",
+        "--includeRevId",
+        "--fieldseparator=\u001f"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "STATUS\u001f63\u001fExample Repository\u001fexample@unity\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\\More2.cs.meta\u001fFalse\u001f1059\u001fMerge from 62\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\\More2.cs\u001fFalse\u001f1058\u001fMerge from 62\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\\More1.cs.meta\u001fFalse\u001f1057\u001fMerge from 62\r\nCP\u001fC:\\Example\\workspace\\fixtures\\evidence\\new\\More1.cs\u001fFalse\u001f1056\u001fMerge from 62\r\nRP\u001fC:\\Example\\workspace\\fixtures\\evidence\\replace2.txt\u001fFalse\u001f1003\u001fMerge from 62\r\nRP\u001fC:\\Example\\workspace\\fixtures\\evidence\\replace1.txt\u001fFalse\u001f1004\u001fMerge from 62\r\nCO\u001fC:\\Example\\workspace\\fixtures\\evidence\\changed2.txt\u001fFalse\u001f-1\u001fMerge from 62\r\nCO\u001fC:\\Example\\workspace\\fixtures\\evidence\\changed1.txt\u001fFalse\u001f-1\u001fMerge from 62\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "091-files-merge-checkin",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "3d3740d529c5558dab9f95f8e089aa3e0a20a7f78b9bdd226084c9e1ff0998d8",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "checkin",
+        "-c=test(evidence): 091-files-merge-checkin",
+        "--all",
+        "--applychanged",
+        "--machinereadable",
+        "--startlineseparator=__EV_S__",
+        "--endlineseparator=__EV_E__",
+        "--fieldseparator=__EV_F__"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "__EV_S__CI_START__EV_E__\r\n__EV_S__STAGE__EV_F__Validating checkin data__EV_E__\r\n__EV_S__STAGE__EV_F__Validating checkin data__EV_E__\r\n__EV_S__STAGE__EV_F__Uploading file data__EV_E__\r\n__EV_S__STAGE__EV_F__Confirming checkin operation__EV_E__\r\n__EV_S__STAGE__EV_F____EV_E__\r\n__EV_S__CO__EV_F__C:\\Example\\workspace\\fixtures\\evidence__EV_E__\r\n__EV_S__CO__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new__EV_E__\r\n__EV_S__CP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\More1.cs__EV_E__\r\n__EV_S__CP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\More1.cs.meta__EV_E__\r\n__EV_S__CP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\More2.cs__EV_E__\r\n__EV_S__CP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\new\\More2.cs.meta__EV_E__\r\n__EV_S__RP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\replace1.txt__EV_E__\r\n__EV_S__RP__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\replace2.txt__EV_E__\r\n__EV_S__CO__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed1.txt__EV_E__\r\n__EV_S__CO__EV_F__C:\\Example\\workspace\\fixtures\\evidence\\changed2.txt__EV_E__\r\n__EV_S__CHANGESET__EV_F__cs:64@br:/main/evidence/files-target@Example Repository@example@unity (mount:'/')__EV_E__\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "092-files-clean-full",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "7827c1f17e73bde10835f46ca0c0d5a1866723c41bc71fc313414d4315a83052",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--all"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "/main/evidence/files-target@Example Repository@example@unity (cs:64 - head)\r\n\r\n",
+      "stderr": ""
+    },
+    {
+      "label": "092-files-clean-machine",
+      "provenance": {
+        "client": "11.0.16.10484",
+        "platform": "Windows",
+        "source": "live synthetic sandbox capture",
+        "rawStdoutSha256": "3050ea56adc70362b14504593520ef48dd19fa7e3806a84982e7ef8684fae12c",
+        "sanitizer": "sanitize.cjs (identity substitutions only; no delimiter or record rewriting)"
+      },
+      "argv": [
+        "status",
+        "--machinereadable",
+        "--includeRevId",
+        "--fieldseparator=\u001f"
+      ],
+      "cwd": "C:\\Example\\workspace",
+      "exit": 0,
+      "signal": null,
+      "error": null,
+      "stdout": "STATUS\u001f64\u001fExample Repository\u001fexample@unity\r\n",
+      "stderr": ""
+    }
+  ]
+}
