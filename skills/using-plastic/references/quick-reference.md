@@ -28,7 +28,7 @@ Plastic merges into the branch currently loaded in the workspace; switching afte
 
 - Run `plastic_merge(...)`.
 - If `plastic_merge(...)` reports `FILE_CONFLICT`, inspect/resolve the listed paths and validate before re-inspecting markers and remaining conflicts.
-- Run `plastic_mergeListConflictMarkers()` and `plastic_status()`; edit/validate and re-inspect before checkin. Unknown or nonempty marker evidence blocks. Never force-finalize or reapply after uncertainty.
+- Run `plastic_mergeListConflictMarkers()` and `plastic_status()`; edit/validate and re-inspect before checkin. Pending (observed complete ASCII CRLF exit-1 records) or unknown marker evidence blocks; successful informational pending is not readiness or native exit-zero command completion. Never force-finalize or reapply after uncertainty.
 - Pending merge links are expected until the merge result is checked in; merge-in-progress hints are blockers.
 - If validation/tests were run after the merge, run `plastic_status()` again before checkin so generated private artifacts do not muddy the result.
 - Confirm the merge changeset and final workspace branch are the intended target. A source/target mismatch is failure, even when the command returned success or the workspace is clean.

@@ -3,7 +3,7 @@ import path from "node:path";
 import { tool } from "../tool-definition";
 import { captureWorkspaceMergeCommand } from "../execution/workspace-merge-command";
 import { markerInspectionFromObservation, markerReceipt, safeMarkerText, type MarkerAction, type MarkerInspection, type MarkerReceipt, type MarkerRequest } from "../domain/marker-lifecycle";
-export { classifyMarkerInspection, emptyMarkerInspection, markerReceipt, safeMarkerText } from "../domain/marker-lifecycle";
+export { classifyMarkerInspection, emptyMarkerInspection, markerListingCaptureComplete, markerReceipt, safeMarkerText } from "../domain/marker-lifecycle";
 export type { MarkerAction, MarkerInspection, MarkerReceipt } from "../domain/marker-lifecycle";
 export type { MarkerGate } from "../domain/marker-gate";
 
@@ -75,7 +75,7 @@ async function execute(action: MarkerAction, args: unknown) {
     return text;
 }
 export const mergeListConflictMarkers = tool({
-    description: "Read native conflict-marker evidence once. Empty complete output proves marker absence only, never all-conflict readiness. Unrecognized listing records remain unknown.",
+    description: "Read native conflict-marker evidence once. Empty complete exit-zero output proves marker absence only, never all-conflict readiness. Observed complete ASCII CRLF exit-1 records report pending; other evidence remains unknown.",
     args: common(), execute: args => execute("merge-list-conflict-markers", args),
 });
 export const mergeMarkResolved = tool({

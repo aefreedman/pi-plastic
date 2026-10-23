@@ -13,7 +13,7 @@ const capture = object({ stdoutBytes: uint(), stderrBytes: uint(), stdoutRetaine
 const request = object({ workdir: str(), format: enumeration(["text", "json"]), paths: Type.Array(str(), { maxItems: 64 }), acknowledgeIntentionalMarkers: Type.Boolean(), preflight: Type.Boolean() });
 const schema = (action: MarkerAction) => Type.Unsafe<MarkerReceipt>(object({
     schemaVersion: Type.Literal(1), action: Type.Literal(action), provenance: object({ source: Type.Literal("plastic"), producer: Type.Literal("@aefree/pi-plastic"), contentTrust: Type.Literal("external") }),
-    ok: Type.Boolean(), outcome: enumeration(["clear", "preflight", "command-completed", "failed", "uncertain"]),
+    ok: Type.Boolean(), outcome: enumeration(["clear", "pending", "preflight", "command-completed", "failed", "uncertain"]),
     data: object({ requested: nullable(request), command: nullable(Type.Array(str(), { minItems: 2, maxItems: 66 })), inspection: object({ state: enumeration(["clear", "pending", "unknown"]), attempt, capture: nullable(capture), stdout: nullable(str(65536)), stderr: nullable(str(16384)) }), commandCompleted: Type.Boolean(), effect: enumeration(["not-attempted", "not-proven", "uncertain"]), checkinReadiness: Type.Literal("unknown"), verification: Type.Literal("unverified") }),
     error: nullable(object({ code: enumeration(["invalid_request", "unknown_evidence", "producer_failed"]), message: str(256) })),
 }));

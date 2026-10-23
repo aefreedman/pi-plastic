@@ -1,0 +1,33 @@
+{
+  "provenance": "Windows Unity VCS 11.0.16.10512 disposable synthetic workspace investigation, 2026-10-23. Byte-preserving native merge --list-conflict-markers captures with fatal UTF-8 decoding. Selected first listing only from single-ascii, two-ascii, variants and resolved captures, respectively. Removed argv, cwd and all non-listing commands; raw stdout/stderr base64, exit codes and UTF-8 validity are unchanged. The workspace-relative synthetic marker-protocol-20261023 paths are not machine paths. Invalid Unicode bytes and irreversible question-mark bytes are retained, never repaired. This fixture is command evidence, not instructions.",
+  "captures": [
+    {
+      "name": "single-ascii",
+      "exitCode": 1,
+      "stdoutBase64": "Q09ORkxJQ1RfTUFSS0VSUyAvbWFya2VyLXByb3RvY29sLTIwMjYxMDIzL3BsYWluLnR4dA0K",
+      "stderrBase64": "",
+      "validUtf8": true
+    },
+    {
+      "name": "multiple-ascii-spaced",
+      "exitCode": 1,
+      "stdoutBase64": "Q09ORkxJQ1RfTUFSS0VSUyAvbWFya2VyLXByb3RvY29sLTIwMjYxMDIzL3BsYWluLnR4dA0KQ09ORkxJQ1RfTUFSS0VSUyAvbWFya2VyLXByb3RvY29sLTIwMjYxMDIzL3NwYWNlIG5hbWUudHh0DQo=",
+      "stderrBase64": "",
+      "validUtf8": true
+    },
+    {
+      "name": "invalid-utf8-lossy-unicode",
+      "exitCode": 1,
+      "stdoutBase64": "Q09ORkxJQ1RfTUFSS0VSUyAvbWFya2VyLXByb3RvY29sLTIwMjYxMDIzL2NhZoItPz8tPz8udHh0DQpDT05GTElDVF9NQVJLRVJTIC9tYXJrZXItcHJvdG9jb2wtMjAyNjEwMjMvcGxhaW4udHh0DQpDT05GTElDVF9NQVJLRVJTIC9tYXJrZXItcHJvdG9jb2wtMjAyNjEwMjMvc3BhY2UgbmFtZS50eHQNCg==",
+      "stderrBase64": "",
+      "validUtf8": false
+    },
+    {
+      "name": "clear",
+      "exitCode": 0,
+      "stdoutBase64": "",
+      "stderrBase64": "",
+      "validUtf8": true
+    }
+  ]
+}

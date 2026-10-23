@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { Check } from "typebox/value";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
@@ -13,7 +15,10 @@ import { searchPlasticTools } from "../src/plastic-tool-loading";
 const cwd="C:\\Example\\workspace",repo="Example Repository",server="example@unity";
 const machine=`STATUS\x1f16\x1f${repo}\x1f${server}\r\n`;
 type Mode="clear"|"pending"|"error"|"overflow"|"invalid"|"timeout"|"stderr"|"unresolved";
-// All protocol and process observations here are synthetic, not real SCM evidence.
+// Synthetic transport/status composition; listing bytes come from the sanitized
+// native listing fixture, not invented live command captures.
+const listing = JSON.parse(readFileSync(new URL("./fixtures/marker-list-captures.json", import.meta.url), "utf8")).captures.find((c: any) => c.name === "multiple-ascii-spaced");
+const pendingOutput = Buffer.from(listing.stdoutBase64, "base64");
 async function invoke(route:"merge"|"checkin"|"closeout",mode:Mode, failListing=1, partial?:string){
  const calls:string[][]=[];let listings=0,branch="/main/source",applied=false;
  const deps={spawn:((_:string,argv:string[])=>{
@@ -21,7 +26,7 @@ async function invoke(route:"merge"|"checkin"|"closeout",mode:Mode, failListing=
   queueMicrotask(()=>{c.emit("spawn");let out:string|Buffer="",err="",code=0;
    if(argv.includes("--list-conflict-markers")){
     listings++;if(listings===failListing){
-     if(mode==="pending"){out="CONFLICT_MARKERS fixture.txt\r\n";code=1;}if(mode==="error"){err="Unknown client failure";code=1;}if(mode==="overflow")out=Buffer.alloc(65537);if(mode==="invalid")out=Buffer.from([255]);if(mode==="stderr")err="warning";
+     if(mode==="pending"){out=pendingOutput;code=1;}if(mode==="error"){err="Unknown client failure";code=1;}if(mode==="overflow")out=Buffer.alloc(65537);if(mode==="invalid")out=Buffer.from([255]);if(mode==="stderr")err="warning";
      if(mode==="timeout"){(c as any).__tick?.();return;}
     }
    }else if(argv[0]==="status"){
@@ -45,9 +50,21 @@ if(process.platform==="win32"){
  for(const route of ["merge","checkin","closeout"] as const)for(const mode of ["pending","error","overflow","invalid","stderr","timeout","unresolved"] as const){
   const {r,calls,listings}=await invoke(route,mode);assert(r.isError,route+" "+mode);assert(!calls.some(a=>a[0]==="checkin"));assert.equal(listings,1,"No failed-list retry");assert.equal(calls.filter(a=>a.includes("--merge")).length,route==="checkin"?0:1);
   assert(route==="merge"?validateWorkspaceMergeOutput(r.structuredContent):route==="checkin"?validateCheckinOutput(r.structuredContent):validateCloseoutOutput(r.structuredContent));
+  if(mode==="pending"||mode==="error") {
+   const dto:any=r.structuredContent;
+   const markers=route==="closeout"?dto.data.stages.find((s:any)=>s.kind==="merge").result.data.markers:dto.data.markers;
+   assert.equal(markers.state,mode==="pending"?"pending":"unknown");
+   if(mode==="pending") {
+    assert.equal(r.structuredContent.completeness.capture,"complete");
+    const forged=structuredClone(dto);
+    const m=route==="closeout"?forged.data.stages.find((s:any)=>s.kind==="merge").result.data.markers:forged.data.markers;
+    m.state="clear";
+    assert(!(route==="merge"?validateWorkspaceMergeOutput(forged):route==="checkin"?validateCheckinOutput(forged):validateCloseoutOutput(forged)));
+   }
+  }
   if(mode==="overflow"||mode==="invalid"||mode==="timeout")assert.equal(r.structuredContent.completeness.capture,"incomplete");
  }
- for(const failAt of [2,3]){const {r,calls,listings}=await invoke("closeout","pending",failAt);assert(r.isError);assert(validateCloseoutOutput(r.structuredContent));assert.equal(listings,failAt);assert.equal(calls.filter(a=>a.includes("--merge")).length,1);assert(!calls.some(a=>a[0]==="checkin"));const d:any=r.structuredContent;assert.equal(d.data.stages.at(-1).name,failAt===2?"checkin-preflight":"checkin");}
+ for(const failAt of [2,3]){const {r,calls,listings}=await invoke("closeout","pending",failAt);assert(r.isError);assert(validateCloseoutOutput(r.structuredContent));assert.equal(listings,failAt);assert.equal(calls.filter(a=>a.includes("--merge")).length,1);assert(!calls.some(a=>a[0]==="checkin"));const d:any=r.structuredContent;assert.equal(d.data.stages.at(-1).name,failAt===2?"checkin-preflight":"checkin");assert.equal(d.data.stages.at(-1).result.data.markers.state,"pending");assert.equal(d.completeness.capture,"complete");}
  for(const kind of ["binary","symlink","recursive","directory","delete-change"]){const {r,calls,listings}=await invoke("merge","clear",1,kind);assert(r.isError);assert.equal(calls.length,1);assert.equal(listings,0);assert.equal(r.structuredContent.data.commandCompleted,false);assert.match(r.structuredContent.data.commandOutput!.stdout,new RegExp(kind));assert(!calls[0].some(a=>/keep(source|destination)|automaticresolution|external/.test(a)));assert(calls[0].includes("--conflict-markers"));}
 }
 // Synthetic end-to-end all-copy profiles must retain the same pending contract
@@ -83,6 +100,13 @@ const dir=await mkdtemp(join(tmpdir(),"pi-marker-integration-"));try{
  await writeFile(join(dir,"intentional.txt"),"<<<<<<< intentional documentation example\n");let commands:string[][]=[];
  const mark=tools.get("plastic_mergeMarkResolved")!;assert(mark.outputSchema);assert(tools.get("plastic_mergeListConflictMarkers")!.outputSchema);
  for(const args of [{paths:["intentional.txt"],preflight:true},{paths:["../escape.txt"],acknowledgeIntentionalMarkers:true,preflight:true}]){const r=await mark.execute("fixture",{...args,workdir:dir});assert(r.isError);}
+ const list=tools.get("plastic_mergeListConflictMarkers")!;
+ commands=[];
+ const pending=await runWithAbortSignal(undefined,()=>list.execute("fixture",{workdir:dir,format:"json"}),{spawn:((_:string,a:string[])=>{
+  commands.push([...a]);const c=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill(){return false;}});
+  queueMicrotask(()=>{c.emit("spawn");c.stdout.end(pendingOutput);c.stderr.end();c.emit("close",1,null);});return c;
+ })as any});
+ assert.equal(pending.isError,process.platform!=="win32");assert(Check(list.outputSchema,pending.structuredContent));assert.equal(pending.structuredContent.outcome,process.platform==="win32"?"pending":"uncertain");assert.equal(pending.structuredContent.data.commandCompleted,false);assert.deepEqual(commands,[["merge","--list-conflict-markers"]]);commands=[];
  const result=await runWithAbortSignal(undefined,()=>mark.execute("fixture",{paths:["intentional.txt"],acknowledgeIntentionalMarkers:true,preflight:true,workdir:dir}),{spawn:((_:string,a:string[])=>{commands.push(a);throw Error("No SCM command permitted");})as any});assert(!result.isError);assert.equal(result.structuredContent.outcome,"preflight");assert.equal(commands.length,0);assert.equal(result.structuredContent.data.checkinReadiness,"unknown");
 }finally{await rm(dir,{recursive:true,force:true});}
-console.log("PASS: synthetic marker failures/partial non-text effects stop merge/checkin/closeout without retries; compact completeness; intentional bypass registration and removed API");
+console.log("PASS: captured pending versus unknown marker failures/partial non-text effects stop merge/checkin/closeout without retries; compact completeness; intentional bypass registration and removed API");

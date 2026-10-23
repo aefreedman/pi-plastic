@@ -892,7 +892,7 @@
   {
     "name": "plastic_mergeListConflictMarkers",
     "label": "plastic_mergeListConflictMarkers",
-    "description": "Read native conflict-marker evidence once. Empty complete output proves marker absence only, never all-conflict readiness. Unrecognized listing records remain unknown.",
+    "description": "Read native conflict-marker evidence once. Empty complete exit-zero output proves marker absence only, never all-conflict readiness. Observed complete ASCII CRLF exit-1 records report pending; other evidence remains unknown.",
     "parameters": {
       "type": "object",
       "properties": {

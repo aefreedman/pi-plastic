@@ -1,5 +1,6 @@
 import { Type } from "typebox";
 import { Check } from "typebox/value";
+import { markerListingCaptureComplete } from "../operations/marker-lifecycle";
 import type { MarkerGate } from "../operations/marker-lifecycle";
 const obj = (p: Record<string, any>) => Type.Object(p, { additionalProperties: false });
 const enm = (v: string[]) => Type.Union(v.map(x => Type.Literal(x)));
@@ -14,8 +15,10 @@ export function validateMarkerGate(value: unknown): value is MarkerGate {
  const { state, attempt: a, capture: c } = value as MarkerGate;
  if (a.exitCode !== null && (a.terminal !== "observed" || !["started", "unknown"].includes(a.state))) return false;
  if (c && (c.stdoutRetainedBytes > c.stdoutBytes || c.stderrRetainedBytes > c.stderrBytes || c.complete && (!c.validUtf8 || c.truncated || c.stdoutBytes !== c.stdoutRetainedBytes || c.stderrBytes !== c.stderrRetainedBytes || a.state !== "started" || a.terminal !== "observed" || a.exitCode === null || a.aborted || a.timedOut))) return false;
- // The component currently admits only exactly empty, complete native exit-zero
- // listings. No nonempty protocol has been independently established.
- const clear = !!c?.complete && a.state === "started" && a.terminal === "observed" && a.exitCode === 0 && !a.aborted && !a.timedOut && c.stdoutBytes === 0 && c.stderrBytes === 0;
- return state === (clear ? "clear" : "unknown");
+ // No raw text here: pending metadata is compatible, not file identity proof.
+ // In particular, exit 1/nonempty pending evidence cannot be promoted to clear.
+ const complete = markerListingCaptureComplete({ attempt: a, capture: c });
+ const clear = complete && a.exitCode === 0 && c!.stdoutBytes === 0;
+ const pending = complete && a.exitCode === 1 && c!.stdoutBytes >= "CONFLICT_MARKERS /a\r\n".length;
+ return state === "pending" ? pending : state === (clear ? "clear" : "unknown");
 }
