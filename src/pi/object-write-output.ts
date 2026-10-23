@@ -7,8 +7,8 @@ const requests={
     "changeset-edit-comment":obj({...common,changeset:text,comment:optionalText,commentsFile:optionalText}),
     "shelveset-create":obj({...common,paths,comment:optionalText,commentsFile:optionalText,all:Type.Boolean(),dependencies:Type.Boolean(),summaryFormat:Type.Boolean()}),
     "shelveset-apply":obj({...common,shelveset:text,changePaths:paths,preview:Type.Boolean(),dontCheckout:Type.Boolean(),comparisonMethod:nil(enm(["ignoreeol","ignorewhitespaces","ignoreeolandwhitespaces","recognizeall"]))}),
-    "code-review-create":obj({...common,target:text,title:text,status:optionalText,assignee:optionalText,repository:optionalText,format:optionalText}),
-    "code-review-update":obj({...common,id:text,status:optionalText,assignee:optionalText,repository:optionalText}),
+    "code-review-create":obj({...common,target:text,title:text,status:optionalText,users:nil(Type.Array(text,{minItems:1,maxItems:100})),groups:nil(Type.Array(text,{minItems:1,maxItems:100})),repository:optionalText,format:optionalText}),
+    "code-review-update":obj({...common,id:text,status:optionalText,title:optionalText,repository:optionalText}),
 };
 const attempt=obj({state:enm(["not-attempted","not-started","started","unknown"]),terminal:enm(["not-observed","observed"]),exitCode:nil(uint(2147483647)),aborted:Type.Boolean(),timedOut:Type.Boolean()}),capture=obj({stdoutBytes:uint(),stderrBytes:uint(),stdoutRetainedBytes:uint(65536),stderrRetainedBytes:uint(16384),truncated:Type.Boolean(),complete:Type.Boolean(),validUtf8:Type.Boolean()});
 function schema<A extends ObjectWriteAction>(action:A) {

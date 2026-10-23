@@ -34,7 +34,7 @@ try {
   // Startup may probe patch capabilities. All transport stays in local Node scripts.
   for (const command of ["help", "version"]) await writeFile(join(fixture, command), 'require("node:fs").appendFileSync("calls.jsonl",JSON.stringify(process.argv.slice(1))+"\\n"); console.log("fixture");', { flag: "wx" });
   await writeFile(join(fixture, "calls.jsonl"), "", { flag: "wx" });
-  const names = ["plastic_status", "plastic_branchList", "plastic_branchCreate", "plastic_codeReviewDelete", "plastic_diff"];
+  const names = ["plastic_status", "plastic_branchList", "plastic_branchCreate", "plastic_codeReviewDelete", "plastic_diff", "plastic_codeReviewCommentFind", "plastic_codeReviewCommentAdd", "plastic_codeReviewSetStatus", "plastic_codeReviewReviewerAdd", "plastic_branchEditComment"];
   const code = `const declarations = {}; for (const name of ${JSON.stringify(names)}) { const sample = await describeTool(name); if (typeof sample !== "string") throw Error("Missing declaration: " + name); declarations[name] = sample.split("codemode tool declaration:")[1].split("): Promise<")[0]; } text(JSON.stringify(declarations));`;
   let turns = 0;
   const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
@@ -110,6 +110,12 @@ try {
   };
   tagged("plastic_branchList", "maxItems", ["@integer", "@minimum 1", "@maximum 500"]);
   tagged("plastic_branchList", "limit", ["@integer", "@minimum 1", "@maximum 9007199254740991"]);
+  tagged("plastic_codeReviewCommentFind", "maxItems", ["@integer", "@minimum 1", "@maximum 500"]);
+  tagged("plastic_codeReviewCommentAdd", "line", ["@integer", "@minimum 1"]);
+  assert.match(declarations.plastic_codeReviewSetStatus, /"reviewed"/);
+  assert.match(declarations.plastic_codeReviewCommentAdd, /"Question"/);
+  assert.match(declarations.plastic_branchEditComment, /commentsFile\??:/);
+  assert.match(declarations.plastic_codeReviewReviewerAdd, /users\??:/);
   tagged("plastic_status", "maxItems", ["@integer", "@minimum 1", "@maximum 500"]);
   tagged("plastic_diff", "maxChars", ["@integer", "@minimum 500", "@maximum 20000"]);
   tagged("plastic_diff", "path", ["@minLength 1", "@maxLength 1024"]);

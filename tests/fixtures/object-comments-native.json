@@ -1,0 +1,311 @@
+{
+  "schema": "native-selected-evidence-v1",
+  "client": "11.0.16.10512",
+  "source": "Bounded native cm stdout/stderr bytes; explicit literal substitutions only. Base64 fields preserve transformed bytes including CR CR LF and embedded LF. Native byte counts/hash refer to private originals, selected counts/hash to public-safe transformations.",
+  "transformations": [
+    {
+      "target": "identity",
+      "replacement": "reviewer@example.invalid"
+    },
+    {
+      "target": "repository name",
+      "replacement": "synthetic-repository"
+    },
+    {
+      "target": "server organization",
+      "replacement": "synthetic-org@unity"
+    },
+    {
+      "target": "evidence directory",
+      "replacement": "C:/synthetic-evidence"
+    },
+    {
+      "target": "workspace directory",
+      "replacement": "C:\\synthetic-workspace"
+    },
+    {
+      "target": "MSYS-converted argument in failed experiment",
+      "replacement": "C:/synthetic-git/README.md"
+    }
+  ],
+  "captures": [
+    {
+      "name": "branch-clear",
+      "receipt": {
+        "argv": [
+          "cm",
+          "branch",
+          "editcomment",
+          "br:/main/cm10512-evidence-24976989",
+          ""
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "branch-file",
+      "receipt": {
+        "argv": [
+          "cm",
+          "branch",
+          "editcomment",
+          "br:/main/cm10512-evidence-24976989",
+          "-commentsfile=C:/synthetic-evidence/public/comment-input.txt"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 0,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "branch-replace",
+      "receipt": {
+        "argv": [
+          "cm",
+          "branch",
+          "editcomment",
+          "br:/main/cm10512-evidence-24976989",
+          "synthetic-replaced"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "help-branch-editcomment",
+      "receipt": {
+        "argv": [
+          "cm",
+          "branch",
+          "editcomment",
+          "--help"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 1314,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "TW9kaWZpZXMgdGhlIGNvbW1lbnQgb2YgYSBicmFuY2guDQoNClVzYWdlOg0KDQogICAgY20gYnJhbmNoIHwgYnIgZWRpdGNvbW1lbnQgfCBlZGl0IDxicnNwZWM+IDxuZXdfY29tbWVudD4NCiAgICBjbSBicmFuY2ggfCBiciBlZGl0Y29tbWVudCB8IGVkaXQgPGJyc3BlYz4gLWNvbW1lbnRzZmlsZT08Y29tbWVudHNfZmlsZT4NCg0KT3B0aW9uczoNCg0KICAgIGJyc3BlYyAgICAgICAgICAgICAgVGhlIHRhcmdldCBicmFuY2ggd2hvc2UgY29tbWVudCB3aWxsIGJlIGVkaXRlZC4NCiAgICAgICAgICAgICAgICAgICAgICAgIChVc2UgJ2NtIGhlbHAgb2JqZWN0c3BlYycgdG8gbGVhcm4gbW9yZSBhYm91dCBicmFuY2gNCiAgICAgICAgICAgICAgICAgICAgICAgIHNwZWNzLikNCiAgICBuZXdfY29tbWVudCAgICAgICAgIFRoZSBuZXcgY29tbWVudCB0aGF0IHdpbGwgcmVwbGFjZSB0aGUgY3VycmVudCBjb21tZW50DQogICAgICAgICAgICAgICAgICAgICAgICBvZiB0aGUgdGFyZ2V0ZWQgYnJhbmNoLg0KICAgIC1jb21tZW50c2ZpbGUgICAgICAgUmVwbGFjZXMgdGhlIGNvbW1lbnQgb2YgdGhlIHRhcmdldGVkIGJyYW5jaCB3aXRoIHRoZQ0KICAgICAgICAgICAgICAgICAgICAgICAgY29udGVudHMgb2YgdGhlIHNwZWNpZmllZCBmaWxlLg0KDQpSZW1hcmtzOg0KDQogICAgLSBUaGUgdGFyZ2V0ZWQgYnJhbmNoIHNwZWMgbXVzdCBiZSB2YWxpZC4NCiAgICAtIEFuIGVtcHR5IGNvbW1lbnQgKCIiKSBjbGVhcnMgdGhlIGNvbW1lbnQgb2YgdGhlIGJyYW5jaC4NCg0KRXhhbXBsZXM6DQoNCiAgICBjbSBicmFuY2ggZWRpdGNvbW1lbnQgL21haW4vdGFzazAwMSAiRml4IHRoZSBsb2dpbiB0aW1lb3V0Ig0KICAgIChSZXBsYWNlcyB0aGUgY29tbWVudCBvZiB0aGUgYnJhbmNoICcvbWFpbi90YXNrMDAxJyBpbiB0aGUgcmVwb3NpdG9yeSBvZg0KICAgIHRoZSBjdXJyZW50IHdvcmtzcGFjZS4pDQoNCiAgICBjbSBiciBlZGl0IGJyOi9tYWluL3Rhc2swMDFAbXlyZXBAbXlzZXJ2ZXI6ODA4NCAiIg0KICAgIChDbGVhcnMgdGhlIGNvbW1lbnQgb2YgdGhlIGJyYW5jaCAnL21haW4vdGFzazAwMScgaW4gdGhlIHJlcG9zaXRvcnkNCiAgICAnbXlyZXBAbXlzZXJ2ZXI6ODA4NCcuKQ0KDQogICAgY20gYnJhbmNoIGVkaXRjb21tZW50IC9tYWluL3Rhc2swMDEgLWNvbW1lbnRzZmlsZT1jb21tZW50dGFzazAwMS50eHQNCiAgICAoUmVwbGFjZXMgdGhlIGNvbW1lbnQgb2YgdGhlIGJyYW5jaCAnL21haW4vdGFzazAwMScgd2l0aCB0aGUgY29udGVudHMgb2YNCiAgICB0aGUgJ2NvbW1lbnR0YXNrMDAxLnR4dCcgZmlsZS4pDQoNCg0K",
+          "nativeByteCount": 1314,
+          "selectedByteCount": 1314,
+          "nativeSha256": "9f9021a50ef84c693b459468c7ec7c901467b971b0ffffcb21dd3f07e0bb0133",
+          "selectedSha256": "9f9021a50ef84c693b459468c7ec7c901467b971b0ffffcb21dd3f07e0bb0133"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "help-label-editcomment",
+      "receipt": {
+        "argv": [
+          "cm",
+          "label",
+          "editcomment",
+          "--help"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 1394,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "TW9kaWZpZXMgdGhlIGNvbW1lbnQgb2YgYSBsYWJlbC4NCg0KVXNhZ2U6DQoNCiAgICBjbSBsYWJlbCB8IGxiIGVkaXRjb21tZW50IHwgZWRpdCA8bGJzcGVjPiA8bmV3X2NvbW1lbnQ+DQogICAgY20gbGFiZWwgfCBsYiBlZGl0Y29tbWVudCB8IGVkaXQgPGxic3BlYz4gLWNvbW1lbnRzZmlsZT08Y29tbWVudHNfZmlsZT4NCg0KT3B0aW9uczoNCg0KICAgIGxic3BlYyAgICAgICAgICAgICAgVGhlIHRhcmdldCBsYWJlbCB3aG9zZSBjb21tZW50IHdpbGwgYmUgZWRpdGVkLg0KICAgICAgICAgICAgICAgICAgICAgICAgKFVzZSAnY20gaGVscCBvYmplY3RzcGVjJyB0byBsZWFybiBtb3JlIGFib3V0IGxhYmVsDQogICAgICAgICAgICAgICAgICAgICAgICBzcGVjcy4pDQogICAgbmV3X2NvbW1lbnQgICAgICAgICBUaGUgbmV3IGNvbW1lbnQgdGhhdCB3aWxsIHJlcGxhY2UgdGhlIGN1cnJlbnQgY29tbWVudA0KICAgICAgICAgICAgICAgICAgICAgICAgb2YgdGhlIHRhcmdldGVkIGxhYmVsLg0KICAgIC1jb21tZW50c2ZpbGUgICAgICAgUmVwbGFjZXMgdGhlIGNvbW1lbnQgb2YgdGhlIHRhcmdldGVkIGxhYmVsIHdpdGggdGhlDQogICAgICAgICAgICAgICAgICAgICAgICBjb250ZW50cyBvZiB0aGUgc3BlY2lmaWVkIGZpbGUuDQoNClJlbWFya3M6DQoNCiAgICAtIFRoZSB0YXJnZXRlZCBsYWJlbCBzcGVjIG11c3QgYmUgdmFsaWQuDQogICAgLSBBbiBlbXB0eSBjb21tZW50ICgiIikgY2xlYXJzIHRoZSBjb21tZW50IG9mIHRoZSBsYWJlbC4NCiAgICAtIFRoZSBsYWJlbCBzdGF5cyBvbiB0aGUgY2hhbmdlc2V0IGl0IGlzIGFwcGxpZWQgdG8uIChVc2UNCiAgICAgICdjbSBsYWJlbCBjcmVhdGUnIHRvIGFwcGx5IGFuIGV4aXN0aW5nIGxhYmVsIHRvIGFub3RoZXIgY2hhbmdlc2V0LikNCg0KRXhhbXBsZXM6DQoNCiAgICBjbSBsYWJlbCBlZGl0Y29tbWVudCBsYjpCTDAwMSAiRmlyc3QgcmVsZWFzZSBjYW5kaWRhdGUiDQogICAgKFJlcGxhY2VzIHRoZSBjb21tZW50IG9mIHRoZSBsYWJlbCAnQkwwMDEnIGluIHRoZSByZXBvc2l0b3J5IG9mIHRoZQ0KICAgIGN1cnJlbnQgd29ya3NwYWNlLikNCg0KICAgIGNtIGxiIGVkaXQgbGI6QkwwMDFAbXlyZXBAbXlzZXJ2ZXI6ODA4NCAiIg0KICAgIChDbGVhcnMgdGhlIGNvbW1lbnQgb2YgdGhlIGxhYmVsICdCTDAwMScgaW4gdGhlIHJlcG9zaXRvcnkNCiAgICAnbXlyZXBAbXlzZXJ2ZXI6ODA4NCcuKQ0KDQogICAgY20gbGFiZWwgZWRpdGNvbW1lbnQgbGI6QkwwMDEgLWNvbW1lbnRzZmlsZT1jb21tZW50bGIwMDEudHh0DQogICAgKFJlcGxhY2VzIHRoZSBjb21tZW50IG9mIHRoZSBsYWJlbCAnQkwwMDEnIHdpdGggdGhlIGNvbnRlbnRzIG9mIHRoZQ0KICAgICdjb21tZW50bGIwMDEudHh0JyBmaWxlLikNCg0KDQo=",
+          "nativeByteCount": 1394,
+          "selectedByteCount": 1394,
+          "nativeSha256": "97a7239d0b67fd39edc82cc23f320d2fa0292e396467101633b9e0e2862b74e6",
+          "selectedSha256": "97a7239d0b67fd39edc82cc23f320d2fa0292e396467101633b9e0e2862b74e6"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "label-clear",
+      "receipt": {
+        "argv": [
+          "cm",
+          "label",
+          "editcomment",
+          "lb:cm10512-evidence-24976989",
+          ""
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "label-file",
+      "receipt": {
+        "argv": [
+          "cm",
+          "label",
+          "editcomment",
+          "lb:cm10512-evidence-24976989",
+          "-commentsfile=C:/synthetic-evidence/public/comment-input.txt"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 0,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "label-replace",
+      "receipt": {
+        "argv": [
+          "cm",
+          "label",
+          "editcomment",
+          "lb:cm10512-evidence-24976989",
+          "synthetic-replaced"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 0,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    }
+  ]
+}

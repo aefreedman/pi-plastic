@@ -53,7 +53,7 @@ Complete apply output does not prove applied items/cleanliness/restoration; obse
 plastic_codeReviewCreate(target="br:/main/owned-feature", title="Owned feature review", output="json")
 ```
 
-Preserve target/title and optional status/assignee/repository/format. **Assign someone only when requested.** Creating a review does not authorize changing another person's assignment or opening a real review conversation.
+Preserve target/title and optional status/users/groups/repository/format. Select reviewers only when requested; singular assignee is removed in the current baseline. Creating a review does not authorize changing another person's assignment or opening a real review conversation.
 
 An entire supported default numeric/GUID scalar can be emitted identity evidence. Custom stdout is always opaque; repository scope and requested review attributes stay unverified. A separate explicitly scoped query may provide its own identity evidence, never hidden creation verification.
 
@@ -75,7 +75,7 @@ The native receipt still reports observedCreatedIdentity=null for that custom fo
 plastic_codeReviewUpdate(id="<observed review ID>", status="Reviewed", output="json")
 ```
 
-One exact `codereview -e` command preserves ID/selector plus optional status/assignee/repository. Empty optional review controls retain their existing omitted-flag behavior. No status enum redesign, assignment, readback or retry is added.
+One exact `codereview -e` command requires title and/or status, preserving exact ID and optional repository. Status is the native assignee status, not caller own-review status. Exact values: Under review, Reviewed, Rework required. Empty status/repository reject. Legacy assignee is removed with no fallback: this is a breaking current-baseline correction. See [reviewer, own-status and discussion tools](2026-10-23-comments-and-review-workflow.md). No readback or retry is added.
 
 An empty successful stdout means command completion, not verified requested state. In bounded fixtures, directly scoped observations still showed Under review after one requesting Reviewed update. The producer reports observedUpdatedState=null/effect not-proven; it does not infer cause, no-op, absence or eventual consistency.
 

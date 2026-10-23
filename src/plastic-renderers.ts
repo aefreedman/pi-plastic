@@ -12,6 +12,9 @@ type Summary = { label: string; tone: Tone; notices: string[]; rows: string[] };
 const separator = " \u00b7 ";
 
 const titles: Record<string, string> = {
+  branchEditComment: "Edit branch comment", labelEditComment: "Edit label comment",
+  codeReviewCommentFind: "Review comments", codeReviewCommentAdd: "Add review comment", codeReviewCommentReply: "Reply to review comment", codeReviewCommentEdit: "Edit review comment", codeReviewCommentDelete: "Delete review comments",
+  codeReviewReviewerAdd: "Add reviewers", codeReviewReviewerRemove: "Remove reviewers", codeReviewReviewerList: "Reviewers", codeReviewSetStatus: "Set own review status", codeReviewRequestReview: "Re-request review",
   status: "Status", currentBranch: "Current branch", update: "Update", add: "Add", checkin: "Check in", undo: "Undo",
   resolveDeleteChangeConflict: "Resolve deletion", diff: "Diff", patch: "Review patch", branchCreate: "Create branch", switchBranch: "Switch branch",
   mergeListConflictMarkers: "Inspect merge markers", mergeMarkResolved: "Intentional marker bypass", merge: "Merge", mergeBranches: "Server merge", mergeToBranch: "Merge and check in",
@@ -63,7 +66,7 @@ function target(name: string, args: Args): string {
   if (name === "mergeBranches" || name === "mergeToBranch") return `${scalar(args.source) || "..."} -> ${scalar(args.target) || "parent branch"}`;
   if (name === "patch") return [scalar(args.source), scalar(args.destination)].filter(Boolean).join(" -> ");
   if (name === "diff" && args.mode === "file") return [scalar(args.path), args.revision ? `vs ${scalar(args.revision)}` : "vs workspace base"].join(" ");
-  return scalar(args.branch) || scalar(args.source) || scalar(args.path) || list(args.paths) || scalar(args.shelveset)
+  return scalar(args.label) || scalar(args.review) || scalar(args.commentGuid) || list(args.commentGuids) || scalar(args.branch) || scalar(args.source) || scalar(args.path) || list(args.paths) || scalar(args.shelveset)
     || list(args.ids) || scalar(args.id) || scalar(args.target) || scalar(args.nameLike) || scalar(args.titleLike)
     || (args.allPending === true ? "All pending files" : "");
 }
@@ -81,8 +84,12 @@ export function renderPlasticCall(name: string, input: unknown, theme: RenderThe
   return reuse(context, text);
 }
 
+const commentTools = new Set(["branchEditComment", "labelEditComment", "codeReviewCommentFind", "codeReviewCommentAdd", "codeReviewCommentReply", "codeReviewCommentEdit", "codeReviewCommentDelete", "codeReviewReviewerAdd", "codeReviewReviewerRemove", "codeReviewReviewerList", "codeReviewSetStatus", "codeReviewRequestReview"]);
+const commentActions = new Set(["branch-edit-comment", "label-edit-comment", "find", "add", "reply", "edit", "delete", "reviewer-add", "reviewer-remove", "reviewer-list", "set-status", "request-review"]);
+
 function payload(result: Result, raw: string): Record<string, unknown> {
   const structured = record((result as Result & {structuredContent?:unknown}).structuredContent);
+  if (commentActions.has(scalar(structured.action))) return structured;
   if (["merge-list-conflict-markers","merge-mark-resolved","shelveset-create","shelveset-apply","code-review-create","code-review-update","changeset-edit-comment"].includes(scalar(structured.action)) || structured.action === "patch" || structured.action === "diff" || structured.action === "merge-branches" || structured.action === "checkin" || structured.action === "branch-create" || structured.action === "switch-branch" || structured.action === "update" || structured.action === "add" || structured.action === "undo" || structured.action === "resolve-delete-change-conflict" || structured.action === "merge" || structured.action === "merge-to-branch" || structured.action === "branch-delete" || structured.action === "shelveset-delete" || structured.action === "code-review-delete") return structured;
   const rawResult = record(result.details).rawResult;
   if (rawResult !== null && typeof rawResult === "object") return record(rawResult);
@@ -111,6 +118,15 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
   const notices = strings(envelope.warnings);
   const summary: Summary = { label: "Result returned", tone: "toolOutput", notices, rows: [] };
   const textLines = raw.split(/\r?\n/).filter(line => line.trim());
+  if (commentTools.has(name) && commentActions.has(action)) {
+    summary.label = `${titles[name]}: ${scalar(envelope.outcome)}`;
+    summary.tone = envelope.ok === false ? "error" : "warning";
+    summary.rows = [`Effect: ${scalar(data.effect)}`, `Emitted comment GUID: ${scalar(data.observedGuid) || "unobserved"}`];
+    if (Array.isArray(data.rows)) summary.rows.push(`Observed comments: ${data.rows.length} of ${count(data.observedCount) ?? "unknown"}`);
+    if (envelope.ok === false) notices.unshift(scalar(record(envelope.error).message));
+    notices.push(envelope.outcome === "preflight" ? "Command-only preview; no SCM contacted." : "External evidence only; stored state, repository identity, atomicity and rollback unverified. Never retry automatically.");
+    return summary;
+  }
   const preview = !["update", "add", "undo", "resolve-delete-change-conflict", "merge", "merge-to-branch", "branch-delete", "shelveset-delete", "code-review-delete", "patch","shelveset-create","shelveset-apply","code-review-create","code-review-update","changeset-edit-comment","merge-list-conflict-markers","merge-mark-resolved"].includes(action) && (record(context?.args).preflight === true || action.endsWith("-preflight") || envelope.outcome === "preflight");
   if (context?.isError && !(name === "diff" && Array.isArray(data.outcomes)) && !(name === "mergeBranches" && action === "merge-branches") && !["checkin", "branch-create", "switch-branch", "update", "add", "undo", "resolve-delete-change-conflict", "merge", "merge-to-branch", "branch-delete", "shelveset-delete", "code-review-delete", "patch","shelveset-create","shelveset-apply","code-review-create","code-review-update","changeset-edit-comment","merge-list-conflict-markers","merge-mark-resolved"].includes(action)) {
     summary.label = "Failed";

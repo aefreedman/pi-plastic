@@ -9,10 +9,16 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Native branch/label description replacement/clear; scoped review-comment find/add/reply/edit/delete; reviewer add/remove/list, caller own-status and explicit re-request tools. Closed bounded receipts, zero-command previews and no retry/editor/stdin fallback distinguish emitted identity from stored state and partial effects.
+
 - Classify captured Windows CM ASCII conflict-marker listings as informational `pending`, distinct from unknown failures, while keeping exit-zero command completion strict and all pending checkin/merge/closeout gates blocked without replay. Invalid UTF-8 and lossy Unicode output remain unknown; listing paths never authorize mutation.
 - Native CM 11.0.16.10512+ conflict markers in default auto workspace merges, with independent marker/pending/source-state gates before checkin or closeout. Replaced the unreleased separate marker strategy and removed duplicate forced-finalization API.
 - `plastic_changesetEditComment` for exact replacement, empty-comment clearing, or explicit comment files, with strict selectors and producer-owned receipts.
 - Typed read-only `plastic_mergeListConflictMarkers` and exact-file `plastic_mergeMarkResolved` intentional-marker bypass requiring explicit acknowledgement; compact marker evidence propagates through merge/checkin/closeout. Unknown marker or remaining conflict state blocks mutation without retries.
+
+### Changed
+
+- Current CM baseline correction: review creation uses users/groups, update supports title and exact native status; legacy singular assignee is removed/rejected without fallback. Review-find assignee remains supported.
 
 ## [0.8.5] - 2026-10-21
 

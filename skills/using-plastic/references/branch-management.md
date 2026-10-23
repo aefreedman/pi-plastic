@@ -80,3 +80,7 @@ plastic_merge(source="<source-branch-spec>", strategy="source")
 - Use lowercase and hyphens
 - Follow repository conventions
 - Check for issue-tracker conventions in branch names like issue ID prefixes
+
+## Branch descriptions
+
+Use `plastic_branchEditComment` (not branch create) for explicit replacement/empty clear with exclusive comment/commentsFile. Label descriptions use `plastic_labelEditComment` without moving the label. Load [comment contracts](../../../docs/2026-10-23-comments-and-review-workflow.md) only when needed; no retry/editor/stdin fallback.

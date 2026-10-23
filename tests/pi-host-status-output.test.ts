@@ -1,3 +1,6 @@
+import { branchEditCommentOutputSchema, validateObjectCommentOutput } from "../src/pi/object-comments-output";
+import { codeReviewCommentFindOutputSchema, codeReviewCommentAddOutputSchema, validateReviewCommentOutput } from "../src/pi/review-comments-output";
+import { codeReviewReviewerListOutputSchema, codeReviewSetStatusOutputSchema, validateReviewWorkflowOutput } from "../src/pi/review-workflow-output";
 import { checkinOutputSchema, validateCheckinOutput } from "../src/pi/checkin-output";
 import { branchCreateOutputSchema, validateBranchCreateOutput } from "../src/pi/branch-create-output";
 import { switchOutputSchema, validateSwitchOutput } from "../src/pi/switch-output";
@@ -63,6 +66,12 @@ const receiptCommandFixture = String.raw`const fs = require("node:fs"), path = r
 fs.appendFileSync("calls.jsonl", JSON.stringify(process.argv.slice(1)) + "\n");
 const data = JSON.parse(fs.readFileSync("scenario.json", "utf8"));
 let cfg; try { cfg = JSON.parse(data.output); } catch {}
+if (cfg?.kind === "comments") {
+ if(data.fail){process.stderr.write("synthetic native failure");process.exit(1);}
+ const args=process.argv.slice(2);
+ process.stdout.write(args[0]==="comment"&&args[1]==="add"?"00000000-0000-4000-8000-000000000001\r\n":args[0]==="reviewer"&&args[1]==="list"?" reviewer@example.invalid Under review user\r\n":"");
+ process.exit();
+}
 if (cfg?.kind === "object-write") {
  const cmd=path.basename(process.argv[1]),args=process.argv.slice(2);
  const creation=cmd==="shelveset"&&args[0]==="create"||cmd==="codereview"&&args[0]!=="-e";
@@ -226,9 +235,9 @@ await writeFile(join(fixture, "scenario.json"), "{}", { flag: "wx" });
 await writeFile(join(fixture, "calls.jsonl"), "", { flag: "wx" });
 await writeFile(join(fixture, "version"), `require("node:fs").appendFileSync("calls.jsonl", "version\\n"); console.log("fixture-version");`, { flag: "wx" });
 await writeFile(modifierPath, `export default function(pi) {
-  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo","plastic_resolveDeleteChangeConflict","plastic_merge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
+  pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo","plastic_resolveDeleteChangeConflict","plastic_merge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate","plastic_branchEditComment","plastic_codeReviewCommentFind","plastic_codeReviewCommentAdd","plastic_codeReviewReviewerList","plastic_codeReviewSetStatus"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
   pi.on("tool_result", e => {
-    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo","plastic_resolveDeleteChangeConflict","plastic_merge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate"].includes(e.toolName)) return;
+    if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo","plastic_resolveDeleteChangeConflict","plastic_merge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate","plastic_branchEditComment","plastic_codeReviewCommentFind","plastic_codeReviewCommentAdd","plastic_codeReviewReviewerList","plastic_codeReviewSetStatus"].includes(e.toolName)) return;
     if (globalThis.__plasticHostFixture.scenario === "content-only") return { content: [{ type: "text", text: "foreign replacement" }] };
     if (globalThis.__plasticHostFixture.scenario === "content-pass") return { content: e.content };
   });
@@ -257,14 +266,14 @@ await writeFile(modifierPath, `export default function(pi) {
       pi.registerTool({ name: "fixture_throw", label: "Throw", description: "Fixture", parameters: Type.Object({}), async execute() { throw Error("fixture thrown"); } });
       pi.registerTool({ name: "fixture_nested", label: "Nested", description: "Fixture", parameters: Type.Object({ abort: Type.Optional(Type.Boolean()), child: Type.Optional(Type.String()), request: Type.Optional(Type.Any()), branch: Type.Optional(Type.String()), source: Type.Optional(Type.Union([Type.Literal("xml"), Type.Literal("names"), Type.Literal("fields"), Type.Literal("ids"), Type.Literal("native")])) }), async execute(_id, params, _signal, _update, ctx) {
         const controller = new AbortController(); if (params.abort) controller.abort();
-        state.nested = await ctx.executeTool(params.child ?? "plastic_status", ["plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo","plastic_resolveDeleteChangeConflict","plastic_merge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate"].includes(params.child ?? "") ? params.request ?? {} : params.child === "plastic_mergeBranches" ? {source:"br:/source@Example Repository@example-org@unity",target:"br:/target-😀@Example Repository@example-org@unity",message:"Fixture Unicode résumé 日本語 😀"} : params.child === "plastic_diff" ? { mode:"revisions", leftRevision:"Assets/Fictional.txt#cs:1", rightRevision:"Assets/Fictional.txt#cs:2" } : ["plastic_shelvesetList", "plastic_codeReviewFind"].includes(params.child ?? "") ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
+        state.nested = await ctx.executeTool(params.child ?? "plastic_status", ["plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo","plastic_resolveDeleteChangeConflict","plastic_merge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate","plastic_branchEditComment","plastic_codeReviewCommentFind","plastic_codeReviewCommentAdd","plastic_codeReviewReviewerList","plastic_codeReviewSetStatus"].includes(params.child ?? "") ? params.request ?? {} : params.child === "plastic_mergeBranches" ? {source:"br:/source@Example Repository@example-org@unity",target:"br:/target-😀@Example Repository@example-org@unity",message:"Fixture Unicode résumé 日本語 😀"} : params.child === "plastic_diff" ? { mode:"revisions", leftRevision:"Assets/Fictional.txt#cs:1", rightRevision:"Assets/Fictional.txt#cs:2" } : ["plastic_shelvesetList", "plastic_codeReviewFind"].includes(params.child ?? "") ? { source: params.source ?? "ids" } : params.child === "plastic_workspaceList" ? { source: params.source ?? "fields" } : params.child === "plastic_branchList" ? { source: params.source ?? "names" } : params.child === "plastic_branchExists" ? { branch: params.branch } : params.source === "xml" ? { source: "xml" } : { machineReadable: true }, { signal: controller.signal });
         return { content: [{ type: "text", text: "nested result inspected outside transcript" }], details: { childIsError: state.nested.isError } };
       } });
     }], noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true, systemPrompt: "Run only the local scripted action." },
   });
   assert.deepEqual(services.diagnostics.filter(d => d.type === "error"), []);
   assert.deepEqual(services.resourceLoader.getExtensions().errors, []);
-  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate", "plastic_switchBranch", "plastic_update", "plastic_add", "plastic_undo", "plastic_resolveDeleteChangeConflict","plastic_merge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate", "codemode", "fixture_throw", "fixture_nested"] }));
+  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate", "plastic_switchBranch", "plastic_update", "plastic_add", "plastic_undo", "plastic_resolveDeleteChangeConflict","plastic_merge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate","plastic_branchEditComment","plastic_codeReviewCommentFind","plastic_codeReviewCommentAdd","plastic_codeReviewReviewerList","plastic_codeReviewSetStatus", "codemode", "fixture_throw", "fixture_nested"] }));
   await session.bindExtensions({});
   assert.deepEqual(session.getToolDefinition("plastic_status").outputSchema, statusOutputSchema);
   assert.equal(resolve(session.getAllTools().find((tool: any) => tool.name === "plastic_status").sourceInfo.path), resolve(extensionPath));
@@ -276,7 +285,7 @@ await writeFile(modifierPath, `export default function(pi) {
     const start = records.length;
     await session.prompt(scenario);
     const parent = session.messages.filter((m: any) => m.role === "toolResult").at(-1);
-    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo","plastic_resolveDeleteChangeConflict","plastic_merge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
+    return { parent, children: records.slice(start).filter(r => ["plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo","plastic_resolveDeleteChangeConflict","plastic_merge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate","plastic_branchEditComment","plastic_codeReviewCommentFind","plastic_codeReviewCommentAdd","plastic_codeReviewReviewerList","plastic_codeReviewSetStatus"].includes(r.toolName)), calls: (await readFile(join(fixture, "calls.jsonl"), "utf8")).trim().split("\n").filter(Boolean) };
   };
   const script = (args: object) => ({ code: `const dto = await tools.plastic_status(${JSON.stringify(args)}); if (typeof dto !== "object") throw Error("unexpected fallback"); text(dto);` });
   const text = (result: any) => result.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
@@ -890,8 +899,34 @@ await writeFile(modifierPath, `export default function(pi) {
     const selective=await invoke("object-write-selective","codemode",{code:`const d=await tools.${name}(${JSON.stringify(request)});text({effect:d.data.effect});`});assert.doesNotMatch(text(selective.parent),/schemaVersion|intendedArgv/);
     assert.deepEqual(session.getToolDefinition(name).outputSchema,objectWriteSchemas[action]);
   }
-  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_")).length,26,"Host selects twenty-six schema-bearing tools after finalization retirement; full registry count is tested separately");
-  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_") && session.getToolDefinition(t.name).outputSchema).length,26);
+  for (const [name, request, output, validate] of [
+    ["plastic_branchEditComment", {branch:"br:/main/owned-feature",comment:"explicit"}, JSON.stringify({kind:"comments"}), validateObjectCommentOutput],
+    ["plastic_codeReviewCommentFind", {review:"1114",maxItems:20}, "<PLASTICQUERY></PLASTICQUERY>", validateReviewCommentOutput],
+    ["plastic_codeReviewCommentAdd", {review:"1114",comment:"explicit"}, JSON.stringify({kind:"comments"}), validateReviewCommentOutput],
+    ["plastic_codeReviewReviewerList", {id:"1110",repository:"synthetic-repository@synthetic-org@unity"}, JSON.stringify({kind:"comments"}), validateReviewWorkflowOutput],
+    ["plastic_codeReviewSetStatus", {id:"1110",repository:"synthetic-repository@synthetic-org@unity",status:"reviewed",comment:"explicit"}, JSON.stringify({kind:"comments"}), validateReviewWorkflowOutput],
+  ] as const) {
+    const direct = await run("comments-direct", name, request, output);
+    const dto = direct.children[0].result.structuredContent;
+    assert(validate(dto)); assert(dto.ok); assert.equal(direct.calls.length, 1);
+    const coded = await run("comments-code", "codemode", {code:`text(await tools.${name}(${JSON.stringify(request)}));`}, output);
+    assert.deepEqual(coded.children[0].result.structuredContent, dto);
+    await run("comments-nested", "fixture_nested", {child:name,request}, output);
+    assert.deepEqual(state.nested.result.structuredContent, dto); assert.equal(state.nested.isError, false);
+    for (const entry of [[name,request],["codemode",{code:`text(await tools.${name}(${JSON.stringify(request)}));`}],["fixture_nested",{child:name,request}]] as const) {
+      const failed = await run("comments-error", entry[0], entry[1], output, true);
+      const failure = failed.children[0].result.structuredContent;
+      assert(validate(failure)); assert.equal(failure.ok, false); assert.equal(failed.calls.length,1);
+    }
+    for (const entry of [[name,{...request,preflight:true}],["codemode",{code:`text(await tools.${name}(${JSON.stringify({...request,preflight:true})}));`}],["fixture_nested",{child:name,request:{...request,preflight:true}}]] as const) {
+      const preview = await run("comments-preview",entry[0],entry[1],output);
+      assert.equal(preview.calls.length,0); assert.equal(preview.children[0].result.structuredContent.outcome,"preflight");
+      assert(validate(preview.children[0].result.structuredContent));
+    }
+    assert.deepEqual(session.getToolDefinition(name).outputSchema, ({plastic_branchEditComment:branchEditCommentOutputSchema,plastic_codeReviewCommentFind:codeReviewCommentFindOutputSchema,plastic_codeReviewCommentAdd:codeReviewCommentAddOutputSchema,plastic_codeReviewReviewerList:codeReviewReviewerListOutputSchema,plastic_codeReviewSetStatus:codeReviewSetStatusOutputSchema} as const)[name]);
+  }
+  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_")).length,31,"Host selects thirty-one schema-bearing tools after finalization retirement; full registry count is tested separately");
+  assert.equal(session.getAllTools().filter((t: any) => t.name.startsWith("plastic_") && session.getToolDefinition(t.name).outputSchema).length,31);
   console.log(`PASS: selected checkin/branch-create receipts on SDK/tui ${runtimeVersion}/${tuiVersion}; real file loading, synthetic CLI, exact command counts, preflight/qualification/loaded-parent policy, partial effects, uncertainty/bounds, direct/codemode/nested/native-error/selective/policy/foreign-hook/SDK-event coverage`);
   console.log(`PASS: real Pi host, ${turns} local scripted turns; finalizer/codemode/nested consumers, SDK JSON events, native errors, selective context and foreign-hook fallback; zero network`);
 } finally {

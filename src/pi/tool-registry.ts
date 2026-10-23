@@ -1,3 +1,6 @@
+import { codeReviewReviewerAdd, codeReviewReviewerRemove, codeReviewReviewerList, codeReviewSetStatus, codeReviewRequestReview } from "../operations/review-workflow";
+import { codeReviewCommentFind, codeReviewCommentAdd, codeReviewCommentReply, codeReviewCommentEdit, codeReviewCommentDelete } from "../operations/review-comments";
+import { branchEditComment, labelEditComment } from "../operations/object-comments";
 import { mergeListConflictMarkers, mergeMarkResolved } from "../operations/marker-lifecycle";
 import { changesetEditComment } from "../operations/changeset-comment";
 import { status } from "../operations/status";
@@ -21,6 +24,18 @@ type CoreTool = {
 };
 
 export const PLASTIC_TOOL_REGISTRY = {
+  branchEditComment,
+  labelEditComment,
+  codeReviewCommentFind,
+  codeReviewCommentAdd,
+  codeReviewCommentReply,
+  codeReviewCommentEdit,
+  codeReviewCommentDelete,
+  codeReviewReviewerAdd,
+  codeReviewReviewerRemove,
+  codeReviewReviewerList,
+  codeReviewSetStatus,
+  codeReviewRequestReview,
   status,
   changesetEditComment,
   update,

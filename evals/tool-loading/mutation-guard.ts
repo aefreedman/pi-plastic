@@ -5,6 +5,17 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
  * preflight. Patch content may be returned, but persistent output is prohibited.
  */
 export const MUTATING_PLASTIC_TOOLS = new Set([
+  "plastic_branchEditComment",
+  "plastic_labelEditComment",
+  "plastic_codeReviewCommentAdd",
+  "plastic_codeReviewCommentReply",
+  "plastic_codeReviewCommentEdit",
+  "plastic_codeReviewCommentDelete",
+  "plastic_codeReviewReviewerAdd",
+  "plastic_codeReviewReviewerRemove",
+  "plastic_codeReviewSetStatus",
+  "plastic_codeReviewRequestReview",
+
   "plastic_update", "plastic_mergeBranches",
   "plastic_add", "plastic_checkin", "plastic_undo", "plastic_resolveDeleteChangeConflict",
   "plastic_branchCreate", "plastic_switchBranch", "plastic_merge", "plastic_mergeToBranch",

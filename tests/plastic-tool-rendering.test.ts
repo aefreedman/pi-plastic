@@ -221,7 +221,7 @@ try {
   // Verify the registration boundary and a real command-only preflight without launching cm.
   const tools: ToolDefinition[] = [];
   registerPlastic({ registerTool: tool => tools.push(tool), on() {} } as ExtensionAPI);
-  assert.equal(tools.length, 30);
+  assert.equal(tools.length, 42);
   for (const tool of tools) assert(tool.renderCall && tool.renderResult, `${tool.name} needs both renderers`);
   const serverMerge = tools.find(tool => tool.name === "plastic_mergeBranches")!;
   const actual = await serverMerge.execute("preview", { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", message: "Review", preflight: true, format: "json" }, undefined, undefined, { cwd: "C:/Projects/MyGame" } as ExtensionContext);
@@ -241,6 +241,22 @@ try {
   const errorResult = serverMerge.renderResult!(textResult("Permission denied"), { expanded: false, isPartial: false }, theme as Theme, { ...rendererContext, isError: true });
   assert.match(plain(errorResult), /Failed[\s\S]*Permission denied/);
 
+  for (const [exportName, request] of [
+    ["branchEditComment", {branch:"br:/main/owned-feature",comment:"explicit"}],
+    ["labelEditComment", {label:"lb:owned-label",comment:""}],
+    ["codeReviewCommentFind", {review:"1114"}],
+    ["codeReviewCommentAdd", {review:"1114",comment:"explicit"}],
+    ["codeReviewReviewerList", {id:"1110",repository:"synthetic-repository@synthetic-org@unity"}],
+    ["codeReviewSetStatus", {id:"1110",repository:"synthetic-repository@synthetic-org@unity",status:"reviewed"}],
+  ] as const) {
+    const tool = tools.find(tool => tool.name === `plastic_${exportName}`)!;
+    const preview = await tool.execute("preview", {...request,preflight:true}, undefined, undefined, {cwd:process.cwd()} as ExtensionContext);
+    assert.match(render(exportName,preview), /preflight/);
+    assert.match(render(exportName,preview), /Command-only preview; no SCM contacted/);
+    const failed = {...preview, structuredContent:{...preview.structuredContent,ok:false,outcome:"uncertain",error:{code:"synthetic",message:"synthetic native failure"}}};
+    assert.match(render(exportName,failed), /uncertain/);
+    assert.match(render(exportName,failed), /stored state, repository identity, atomicity and rollback unverified/);
+  }
   console.log("PASS: Plastic renderer outcomes, previews, evidence, diffs, redaction, keybindings, registration and widths");
   if (process.argv.includes("--preview")) {
     console.log("\nStatus\n" + plain(renderPlasticCall("status", { workdir: "C:/Projects/MyGame" }, theme)) + "\n" + collapsedStatus);

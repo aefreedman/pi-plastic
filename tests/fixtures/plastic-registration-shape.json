@@ -1,5 +1,693 @@
 [
   {
+    "name": "plastic_branchEditComment",
+    "label": "plastic_branchEditComment",
+    "description": "Replace or clear one exact branch description (cm branch editcomment, CM 11.0.16.10512+); completion is not stored-state verification.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "branch"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "description": "Explicit br:/hierarchy selector, optionally @repository@server qualified.",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "comment": {
+          "type": "string",
+          "description": "Exact replacement text; explicit empty string clears. Exclusive with commentsFile. Option-leading text requires a file.",
+          "maximum": 4096
+        },
+        "commentsFile": {
+          "type": "string",
+          "description": "Explicit local file; exclusive with comment. Stdin '-' is rejected; no editor fallback.",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Zero-command preview; does not contact SCM or verify state."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_labelEditComment",
+    "label": "plastic_labelEditComment",
+    "description": "Replace or clear one exact label description using only cm label editcomment (CM 11.0.16.10512+), never create/reapply/move the label. Completion is not stored-state verification.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "label"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Explicit lb:name selector, optionally @repository@server qualified.",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "comment": {
+          "type": "string",
+          "description": "Exact replacement text; explicit empty string clears. Exclusive with commentsFile. Option-leading text requires a file.",
+          "maximum": 4096
+        },
+        "commentsFile": {
+          "type": "string",
+          "description": "Explicit local file; exclusive with comment. Stdin '-' is rejected; no editor fallback.",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Zero-command preview; does not contact SCM or verify state."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewCommentFind",
+    "label": "plastic_codeReviewCommentFind",
+    "description": "Read bounded comments for one exact numeric review ID using CM 11.0.16.10512 XML; no server-path evidence available.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "review"
+      ],
+      "properties": {
+        "review": {
+          "type": "string"
+        },
+        "maxItems": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "preflight": {
+          "type": "boolean"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string"
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewCommentAdd",
+    "label": "plastic_codeReviewCommentAdd",
+    "description": "Add explicit review-wide or inline text/file comment; completion is unverified stored state.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "review"
+      ],
+      "properties": {
+        "review": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "changeset": {
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "Change"
+            },
+            {
+              "type": "string",
+              "const": "Question"
+            },
+            {
+              "type": "string",
+              "const": "Comment"
+            }
+          ],
+          "description": "Allowed values."
+        },
+        "comment": {
+          "type": "string",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "commentsFile": {
+          "type": "string",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string"
+        },
+        "preflight": {
+          "type": "boolean"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string"
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewCommentReply",
+    "label": "plastic_codeReviewCommentReply",
+    "description": "Reply to exact comment GUID. Explicit discard=true additionally discards pending requested change.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "commentGuid"
+      ],
+      "properties": {
+        "commentGuid": {
+          "type": "string"
+        },
+        "discard": {
+          "type": "boolean"
+        },
+        "comment": {
+          "type": "string",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "commentsFile": {
+          "type": "string",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string"
+        },
+        "preflight": {
+          "type": "boolean"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string"
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewCommentEdit",
+    "label": "plastic_codeReviewCommentEdit",
+    "description": "Replace text of exact comment GUID, never type/location. Empty clears unsupported.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "commentGuid"
+      ],
+      "properties": {
+        "commentGuid": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "commentsFile": {
+          "type": "string",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string"
+        },
+        "preflight": {
+          "type": "boolean"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string"
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewCommentDelete",
+    "label": "plastic_codeReviewCommentDelete",
+    "description": "Delete once an explicit bounded comment GUID list. Partial success possible; no rollback/retry.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "commentGuids"
+      ],
+      "properties": {
+        "commentGuids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minimum": 1,
+          "maximum": 32
+        },
+        "repository": {
+          "type": "string"
+        },
+        "preflight": {
+          "type": "boolean"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string"
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewReviewerAdd",
+    "label": "plastic_codeReviewReviewerAdd",
+    "description": "Add explicitly selected reviewers; existing reviewers are kept.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "id",
+        "repository"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Exact numeric review ID or GUID.",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string",
+          "description": "Explicit repository specification.",
+          "minimum": 1
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Zero-command preview only."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        },
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Unique exact comma-free native users; me supported.",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Unique exact comma-free native reviewer groups.",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewReviewerRemove",
+    "label": "plastic_codeReviewReviewerRemove",
+    "description": "Remove only explicitly selected reviewers.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "id",
+        "repository"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Exact numeric review ID or GUID.",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string",
+          "description": "Explicit repository specification.",
+          "minimum": 1
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Zero-command preview only."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        },
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Unique exact comma-free native users; me supported.",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Unique exact comma-free native reviewer groups.",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewReviewerList",
+    "label": "plastic_codeReviewReviewerList",
+    "description": "Read bounded opaque native reviewer evidence; no parsed membership or identity guarantee.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "id",
+        "repository"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Exact numeric review ID or GUID.",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string",
+          "description": "Explicit repository specification.",
+          "minimum": 1
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Zero-command preview only."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewSetStatus",
+    "label": "plastic_codeReviewSetStatus",
+    "description": "Set caller own review status, not assignee status. Optional explicit status comment only.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "id",
+        "repository",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Exact numeric review ID or GUID.",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string",
+          "description": "Explicit repository specification.",
+          "minimum": 1
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Zero-command preview only."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "reviewed"
+            },
+            {
+              "type": "string",
+              "const": "rework-required"
+            },
+            {
+              "type": "string",
+              "const": "under-review"
+            }
+          ],
+          "description": "Allowed values."
+        },
+        "comment": {
+          "type": "string",
+          "minimum": 1
+        },
+        "commentsFile": {
+          "type": "string",
+          "minimum": 1
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewRequestReview",
+    "label": "plastic_codeReviewRequestReview",
+    "description": "Explicitly re-request all OR selected users/groups. Never attaches a comment.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "id",
+        "repository"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Exact numeric review ID or GUID.",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string",
+          "description": "Explicit repository specification.",
+          "minimum": 1
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Zero-command preview only."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        },
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Unique exact comma-free native users; me supported.",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Unique exact comma-free native reviewer groups.",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "all": {
+          "type": "boolean"
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
     "name": "plastic_status",
     "label": "plastic_status",
     "description": "Show Plastic SCM workspace status (cm status).",
@@ -1424,12 +2112,39 @@
           "minimum": 1
         },
         "status": {
-          "type": "string",
-          "description": "Initial review status."
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "Under review"
+            },
+            {
+              "type": "string",
+              "const": "Reviewed"
+            },
+            {
+              "type": "string",
+              "const": "Rework required"
+            }
+          ],
+          "description": "Initial native review status."
         },
-        "assignee": {
-          "type": "string",
-          "description": "Initial review assignee."
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Exact unique native user names; special user me is supported.",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Exact unique native reviewer group names.",
+          "minimum": 1,
+          "maximum": 100
         },
         "repository": {
           "type": "string",
@@ -1481,12 +2196,26 @@
           "minimum": 1
         },
         "status": {
-          "type": "string",
-          "description": "Updated review status."
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "Under review"
+            },
+            {
+              "type": "string",
+              "const": "Reviewed"
+            },
+            {
+              "type": "string",
+              "const": "Rework required"
+            }
+          ],
+          "description": "Assignee status, not the caller own review status: Under review, Reviewed, or Rework required."
         },
-        "assignee": {
+        "title": {
           "type": "string",
-          "description": "Updated review assignee."
+          "description": "Updated review title.",
+          "minimum": 1
         },
         "repository": {
           "type": "string",

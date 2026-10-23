@@ -1,3 +1,4 @@
+import { validReviewId, validReviewMembers } from "../domain/review-workflow";
 import { captureWorkspaceMergeCommand, emptyWorkspaceMergeAttempt } from "../execution/workspace-merge-command";
 
 export const OBJECT_WRITE_ACTIONS = ["shelveset-create", "shelveset-apply", "code-review-create", "code-review-update", "changeset-edit-comment"] as const;
@@ -7,8 +8,8 @@ export type ObjectWriteRequests = {
     "changeset-edit-comment": Common & { changeset: string; comment: string|null; commentsFile: string|null };
     "shelveset-create": Common & { paths: string[]|null; comment: string|null; commentsFile: string|null; all: boolean; dependencies: boolean; summaryFormat: boolean };
     "shelveset-apply": Common & { shelveset: string; changePaths: string[]|null; preview: boolean; dontCheckout: boolean; comparisonMethod: string|null };
-    "code-review-create": Common & { target: string; title: string; status: string|null; assignee: string|null; repository: string|null; format: string|null };
-    "code-review-update": Common & { id: string; status: string|null; assignee: string|null; repository: string|null };
+    "code-review-create": Common & { target: string; title: string; status: string|null; users: string[]|null; groups: string[]|null; repository: string|null; format: string|null };
+    "code-review-update": Common & { id: string; status: string|null; title: string|null; repository: string|null };
 };
 export type ObjectWriteRequest = ObjectWriteRequests[ObjectWriteAction];
 export type EmittedObjectIdentity = { kind: "shelveset"|"code-review"; value: string; basis: "default-scalar"|"summary-scalar" };
@@ -31,8 +32,8 @@ const keys = {
     "changeset-edit-comment": ["changeset","comment","commentsFile"],
     "shelveset-create": ["paths","comment","commentsFile","all","dependencies","summaryFormat"],
     "shelveset-apply": ["shelveset","changePaths","preview","dontCheckout","comparisonMethod"],
-    "code-review-create": ["target","title","status","assignee","repository","format"],
-    "code-review-update": ["id","status","assignee","repository"],
+    "code-review-create": ["target","title","status","users","groups","repository","format"],
+    "code-review-update": ["id","status","title","repository"],
 } as const;
 const comparisons=["ignoreeol","ignorewhitespaces","ignoreeolandwhitespaces","recognizeall"];
 export function validWriteText(v:unknown, multiline=false, empty=false):v is string {
@@ -46,8 +47,8 @@ export function validObjectWriteRequest(a:ObjectWriteAction,r:ObjectWriteRequest
     if(a==="changeset-edit-comment")return validWriteOperand(v.changeset)&&/^cs:(?:[0-9]+|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})(?:@[^@]+(?:@[^@]+(?:@(cloud|unity))?)?)?$/i.test(v.changeset)&&(v.comment!==null)!==(v.commentsFile!==null)&&(v.comment===null||validWriteText(v.comment,true,true)&&!v.comment.trimStart().startsWith("-"))&&(v.commentsFile===null||validWriteText(v.commentsFile));
     if(a==="shelveset-create")return (v.paths===null||validWritePaths(v.paths))&&(v.comment===null||validWriteText(v.comment,true))&&(v.commentsFile===null||validWriteText(v.commentsFile))&&!(v.comment!==null&&v.commentsFile!==null)&&[v.all,v.dependencies,v.summaryFormat].every(x=>typeof x==="boolean");
     if(a==="shelveset-apply")return validWriteOperand(v.shelveset)&&(v.changePaths===null||validWritePaths(v.changePaths))&&[v.preview,v.dontCheckout].every(x=>typeof x==="boolean")&&(v.comparisonMethod===null||comparisons.includes(v.comparisonMethod as string));
-    if(![v.status,v.assignee,v.repository].every(x=>x===null||validWriteText(x,false,true)))return false;
-    return a==="code-review-create"?validWriteOperand(v.target)&&validWriteOperand(v.title)&&(v.format===null||validWriteText(v.format,true,true)):validWriteOperand(v.id);
+    if(v.status!==null&&!["Under review","Reviewed","Rework required"].includes(v.status as string)||v.repository!==null&&!validWriteOperand(v.repository))return false;
+    return a==="code-review-create"?validWriteOperand(v.target)&&validWriteOperand(v.title)&&[v.users,v.groups].every(x=>x===null||validReviewMembers(x))&&(v.format===null||validWriteText(v.format,true,true)):validReviewId(v.id)&&(v.title===null||validWriteText(v.title))&&(v.title!==null||v.status!==null);
 }
 export function objectWritePrefix(a:ObjectWriteAction) {return a==="changeset-edit-comment"?["changeset","editcomment"]:a==="shelveset-create"?["shelveset","create"]:a==="shelveset-apply"?["shelveset","apply"]:a==="code-review-create"?["codereview"]:["codereview","-e"];}
 export function objectWriteArgv(a:ObjectWriteAction,r:ObjectWriteRequest):string[] {
@@ -59,7 +60,7 @@ export function objectWriteArgv(a:ObjectWriteAction,r:ObjectWriteRequest):string
     } else if(a==="shelveset-apply") {
         argv.push(v.shelveset,...(v.changePaths??[]));if(v.preview)argv.push("--preview");if(v.dontCheckout)argv.push("--dontcheckout");if(v.comparisonMethod!==null)argv.push(`--comparisonmethod=${v.comparisonMethod}`);
     } else {
-        argv.push(...(a==="code-review-create"?[v.target,v.title]:[v.id]));if(v.status)argv.push(`--status=${v.status}`);if(v.assignee)argv.push(`--assignee=${v.assignee}`);if(v.repository)argv.push(`--repository=${v.repository}`);if(a==="code-review-create"&&v.format)argv.push(`--format=${v.format}`);
+        argv.push(...(a==="code-review-create"?[v.target,v.title]:[v.id]));if(v.status)argv.push(`--status=${v.status}`);if(a==="code-review-create") {if(v.users)argv.push(`--users=${v.users.join(",")}`);if(v.groups)argv.push(`--groups=${v.groups.join(",")}`);} else if(v.title!==null)argv.push(`--title=${v.title}`);if(v.repository)argv.push(`--repository=${v.repository}`);if(a==="code-review-create"&&v.format)argv.push(`--format=${v.format}`);
     }
     return argv;
 }
@@ -80,7 +81,7 @@ export async function assembleObjectWriteReceipt(a:ObjectWriteAction,args:unknow
         const i={...args} as Record<string,unknown>,r:any={workdir:i.workdir===undefined?process.cwd():i.workdir,preflight:i.preflight===undefined?false:i.preflight,output:i.output===undefined?"text":i.output};
         for(const k of keys[a]) {
             if(Object.hasOwn(i,k)&&i[k]===null)return objectWriteFailure(a,d,"invalid_request","Explicit null controls are unsupported; omit optional controls.");
-            const v=i[k];r[k]=v===undefined?(["all","dependencies","summaryFormat","preview","dontCheckout"].includes(k)?false:null):["paths","changePaths"].includes(k)&&Array.isArray(v)&&v.length<=256?Array.from(v):v;
+            const v=i[k];r[k]=v===undefined?(["all","dependencies","summaryFormat","preview","dontCheckout"].includes(k)?false:null):["paths","changePaths","users","groups"].includes(k)&&Array.isArray(v)&&v.length<=256?Array.from(v):v;
         }
         if(!validObjectWriteRequest(a,r))return objectWriteFailure(a,d,"invalid_request","Use exact non-option operands, bounded lists/text, exclusive comments, strict booleans and declared output/comparison modes.");
         d.requested=r;d.intendedArgv=objectWriteArgv(a,r);

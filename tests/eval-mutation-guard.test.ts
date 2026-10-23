@@ -19,7 +19,7 @@ for (const entry of PLASTIC_SEARCH_CATALOG.filter((entry) => entry.tags.includes
 }
 // Catalog tags alone are insufficient: update synchronizes disk, and merge/conflict
 // workflows mutate despite not carrying a mutation tag. Keep an exhaustive read classification.
-const reads = ["plastic_mergeListConflictMarkers", "plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_workspaceList", "plastic_diff", "plastic_tool_search"];
+const reads = ["plastic_codeReviewCommentFind", "plastic_codeReviewReviewerList", "plastic_mergeListConflictMarkers", "plastic_status", "plastic_currentBranch", "plastic_branchList", "plastic_branchExists", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_workspaceList", "plastic_diff", "plastic_tool_search"];
 assert.deepEqual(new Set(harness.registry.keys()), new Set([...MUTATING_PLASTIC_TOOLS, "plastic_patch", ...reads]), "new registrations require effect classification");
 for (const name of MUTATING_PLASTIC_TOOLS) {
   assert(await dispatch(name));
@@ -28,7 +28,7 @@ for (const name of MUTATING_PLASTIC_TOOLS) {
 }
 for (const key of ["output", "output_file", "outputFile"]) assert(await dispatch("plastic_patch", { [key]: "review.patch", preflight: true }));
 assert.equal(executions, 0, "blocked calls must never reach fake SCM dispatch");
-const preflightTools = ["plastic_checkin", "plastic_resolveDeleteChangeConflict", "plastic_switchBranch", "plastic_merge", "plastic_mergeBranches", "plastic_mergeToBranch", "plastic_mergeMarkResolved", "plastic_branchDelete", "plastic_shelvesetDelete", "plastic_codeReviewDelete", "plastic_shelvesetCreate", "plastic_shelvesetApply", "plastic_codeReviewCreate", "plastic_codeReviewUpdate", "plastic_changesetEditComment"];
+const preflightTools = ["plastic_branchEditComment", "plastic_labelEditComment", "plastic_codeReviewCommentAdd", "plastic_codeReviewCommentReply", "plastic_codeReviewCommentEdit", "plastic_codeReviewCommentDelete", "plastic_codeReviewReviewerAdd", "plastic_codeReviewReviewerRemove", "plastic_codeReviewSetStatus", "plastic_codeReviewRequestReview", "plastic_checkin", "plastic_resolveDeleteChangeConflict", "plastic_switchBranch", "plastic_merge", "plastic_mergeBranches", "plastic_mergeToBranch", "plastic_mergeMarkResolved", "plastic_branchDelete", "plastic_shelvesetDelete", "plastic_codeReviewDelete", "plastic_shelvesetCreate", "plastic_shelvesetApply", "plastic_codeReviewCreate", "plastic_codeReviewUpdate", "plastic_changesetEditComment"];
 for (const name of MUTATING_PLASTIC_TOOLS) {
   const schema = harness.registry.get(name)!.parameters as any;
   assert.equal(Object.hasOwn(schema.properties, "preflight"), preflightTools.includes(name), `${name}: actual supported preflight schema`);

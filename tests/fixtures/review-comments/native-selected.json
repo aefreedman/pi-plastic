@@ -1,0 +1,213 @@
+{
+  "schema": "native-selected-evidence-v1",
+  "client": "11.0.16.10512",
+  "source": "Bounded native cm stdout/stderr bytes; explicit literal substitutions only. Base64 fields preserve transformed bytes including CR CR LF and embedded LF. Native byte counts/hash refer to private originals, selected counts/hash to public-safe transformations.",
+  "transformations": [
+    {
+      "target": "identity",
+      "replacement": "reviewer@example.invalid"
+    },
+    {
+      "target": "repository name",
+      "replacement": "synthetic-repository"
+    },
+    {
+      "target": "server organization",
+      "replacement": "synthetic-org@unity"
+    },
+    {
+      "target": "evidence directory",
+      "replacement": "C:/synthetic-evidence"
+    },
+    {
+      "target": "workspace directory",
+      "replacement": "C:\\synthetic-workspace"
+    },
+    {
+      "target": "MSYS-converted argument in failed experiment",
+      "replacement": "C:/synthetic-git/README.md"
+    }
+  ],
+  "captures": [
+    {
+      "name": "comment-add-wide",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "comment",
+          "add",
+          "1110",
+          "-c=synthetic wide <xml> & | #"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 38
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "MTk1Yjg1ZDYtYTM5Yi00Y2Y3LWEwYTUtYzlmNjliMWIxY2Y4DQo=",
+          "nativeByteCount": 38,
+          "selectedByteCount": 38,
+          "nativeSha256": "c059c9e3255c39a39465447406acd1491077b3c0f635d6605a5ccceeb7ef066f",
+          "selectedSha256": "c059c9e3255c39a39465447406acd1491077b3c0f635d6605a5ccceeb7ef066f"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "comment-delete-mixed",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "comment",
+          "delete",
+          "c62cc98a-8039-448d-b2ab-4e2529518c6b",
+          "00000000-0000-4000-8000-249769890001"
+        ],
+        "exitCode": 1,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 0,
+          "stderr": 119
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "Q2FuJ3QgZGVsZXRlIHRoZSBjb21tZW50IDAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTI0OTc2OTg5MDAwMTogTm8gc3VjaCBjb21tZW50OiAwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0yNDk3Njk4OTAwMDEuDQo=",
+          "nativeByteCount": 119,
+          "selectedByteCount": 119,
+          "nativeSha256": "7def68764e912d3e4475f902e39c2daff7f4f03de71a4dd1fb964bd2ca5081d3",
+          "selectedSha256": "7def68764e912d3e4475f902e39c2daff7f4f03de71a4dd1fb964bd2ca5081d3"
+        }
+      }
+    },
+    {
+      "name": "comments-read-inline-question",
+      "receipt": {
+        "argv": [
+          "cm",
+          "find",
+          "changereviewcomment",
+          "where reviewid=1114",
+          "--xml",
+          "--encoding=utf-8"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 1630
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiID8+DQo8UExBU1RJQ1FVRVJZPg0KICA8Q0hBTkdFUkVWSUVXQ09NTUVOVD4NCiAgICA8SUQ+MTExNTwvSUQ+DQogICAgPE9XTkVSPnJldmlld2VyQGV4YW1wbGUuaW52YWxpZDwvT1dORVI+DQogICAgPERBVEU+MjAyNi0xMC0yM1QxMDo0ODowOS0wNDowMDwvREFURT4NCiAgICA8Q09NTUVOVD5bcmVxdWVzdGVkLXJldmlldy1mcm9tXXJldmlld2VyQGV4YW1wbGUuaW52YWxpZDwvQ09NTUVOVD4NCiAgICA8UkVWSVNJT05JRD4tMTwvUkVWSVNJT05JRD4NCiAgICA8UkVWSUVXSUQ+MTExNDwvUkVWSUVXSUQ+DQogICAgPExPQ0FUSU9OPi0xPC9MT0NBVElPTj4NCiAgICA8TElORT48L0xJTkU+DQogICAgPFRZUEU+dGltZWxpbmU8L1RZUEU+DQogICAgPFBBUkVOVD4tMTwvUEFSRU5UPg0KICAgIDxDSEFOR0VTRVQ+LTE8L0NIQU5HRVNFVD4NCiAgICA8QVBQTElFRElOQ0hBTkdFU0VUPi0xPC9BUFBMSUVESU5DSEFOR0VTRVQ+DQogICAgPEdVSUQ+NDJmYzczODItNDUwMy00M2VjLTg1M2UtNjBmMmM5ZDViYmQ1PC9HVUlEPg0KICA8L0NIQU5HRVJFVklFV0NPTU1FTlQ+DQogIDxDSEFOR0VSRVZJRVdDT01NRU5UPg0KICAgIDxJRD4xMTE2PC9JRD4NCiAgICA8T1dORVI+cmV2aWV3ZXJAZXhhbXBsZS5pbnZhbGlkPC9PV05FUj4NCiAgICA8REFURT4yMDI2LTEwLTIzVDEwOjQ4OjE0LTA0OjAwPC9EQVRFPg0KICAgIDxDT01NRU5UPnN5bnRoZXRpYy1pbmxpbmUtY2hhbmdlPC9DT01NRU5UPg0KICAgIDxSRVZJU0lPTklEPjEwMjwvUkVWSVNJT05JRD4NCiAgICA8UkVWSUVXSUQ+MTExNDwvUkVWSUVXSUQ+DQogICAgPExPQ0FUSU9OPjA8L0xPQ0FUSU9OPg0KICAgIDxMSU5FPjE8L0xJTkU+DQogICAgPFRZUEU+Y2hhbmdlPC9UWVBFPg0KICAgIDxQQVJFTlQ+LTE8L1BBUkVOVD4NCiAgICA8Q0hBTkdFU0VUPjE2PC9DSEFOR0VTRVQ+DQogICAgPEFQUExJRURJTkNIQU5HRVNFVD4tMTwvQVBQTElFRElOQ0hBTkdFU0VUPg0KICAgIDxHVUlEPmRiMGFjNDk1LWQ1Y2MtNGViOC1hODg4LTJkMzBkM2VhOWM5MDwvR1VJRD4NCiAgPC9DSEFOR0VSRVZJRVdDT01NRU5UPg0KICA8Q0hBTkdFUkVWSUVXQ09NTUVOVD4NCiAgICA8SUQ+MTExNzwvSUQ+DQogICAgPE9XTkVSPnJldmlld2VyQGV4YW1wbGUuaW52YWxpZDwvT1dORVI+DQogICAgPERBVEU+MjAyNi0xMC0yM1QxMDo0ODoyNi0wNDowMDwvREFURT4NCiAgICA8Q09NTUVOVD5zeW50aGV0aWMgY2Fmw6kgzqkKc2Vjb25kIGxpbmUgJmx0O3htbCZndDsgJmFtcDsgfCAjCjwvQ09NTUVOVD4NCiAgICA8UkVWSVNJT05JRD4xMDI8L1JFVklTSU9OSUQ+DQogICAgPFJFVklFV0lEPjExMTQ8L1JFVklFV0lEPg0KICAgIDxMT0NBVElPTj4xPC9MT0NBVElPTj4NCiAgICA8TElORT4yPC9MSU5FPg0KICAgIDxUWVBFPnF1ZXN0aW9uPC9UWVBFPg0KICAgIDxQQVJFTlQ+LTE8L1BBUkVOVD4NCiAgICA8Q0hBTkdFU0VUPjE2PC9DSEFOR0VTRVQ+DQogICAgPEFQUExJRURJTkNIQU5HRVNFVD4tMTwvQVBQTElFRElOQ0hBTkdFU0VUPg0KICAgIDxHVUlEPjI4MmNkYTJlLTUwY2EtNDE5ZC04N2RmLTkyY2I4NGI4YWEyODwvR1VJRD4NCiAgPC9DSEFOR0VSRVZJRVdDT01NRU5UPg0KPC9QTEFTVElDUVVFUlk+DQo=",
+          "nativeByteCount": 1630,
+          "selectedByteCount": 1646,
+          "nativeSha256": "df727bee60fbb8716592f7b726fd253b0ed31a1415d58b8b95ff98492c751103",
+          "selectedSha256": "10fb706cf2067b1e2c136a29d6f13e7a8ef79ce75290d144634469d77fe5bb59"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "comments-read-reply",
+      "receipt": {
+        "argv": [
+          "cm",
+          "find",
+          "changereviewcomment",
+          "where reviewid=1114",
+          "--xml",
+          "--encoding=utf-8"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 2636
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiID8+DQo8UExBU1RJQ1FVRVJZPg0KICA8Q0hBTkdFUkVWSUVXQ09NTUVOVD4NCiAgICA8SUQ+MTExNTwvSUQ+DQogICAgPE9XTkVSPnJldmlld2VyQGV4YW1wbGUuaW52YWxpZDwvT1dORVI+DQogICAgPERBVEU+MjAyNi0xMC0yM1QxMDo0ODowOS0wNDowMDwvREFURT4NCiAgICA8Q09NTUVOVD5bcmVxdWVzdGVkLXJldmlldy1mcm9tXXJldmlld2VyQGV4YW1wbGUuaW52YWxpZDwvQ09NTUVOVD4NCiAgICA8UkVWSVNJT05JRD4tMTwvUkVWSVNJT05JRD4NCiAgICA8UkVWSUVXSUQ+MTExNDwvUkVWSUVXSUQ+DQogICAgPExPQ0FUSU9OPi0xPC9MT0NBVElPTj4NCiAgICA8TElORT48L0xJTkU+DQogICAgPFRZUEU+dGltZWxpbmU8L1RZUEU+DQogICAgPFBBUkVOVD4tMTwvUEFSRU5UPg0KICAgIDxDSEFOR0VTRVQ+LTE8L0NIQU5HRVNFVD4NCiAgICA8QVBQTElFRElOQ0hBTkdFU0VUPi0xPC9BUFBMSUVESU5DSEFOR0VTRVQ+DQogICAgPEdVSUQ+NDJmYzczODItNDUwMy00M2VjLTg1M2UtNjBmMmM5ZDViYmQ1PC9HVUlEPg0KICA8L0NIQU5HRVJFVklFV0NPTU1FTlQ+DQogIDxDSEFOR0VSRVZJRVdDT01NRU5UPg0KICAgIDxJRD4xMTE2PC9JRD4NCiAgICA8T1dORVI+cmV2aWV3ZXJAZXhhbXBsZS5pbnZhbGlkPC9PV05FUj4NCiAgICA8REFURT4yMDI2LTEwLTIzVDEwOjQ4OjE0LTA0OjAwPC9EQVRFPg0KICAgIDxDT01NRU5UPnN5bnRoZXRpYy1pbmxpbmUtY2hhbmdlPC9DT01NRU5UPg0KICAgIDxSRVZJU0lPTklEPjEwMjwvUkVWSVNJT05JRD4NCiAgICA8UkVWSUVXSUQ+MTExNDwvUkVWSUVXSUQ+DQogICAgPExPQ0FUSU9OPjA8L0xPQ0FUSU9OPg0KICAgIDxMSU5FPjE8L0xJTkU+DQogICAgPFRZUEU+Y2hhbmdlPC9UWVBFPg0KICAgIDxQQVJFTlQ+LTE8L1BBUkVOVD4NCiAgICA8Q0hBTkdFU0VUPjE2PC9DSEFOR0VTRVQ+DQogICAgPEFQUExJRURJTkNIQU5HRVNFVD4tMTwvQVBQTElFRElOQ0hBTkdFU0VUPg0KICAgIDxHVUlEPmRiMGFjNDk1LWQ1Y2MtNGViOC1hODg4LTJkMzBkM2VhOWM5MDwvR1VJRD4NCiAgPC9DSEFOR0VSRVZJRVdDT01NRU5UPg0KICA8Q0hBTkdFUkVWSUVXQ09NTUVOVD4NCiAgICA8SUQ+MTExNzwvSUQ+DQogICAgPE9XTkVSPnJldmlld2VyQGV4YW1wbGUuaW52YWxpZDwvT1dORVI+DQogICAgPERBVEU+MjAyNi0xMC0yM1QxMDo0ODoyNi0wNDowMDwvREFURT4NCiAgICA8Q09NTUVOVD5zeW50aGV0aWMgY2Fmw6kgzqkKc2Vjb25kIGxpbmUgJmx0O3htbCZndDsgJmFtcDsgfCAjCjwvQ09NTUVOVD4NCiAgICA8UkVWSVNJT05JRD4xMDI8L1JFVklTSU9OSUQ+DQogICAgPFJFVklFV0lEPjExMTQ8L1JFVklFV0lEPg0KICAgIDxMT0NBVElPTj4xPC9MT0NBVElPTj4NCiAgICA8TElORT4yPC9MSU5FPg0KICAgIDxUWVBFPnF1ZXN0aW9uPC9UWVBFPg0KICAgIDxQQVJFTlQ+LTE8L1BBUkVOVD4NCiAgICA8Q0hBTkdFU0VUPjE2PC9DSEFOR0VTRVQ+DQogICAgPEFQUExJRURJTkNIQU5HRVNFVD4tMTwvQVBQTElFRElOQ0hBTkdFU0VUPg0KICAgIDxHVUlEPjI4MmNkYTJlLTUwY2EtNDE5ZC04N2RmLTkyY2I4NGI4YWEyODwvR1VJRD4NCiAgPC9DSEFOR0VSRVZJRVdDT01NRU5UPg0KICA8Q0hBTkdFUkVWSUVXQ09NTUVOVD4NCiAgICA8SUQ+MTExODwvSUQ+DQogICAgPE9XTkVSPnJldmlld2VyQGV4YW1wbGUuaW52YWxpZDwvT1dORVI+DQogICAgPERBVEU+MjAyNi0xMC0yM1QxMDo0ODoyNy0wNDowMDwvREFURT4NCiAgICA8Q09NTUVOVD5zeW50aGV0aWMtaW5saW5lLWNvbW1lbnQ8L0NPTU1FTlQ+DQogICAgPFJFVklTSU9OSUQ+MTAyPC9SRVZJU0lPTklEPg0KICAgIDxSRVZJRVdJRD4xMTE0PC9SRVZJRVdJRD4NCiAgICA8TE9DQVRJT04+MjwvTE9DQVRJT04+DQogICAgPExJTkU+MzwvTElORT4NCiAgICA8VFlQRT5jb21tZW50PC9UWVBFPg0KICAgIDxQQVJFTlQ+LTE8L1BBUkVOVD4NCiAgICA8Q0hBTkdFU0VUPjE2PC9DSEFOR0VTRVQ+DQogICAgPEFQUExJRURJTkNIQU5HRVNFVD4tMTwvQVBQTElFRElOQ0hBTkdFU0VUPg0KICAgIDxHVUlEPmM2MmNjOThhLTgwMzktNDQ4ZC1iMmFiLTRlMjUyOTUxOGM2YjwvR1VJRD4NCiAgPC9DSEFOR0VSRVZJRVdDT01NRU5UPg0KICA8Q0hBTkdFUkVWSUVXQ09NTUVOVD4NCiAgICA8SUQ+MTExOTwvSUQ+DQogICAgPE9XTkVSPnJldmlld2VyQGV4YW1wbGUuaW52YWxpZDwvT1dORVI+DQogICAgPERBVEU+MjAyNi0xMC0yM1QxMDo0ODoyOC0wNDowMDwvREFURT4NCiAgICA8Q09NTUVOVD5zeW50aGV0aWMtaW5saW5lLXJlcGx5PC9DT01NRU5UPg0KICAgIDxSRVZJU0lPTklEPjEwMjwvUkVWSVNJT05JRD4NCiAgICA8UkVWSUVXSUQ+MTExNDwvUkVWSUVXSUQ+DQogICAgPExPQ0FUSU9OPjA8L0xPQ0FUSU9OPg0KICAgIDxMSU5FPjE8L0xJTkU+DQogICAgPFRZUEU+Y29tbWVudDwvVFlQRT4NCiAgICA8UEFSRU5UPjExMTY8L1BBUkVOVD4NCiAgICA8Q0hBTkdFU0VUPjE2PC9DSEFOR0VTRVQ+DQogICAgPEFQUExJRURJTkNIQU5HRVNFVD4tMTwvQVBQTElFRElOQ0hBTkdFU0VUPg0KICAgIDxHVUlEPjQ5NDgwZDllLTAzNTQtNGQ5Yi1iOWMwLTIwY2UyYjA1OGUxNDwvR1VJRD4NCiAgPC9DSEFOR0VSRVZJRVdDT01NRU5UPg0KPC9QTEFTVElDUVVFUlk+DQo=",
+          "nativeByteCount": 2636,
+          "selectedByteCount": 2660,
+          "nativeSha256": "4fa3a9154b62431ce73ad5cd9f1538314ef76e4d92feecdcb8f0053d738b111a",
+          "selectedSha256": "619cef3b7488d95673b8ad63394075dc67ae8c8bc54bbe7fb3f1697af5f8bdc5"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "comments-read-wide",
+      "receipt": {
+        "argv": [
+          "cm",
+          "find",
+          "changereviewcomment",
+          "where reviewid=1110",
+          "--xml",
+          "--encoding=utf-8"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 1664,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiID8+DQo8UExBU1RJQ1FVRVJZPg0KICA8Q0hBTkdFUkVWSUVXQ09NTUVOVD4NCiAgICA8SUQ+MTExMTwvSUQ+DQogICAgPE9XTkVSPnJldmlld2VyQGV4YW1wbGUuaW52YWxpZDwvT1dORVI+DQogICAgPERBVEU+MjAyNi0xMC0yM1QxMDo0NzowNi0wNDowMDwvREFURT4NCiAgICA8Q09NTUVOVD5bcmVxdWVzdGVkLXJldmlldy1mcm9tXXJldmlld2VyQGV4YW1wbGUuaW52YWxpZDwvQ09NTUVOVD4NCiAgICA8UkVWSVNJT05JRD4tMTwvUkVWSVNJT05JRD4NCiAgICA8UkVWSUVXSUQ+MTExMDwvUkVWSUVXSUQ+DQogICAgPExPQ0FUSU9OPi0xPC9MT0NBVElPTj4NCiAgICA8TElORT48L0xJTkU+DQogICAgPFRZUEU+dGltZWxpbmU8L1RZUEU+DQogICAgPFBBUkVOVD4tMTwvUEFSRU5UPg0KICAgIDxDSEFOR0VTRVQ+LTE8L0NIQU5HRVNFVD4NCiAgICA8QVBQTElFRElOQ0hBTkdFU0VUPi0xPC9BUFBMSUVESU5DSEFOR0VTRVQ+DQogICAgPEdVSUQ+MWNjNTQ5MmMtNDRjNy00NDQwLTkwYTAtNjBjNDgyYzcxOTVjPC9HVUlEPg0KICA8L0NIQU5HRVJFVklFV0NPTU1FTlQ+DQogIDxDSEFOR0VSRVZJRVdDT01NRU5UPg0KICAgIDxJRD4xMTEyPC9JRD4NCiAgICA8T1dORVI+cmV2aWV3ZXJAZXhhbXBsZS5pbnZhbGlkPC9PV05FUj4NCiAgICA8REFURT4yMDI2LTEwLTIzVDEwOjQ3OjU2LTA0OjAwPC9EQVRFPg0KICAgIDxDT01NRU5UPltyZW5hbWVkLXRpdGxlXXN5bnRoZXRpYy1yZXZpZXctMjQ5NzY5ODkjLSZndDsjc3ludGhldGljLXRpdGxlLXVwZGF0ZWQ8L0NPTU1FTlQ+DQogICAgPFJFVklTSU9OSUQ+LTE8L1JFVklTSU9OSUQ+DQogICAgPFJFVklFV0lEPjExMTA8L1JFVklFV0lEPg0KICAgIDxMT0NBVElPTj4tMTwvTE9DQVRJT04+DQogICAgPExJTkU+PC9MSU5FPg0KICAgIDxUWVBFPnRpbWVsaW5lPC9UWVBFPg0KICAgIDxQQVJFTlQ+LTE8L1BBUkVOVD4NCiAgICA8Q0hBTkdFU0VUPi0xPC9DSEFOR0VTRVQ+DQogICAgPEFQUExJRURJTkNIQU5HRVNFVD4tMTwvQVBQTElFRElOQ0hBTkdFU0VUPg0KICAgIDxHVUlEPjRkZjU0OTFlLTgzNTEtNGIzZS1hZTc0LTA0NTU2NjRlNmE0YzwvR1VJRD4NCiAgPC9DSEFOR0VSRVZJRVdDT01NRU5UPg0KICA8Q0hBTkdFUkVWSUVXQ09NTUVOVD4NCiAgICA8SUQ+MTExMzwvSUQ+DQogICAgPE9XTkVSPnJldmlld2VyQGV4YW1wbGUuaW52YWxpZDwvT1dORVI+DQogICAgPERBVEU+MjAyNi0xMC0yM1QxMDo0Nzo1Ny0wNDowMDwvREFURT4NCiAgICA8Q09NTUVOVD5zeW50aGV0aWMgd2lkZSAmbHQ7eG1sJmd0OyAmYW1wOyB8ICM8L0NPTU1FTlQ+DQogICAgPFJFVklTSU9OSUQ+LTE8L1JFVklTSU9OSUQ+DQogICAgPFJFVklFV0lEPjExMTA8L1JFVklFV0lEPg0KICAgIDxMT0NBVElPTj4tMTwvTE9DQVRJT04+DQogICAgPExJTkU+PC9MSU5FPg0KICAgIDxUWVBFPmNvbnZlcnNhdGlvbjwvVFlQRT4NCiAgICA8UEFSRU5UPi0xPC9QQVJFTlQ+DQogICAgPENIQU5HRVNFVD4tMTwvQ0hBTkdFU0VUPg0KICAgIDxBUFBMSUVESU5DSEFOR0VTRVQ+LTE8L0FQUExJRURJTkNIQU5HRVNFVD4NCiAgICA8R1VJRD4xOTViODVkNi1hMzliLTRjZjctYTBhNS1jOWY2OWIxYjFjZjg8L0dVSUQ+DQogIDwvQ0hBTkdFUkVWSUVXQ09NTUVOVD4NCjwvUExBU1RJQ1FVRVJZPg0K",
+          "nativeByteCount": 1664,
+          "selectedByteCount": 1680,
+          "nativeSha256": "0a11bfe12a1ad9c3d926952826fce0c1947be83b6adeac5ddbba5b3034b511a0",
+          "selectedSha256": "4fe42863b9ce6e3f0a82a8b704b9315c0c6b6e9bf25b0b819da7090b6f621257"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    }
+  ]
+}

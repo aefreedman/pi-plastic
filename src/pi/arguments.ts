@@ -5,6 +5,18 @@ type ToolConfig = {
 };
 
 export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
+  branchEditComment: { prepareArguments: prepareCommentArguments },
+  labelEditComment: { prepareArguments: prepareCommentArguments },
+  codeReviewCommentFind: { prepareArguments: prepareCommentArguments },
+  codeReviewCommentAdd: { prepareArguments: prepareCommentArguments },
+  codeReviewCommentReply: { prepareArguments: prepareCommentArguments },
+  codeReviewCommentEdit: { prepareArguments: prepareCommentArguments },
+  codeReviewCommentDelete: { prepareArguments: prepareCommentArguments },
+  codeReviewReviewerAdd: { prepareArguments: prepareCommentArguments },
+  codeReviewReviewerRemove: { prepareArguments: prepareCommentArguments },
+  codeReviewReviewerList: { prepareArguments: prepareCommentArguments },
+  codeReviewSetStatus: { prepareArguments: prepareCommentArguments },
+  codeReviewRequestReview: { prepareArguments: prepareCommentArguments },
   status: {
     prepareArguments(args) {
       const input = normalizeOutputFormatAlias(normalizeArgs(args));
@@ -286,4 +298,11 @@ function promoteSinglePath(input: Record<string, unknown>): void {
   if (typeof singlePath === "string" && singlePath.trim().length > 0) {
     input.paths = [singlePath];
   }
+}
+
+function prepareCommentArguments(args: unknown): Record<string, unknown> {
+  const input = normalizeOutputFormatAlias(normalizeArgs(args));
+  normalizeWorkdirAliases(input);
+  for (const key of ["cwd", "workingDirectory", "working_directory"]) delete input[key];
+  return input;
 }

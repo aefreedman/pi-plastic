@@ -10,8 +10,9 @@ export const codeReviewCreate = tool({
     args: {
         target: tool.schema.string().min(1).describe("Review target spec (branch, changeset, or shelveset spec)."),
         title: tool.schema.string().min(1).describe("Code review title."),
-        status: tool.schema.string().optional().describe("Initial review status."),
-        assignee: tool.schema.string().optional().describe("Initial review assignee."),
+        status: tool.schema.enum(["Under review", "Reviewed", "Rework required"]).optional().describe("Initial native review status."),
+        users: tool.schema.array(tool.schema.string()).min(1).max(100).optional().describe("Exact unique native user names; special user me is supported."),
+        groups: tool.schema.array(tool.schema.string()).min(1).max(100).optional().describe("Exact unique native reviewer group names."),
         repository: tool.schema.string().optional().describe("Repository specification when no workspace is used."),
         format: tool.schema.string().optional().describe("Format string for creation output."),
         preflight: tool.schema.boolean().optional().describe("Command-only zero-CLI preview; no existence/conflict/state analysis."),
@@ -30,8 +31,8 @@ export const codeReviewUpdate = tool({
     description: "Update an existing code review (cm codereview -e).",
     args: {
         id: tool.schema.string().min(1).describe("Code review id or GUID."),
-        status: tool.schema.string().optional().describe("Updated review status."),
-        assignee: tool.schema.string().optional().describe("Updated review assignee."),
+        status: tool.schema.enum(["Under review", "Reviewed", "Rework required"]).optional().describe("Assignee status, not the caller own review status: Under review, Reviewed, or Rework required."),
+        title: tool.schema.string().min(1).optional().describe("Updated review title."),
         repository: tool.schema.string().optional().describe("Repository specification when no workspace is used."),
         preflight: tool.schema.boolean().optional().describe("Command-only zero-CLI preview; no existence/conflict/state analysis."),
         output: outputFormatArg,

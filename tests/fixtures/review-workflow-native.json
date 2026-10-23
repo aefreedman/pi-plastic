@@ -1,0 +1,630 @@
+{
+  "schema": "native-selected-evidence-v1",
+  "client": "11.0.16.10512",
+  "source": "Bounded native cm stdout/stderr bytes; explicit literal substitutions only. Base64 fields preserve transformed bytes including CR CR LF and embedded LF. Native byte counts/hash refer to private originals, selected counts/hash to public-safe transformations.",
+  "transformations": [
+    {
+      "target": "identity",
+      "replacement": "reviewer@example.invalid"
+    },
+    {
+      "target": "repository name",
+      "replacement": "synthetic-repository"
+    },
+    {
+      "target": "server organization",
+      "replacement": "synthetic-org@unity"
+    },
+    {
+      "target": "evidence directory",
+      "replacement": "C:/synthetic-evidence"
+    },
+    {
+      "target": "workspace directory",
+      "replacement": "C:\\synthetic-workspace"
+    },
+    {
+      "target": "MSYS-converted argument in failed experiment",
+      "replacement": "C:/synthetic-git/README.md"
+    }
+  ],
+  "captures": [
+    {
+      "name": "help-codereview-review",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "review",
+          "--help"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 2475,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "U2V0cyB5b3VyIHJldmlldyBzdGF0dXMgb24gYSBjb2RlIHJldmlldywgb3IgYXNrcyBpdHMgcmV2aWV3ZXJzIHRvIHJldmlldyBpdCBhZ2Fpbi4NCg0KVXNhZ2U6DQoNCiAgICBjbSBjb2RlcmV2aWV3IHwgY3IgcmV2aWV3IDxyZXZpZXdfaWQ+DQogICAgICAgICAgICAgICAgKC0tcmV2aWV3ZWQgfCAtLXJld29yay1yZXF1aXJlZCB8IC0tdW5kZXItcmV2aWV3KQ0KICAgICAgICAgICAgICAgIFstYz08c3RyX2NvbW1lbnQ+IHwgLWNvbW1lbnRzZmlsZT08Y29tbWVudHNfZmlsZT5dDQogICAgICAgICAgICAgICAgWy0tcmVwb3NpdG9yeT08cmVwX3NwZWM+XQ0KICAgIChTZXRzIHlvdXIgb3duIHJldmlldyBzdGF0dXMuKQ0KDQogICAgY20gY29kZXJldmlldyB8IGNyIHJldmlldyA8cmV2aWV3X2lkPiAtLXJlLXJlcXVlc3QNCiAgICAgICAgICAgICAgICAoLS1hbGwgfCBbLS11c2Vycz08dXNlcnMtbGlzdD5dIFstLWdyb3Vwcz08Z3JvdXBzLWxpc3Q+XSkNCiAgICAgICAgICAgICAgICBbLS1yZXBvc2l0b3J5PTxyZXBfc3BlYz5dDQogICAgKEFza3MgdGhlIHJldmlld2VycyB0byByZXZpZXcgdGhlIGNvZGUgcmV2aWV3IGFnYWluLikNCg0KT3B0aW9uczoNCg0KICAgIC0tcmV2aWV3ZWQgICAgICAgICAgU2V0cyB5b3VyIHJldmlldyBzdGF0dXMgdG8gIlJldmlld2VkIi4NCiAgICAtLXJld29yay1yZXF1aXJlZCAgIFNldHMgeW91ciByZXZpZXcgc3RhdHVzIHRvICJSZXdvcmsgcmVxdWlyZWQiLg0KICAgIC0tdW5kZXItcmV2aWV3ICAgICAgU2V0cyB5b3VyIHJldmlldyBzdGF0dXMgYmFjayB0byAiVW5kZXIgcmV2aWV3Ii4NCiAgICAtLXJlLXJlcXVlc3QgICAgICAgIFNldHMgdGhlIHN0YXR1cyBvZiB0aGUgZ2l2ZW4gcmV2aWV3ZXJzIGJhY2sgdG8NCiAgICAgICAgICAgICAgICAgICAgICAgICJVbmRlciByZXZpZXciLg0KICAgIC1jICAgICAgICAgICAgICAgICAgQXR0YWNoZXMgYSBjb21tZW50IHRvIHRoZSBzdGF0dXMgY2hhbmdlLg0KICAgIC1jb21tZW50c2ZpbGUgICAgICAgUmVhZHMgdGhlIHN0YXR1cyBjaGFuZ2UgY29tbWVudCBmcm9tIGEgZmlsZS4NCiAgICAgICAgICAgICAgICAgICAgICAgIFVzZSAnLWNvbW1lbnRzZmlsZT0tJyB0byByZWFkIGl0IGZyb20gdGhlIHN0YW5kYXJkDQogICAgICAgICAgICAgICAgICAgICAgICBpbnB1dC4NCiAgICAtLWFsbCAgICAgICAgICAgICAgIFdpdGggLS1yZS1yZXF1ZXN0LCBhc2tzIGFsbCB0aGUgcmV2aWV3ZXJzIGFnYWluLg0KICAgIC0tdXNlcnMgICAgICAgICAgICAgV2l0aCAtLXJlLXJlcXVlc3QsIGEgY29tbWEtc2VwYXJhdGVkIGxpc3Qgb2YgdGhlDQogICAgICAgICAgICAgICAgICAgICAgICByZXZpZXdlcnMgdG8gYXNrIGFnYWluLiBUaGUgc3BlY2lhbCB1c2VyICdtZScgaXMNCiAgICAgICAgICAgICAgICAgICAgICAgIHN1cHBvcnRlZC4NCiAgICAtLWdyb3VwcyAgICAgICAgICAgIFdpdGggLS1yZS1yZXF1ZXN0LCBhIGNvbW1hLXNlcGFyYXRlZCBsaXN0IG9mIHRoZQ0KICAgICAgICAgICAgICAgICAgICAgICAgcmV2aWV3ZXIgZ3JvdXBzIHRvIGFzayBhZ2Fpbi4NCiAgICAtLXJlcG9zaXRvcnkgICAgICAgIFNldHMgdGhlIHJlcG9zaXRvcnkgdG8gYmUgdXNlZCBhcyBkZWZhdWx0Lg0KICAgICAgICAgICAgICAgICAgICAgICAgKFVzZSAnY20gaGVscCBvYmplY3RzcGVjJyB0byBsZWFybiBtb3JlIGFib3V0DQogICAgICAgICAgICAgICAgICAgICAgICByZXBvc2l0b3J5IHNwZWNzLikNCiAgICByZXZpZXdfaWQgICAgICAgICAgIENvZGUgcmV2aWV3IElEIG9yIEdVSUQuDQoNClJlbWFya3M6DQoNCiAgICBVc2UgZXhhY3RseSBvbmUgb2YgLS1yZXZpZXdlZCwgLS1yZXdvcmstcmVxdWlyZWQsIC0tdW5kZXItcmV2aWV3LCBvcg0KICAgIC0tcmUtcmVxdWVzdC4NCg0KICAgIFRvIHNldCB5b3VyIHJldmlldyBzdGF0dXMsIHlvdSBtdXN0IGJlIGEgcmV2aWV3ZXIgb2YgdGhlIGNvZGUgcmV2aWV3LCBhDQogICAgbWVtYmVyIG9mIGEgcmV2aWV3ZXIgZ3JvdXAsIG9yIGEgc2VydmVyIGFkbWluaXN0cmF0b3IuDQoNCiAgICAtLXJlLXJlcXVlc3QgcmVxdWlyZXMgZWl0aGVyIC0tYWxsIG9yIHRoZSByZXZpZXdlcnMgdG8gYXNrIGFnYWluIGluDQogICAgLS11c2VycywgLS1ncm91cHMsIG9yIGJvdGguIEl0IGRvZXNuJ3QgYWNjZXB0IGEgY29tbWVudC4NCg0KRXhhbXBsZXM6DQoNCiAgICBjbSBjb2RlcmV2aWV3IHJldmlldyAxMzY3IC0tcmV2aWV3ZWQgLWM9IkxHVE0iDQogICAgY20gY3IgcmV2aWV3IDEzNjcgLS1yZXdvcmstcmVxdWlyZWQgLWNvbW1lbnRzZmlsZT1ub3Rlcy50eHQNCiAgICBlY2hvICJMb29raW5nIGFnYWluIiB8IGNtIGNyIHJldmlldyAxMzY3IC0tdW5kZXItcmV2aWV3IC1jb21tZW50c2ZpbGU9LQ0KICAgIGNtIGNyIHJldmlldyAxMzY3IC0tcmUtcmVxdWVzdCAtLWFsbA0KICAgIGNtIGNyIHJldmlldyAxMzY3IC0tcmUtcmVxdWVzdCAtLXVzZXJzPXVzZXIxDQoNCg0K",
+          "nativeByteCount": 2475,
+          "selectedByteCount": 2475,
+          "nativeSha256": "f387bcd77d887904d6eccada9a3ff32478241ca68c7073f4f0323b97e44806d1",
+          "selectedSha256": "f387bcd77d887904d6eccada9a3ff32478241ca68c7073f4f0323b97e44806d1"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "help-review",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "--help"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 4583,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "Q3JlYXRlcywgZWRpdHMsIG9yIGRlbGV0ZXMgY29kZSByZXZpZXdzLg0KDQpVc2FnZToNCg0KICAgIGNtIGNvZGVyZXZpZXcgPHNwZWM+IDx0aXRsZT4gWy0tc3RhdHVzPTxzdGF0dXNfbmFtZT4gfCAtLWNvZGVyZXZpZXdzdGF0dXM9PHN0YXR1c19uYW1lPl0NCiAgICAgICAgICAgICAgICBbLS11c2Vycz08dXNlcnMtbGlzdD5dIFstLWdyb3Vwcz08Z3JvdXBzLWxpc3Q+XQ0KICAgICAgICAgICAgICAgIFstLWZvcm1hdD08c3RyX2Zvcm1hdD5dIFstLXJlcG9zaXRvcnk9PHJlcF9zcGVjPl0NCiAgICAoQ3JlYXRlcyBhIGNvZGUgcmV2aWV3LikNCg0KICAgIGNtIGNvZGVyZXZpZXcgLWUgPGlkPiBbLS1zdGF0dXM9PHN0YXR1c19uYW1lPiB8IC0tY29kZXJldmlld3N0YXR1cz08c3RhdHVzX25hbWU+XQ0KICAgICAgICAgICAgICAgIFstLXRpdGxlPTx0aXRsZT5dIFstLXJlcG9zaXRvcnk9PHJlcF9zcGVjPl0NCiAgICAoRWRpdHMgYSBjb2RlIHJldmlldy4pDQoNCiAgICBjbSBjb2RlcmV2aWV3IC1kIDxpZD4gWyAuLi5dIFstLXJlcG9zaXRvcnk9PHJlcF9zcGVjPl0NCiAgICAoRGVsZXRlcyBvbmUgb3IgbW9yZSBjb2RlIHJldmlld3MuKQ0KDQogICAgY20gY29kZXJldmlldyAoY29tbWVudCB8IHJldmlld2VyKSA8Y29tbWFuZD4gW29wdGlvbnNdDQogICAgY20gY29kZXJldmlldyByZXZpZXcgPGlkPiBbb3B0aW9uc10NCiAgICAoTWFuYWdlcyB0aGUgY29tbWVudHMsIHRoZSByZXZpZXdlcnMgYW5kIHlvdXIgb3duIHJldmlldyBzdGF0dXMgb2YgYSBjb2RlDQogICAgcmV2aWV3LiBSdW4gJ2NtIGNvZGVyZXZpZXcgY29tbWVudCAtLXVzYWdlJywNCiAgICAnY20gY29kZXJldmlldyByZXZpZXdlciAtLXVzYWdlJyBvciAnY20gY29kZXJldmlldyByZXZpZXcgLS11c2FnZScNCiAgICB0byBsZWFybiBtb3JlLikNCg0KDQpPcHRpb25zOg0KDQogICAgLWUgICAgICAgICAgICAgICAgICAgICBFZGl0cyB0aGUgcGFyYW1ldGVycyBvZiBhbiBleGlzdGluZyBjb2RlIHJldmlldy4NCiAgICAtZCAgICAgICAgICAgICAgICAgICAgIERlbGV0ZXMgb25lIG9yIG1vcmUgZXhpc3RpbmcgY29kZSByZXZpZXdzLiBVc2UgYQ0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIHdoaXRlc3BhY2UgdG8gc2VwYXJhdGUgdGhlIGNvZGUgcmV2aWV3cyBJRHMuDQogICAgLS1zdGF0dXMgICAgICAgICAgICAgICBTZXRzIHRoZSBuZXcgc3RhdHVzIG9mIGEgY29kZSByZXZpZXcuIFNlZSBSZW1hcmtzIGZvcg0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIGFkZGl0aW9uYWwgaW5mb3JtYXRpb24uDQogICAgLS1jb2RlcmV2aWV3c3RhdHVzICAgICBUaGlzIGlzIGFuIGFsaWFzIG9mICctLXN0YXR1cycuDQogICAgLS11c2VycyAgICAgICAgICAgICAgICBBIGNvbW1hLXNlcGFyYXRlZCBsaXN0IG9mIHRoZSBuYW1lcyBvZiB0aGUgdXNlcnMgdG8NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBiZSBhZGRlZCBhcyByZXZpZXdlcnMgb24gY3JlYXRlLiBUaGUgc3BlY2lhbCB1c2VyDQogICAgICAgICAgICAgICAgICAgICAgICAgICAgJ21lJyBpcyBzdXBwb3J0ZWQuDQogICAgLS1ncm91cHMgICAgICAgICAgICAgICBBIGNvbW1hLXNlcGFyYXRlZCBsaXN0IG9mIHRoZSBuYW1lcyBvZiB0aGUgZ3JvdXBzIHRvDQogICAgICAgICAgICAgICAgICAgICAgICAgICAgYmUgYWRkZWQgYXMgcmV2aWV3ZXJzIG9uIGNyZWF0ZS4NCiAgICAtLXRpdGxlICAgICAgICAgICAgICAgIE9uIC1lLCBzZXRzIHRoZSBuZXcgdGl0bGUgb2YgdGhlIGNvZGUgcmV2aWV3Lg0KICAgIC0tZm9ybWF0ICAgICAgICAgICAgICAgUmV0cmlldmVzIHRoZSBvdXRwdXQgbWVzc2FnZSBpbiBhIHNwZWNpZmljIGZvcm1hdC4gU2VlDQogICAgICAgICAgICAgICAgICAgICAgICAgICAgUmVtYXJrcyBmb3IgYWRkaXRpb25hbCBpbmZvcm1hdGlvbi4NCiAgICAtLXJlcG9zaXRvcnkgICAgICAgICAgIFNldHMgdGhlIHJlcG9zaXRvcnkgdG8gYmUgdXNlZCBhcyBkZWZhdWx0LiAoVXNlDQogICAgICAgICAgICAgICAgICAgICAgICAgICAgJ2NtIGhlbHAgb2JqZWN0c3BlYycgdG8gbGVhcm4gbW9yZSBhYm91dCByZXBvc2l0b3J5IHNwZWNzLikNCiAgICBzcGVjICAgICAgICAgICAgICAgICAgICBJdCBjYW4gYmUgZWl0aGVyIGEgY2hhbmdlc2V0IHNwZWMsIGEgc2hlbHZlIHNwZWMgb3IgYSBicmFuY2ggc3BlYy4NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBJdCB3aWxsIGJlIHRoZSB0YXJnZXQgb2YgdGhlIG5ldyBjb2RlIHJldmlldy4gKFVzZSAnY20gaGVscA0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9iamVjdHNwZWMnIHRvIGxlYXJuIG1vcmUgYWJvdXQgY2hhbmdlc2V0IG9yIGJyYW5jaCBzcGVjcy4pDQogICAgdGl0bGUgICAgICAgICAgICAgICAgICAgQSB0ZXh0IHN0cmluZyB0byBiZSB1c2VkIGFzIHRpdGxlIG9mIHRoZSBuZXcgY29kZSByZXZpZXcuDQogICAgaWQgICAgICAgICAgICAgICAgICAgICAgVGhlIGNvZGUgcmV2aWV3IGlkZW50aWZpY2F0aW9uIG51bWJlci4gQSBHVUlEIGNhbiBiZSB1c2VkIGFzIHdlbGwuDQoNClJlbWFya3M6DQoNCiAgICBUaGlzIGNvbW1hbmQgYWxsb3dzIHVzZXJzIHRvIG1hbmFnZSBjb2RlIHJldmlld3M6IGNyZWF0ZSwgZWRpdCwgYW5kIGRlbGV0ZQ0KICAgIGNvZGUgcmV2aWV3cyBmb3IgY2hhbmdlc2V0cyBvciBicmFuY2hlcy4NCg0KICAgIFRvIGNyZWF0ZSBhIG5ldyBjb2RlIHJldmlldywgYSBjaGFuZ2VzZXQvYnJhbmNoIHNwZWMgYW5kIGEgdGl0bGUgYXJlDQogICAgcmVxdWlyZWQuIFRoZSBpbml0aWFsIHN0YXR1cyBhbmQgcmV2aWV3ZXJzICgtLXVzZXJzIC8gLS1ncm91cHMpIGNhbiBiZQ0KICAgIHNldCwgdG9vLiBBbiBJRCAob3IgR1VJRCBpZiByZXF1ZXN0ZWQpIHdpbGwgYmUgcmV0dXJuZWQgYXMgYSByZXN1bHQuDQoNCiAgICBVc2UgJ2NtIGNvZGVyZXZpZXcgcmV2aWV3ZXInIHRvIG1hbmFnZSB0aGUgcmV2aWV3ZXJzIG9mIGEgY29kZSByZXZpZXcsDQogICAgYW5kICdjbSBjb2RlcmV2aWV3IHJldmlldycgdG8gc2V0IHlvdXIgb3duIHJldmlldyBzdGF0dXMuDQoNCiAgICBXaGVuIGVkaXRpbmcsICctLXN0YXR1cycgc2V0cyB0aGUgc3RhdHVzIG9mIHRoZSBjb2RlIHJldmlldyBhc3NpZ25lZS4NCg0KICAgIFRvIGVkaXQgb3IgZGVsZXRlIGFuIGV4aXN0aW5nIGNvZGUgcmV2aWV3LCB0aGUgdGFyZ2V0IGNvZGUgcmV2aWV3IElEDQogICAgKG9yIEdVSUQpIGlzIHJlcXVpcmVkLiBObyBtZXNzYWdlcyBhcmUgZGlzcGxheWVkIGlmIHRoZXJlIGFyZSBubyBlcnJvcnMuDQoNCiAgICBUaGUgJ3N0YXR1cyBwYXJhbWV0ZXInIG11c3Qgb25seSBiZSBvbmUgb2YgdGhlIGZvbGxvd2luZzogIlVuZGVyIHJldmlldyINCiAgICAoZGVmYXVsdCksICJSZXZpZXdlZCIsIG9yICJSZXdvcmsgcmVxdWlyZWQiLg0KDQogICAgVGhlICdyZXBvc2l0b3J5JyBwYXJhbWV0ZXIgaXMgYXZhaWxhYmxlIHRvIHNldCB0aGUgZGVmYXVsdCB3b3JraW5nDQogICAgcmVwb3NpdG9yeS4gVGhpcyBpcyB1c2VmdWwgd2hlbiB0aGUgdXNlciB3YW50cyB0byBtYW5hZ2UgcmV2aWV3cyBvbg0KICAgIGEgc2VydmVyIGRpZmZlcmVudCB0aGFuIHRoZSBvbmUgYXNzb2NpYXRlZCB0byB0aGUgY3VycmVudCB3b3Jrc3BhY2UsIG9yDQogICAgd2hlbiB0aGVyZSBpcyBubyBjdXJyZW50IHdvcmtzcGFjZSBhdCBhbGwuDQoNCiAgICBPdXRwdXQgZm9ybWF0IHBhcmFtZXRlcnMgKC0tZm9ybWF0IG9wdGlvbik6DQoNCiAgICBUaGlzIGNvbW1hbmQgYWNjZXB0cyBhIGZvcm1hdCBzdHJpbmcgdG8gc2hvdyB0aGUgb3V0cHV0Lg0KDQogICAgVGhlIG91dHB1dCBwYXJhbWV0ZXJzIG9mIHRoaXMgY29tbWFuZCBhcmUgdGhlIGZvbGxvd2luZzoNCg0KICAgIHswfSAgaWQNCiAgICB7MX0gIGd1aWQNCg0KICAgIFBsZWFzZSBub3RlIHRoYXQgdGhlICctLWZvcm1hdCcgcGFyYW1ldGVyIG9ubHkgdGFrZXMgZWZmZWN0IHdoZW4gY3JlYXRpbmcNCiAgICBhIG5ldyBjb2RlIHJldmlldy4NCg0KRXhhbXBsZXM6DQoNCiAgICBjbSBjb2RlcmV2aWV3IGNzOjE4NTZAbXlyZXBvQG15c2VydmVyOjgwODQgIk15IGNvZGUgcmV2aWV3IiAtLXVzZXJzPWR1bW15DQogICAgY20gY29kZXJldmlldyBicjovbWFpbi90YXNrMDAxQG15cmVwb0BteXNlcnZlcjo4MDg0ICJNeSBjb2RlIHJldmlldyIgXA0KICAgICAgICAtLXN0YXR1cz0iUmV3b3JrIHJlcXVpcmVkIiAtLXVzZXJzPW5ld2JpZSAtLWZvcm1hdD0ie2lkfSAtPiB7Z3VpZH0iDQoNCiAgICBjbSBjb2RlcmV2aWV3IHJldmlld2VyIGFkZCAxMzY3IC0tdXNlcnM9bmV3X3Jldmlld2VyDQogICAgY20gY29kZXJldmlldyAtZSAyNzY1ODg4NC01ZGNjLTQ5YjctYjBlZi1hNTc2MGFlNzQwYTMgLS1zdGF0dXM9UmV2aWV3ZWQNCiAgICBjbSBjb2RlcmV2aWV3IC1lIDEzNjcgLS10aXRsZT0iRml4IHRoZSBsb2dpbiBjcmFzaCINCg0KICAgIGNtIGNvZGVyZXZpZXcgLWQgMTM2NyAtLXJlcG9zaXRvcnk9bXlyZW1vdGVyZXBvQG15cmVtb3Rlc2VydmVyOjE4MDg0DQogICAgY20gY29kZXJldmlldyAyNzY1ODg4NC01ZGNjLTQ5YjctYjBlZi1hNTc2MGFlNzQwYTMgLWQNCg0KDQo=",
+          "nativeByteCount": 4583,
+          "selectedByteCount": 4583,
+          "nativeSha256": "99847473ccb78793745d43481c15c16674c6343665e882ce5f28a9bce8df19a3",
+          "selectedSha256": "99847473ccb78793745d43481c15c16674c6343665e882ce5f28a9bce8df19a3"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "help-reviewer-add",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "reviewer",
+          "add",
+          "--help"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 1001
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "QWRkcyByZXZpZXdlcnMgdG8gYSBjb2RlIHJldmlldy4NCg0KVXNhZ2U6DQoNCiAgICBjbSBjb2RlcmV2aWV3IHwgY3IgcmV2aWV3ZXIgYWRkIDxyZXZpZXdfaWQ+DQogICAgICAgICAgICAgICAgWy0tdXNlcnM9PHVzZXJzLWxpc3Q+XSBbLS1ncm91cHM9PGdyb3Vwcy1saXN0Pl0NCiAgICAgICAgICAgICAgICBbLS1yZXBvc2l0b3J5PTxyZXBfc3BlYz5dDQoNCk9wdGlvbnM6DQoNCiAgICAtLXVzZXJzICAgICAgICBBIGNvbW1hLXNlcGFyYXRlZCBsaXN0IG9mIHRoZSBuYW1lcyBvZiB0aGUgdXNlcnMgdG8gYmUNCiAgICAgICAgICAgICAgICAgICAgYWRkZWQgYXMgcmV2aWV3ZXJzLiBUaGUgc3BlY2lhbCB1c2VyICdtZScgYWRkcyB0aGUNCiAgICAgICAgICAgICAgICAgICAgY3VycmVudCB1c2VyLg0KICAgIC0tZ3JvdXBzICAgICAgIEEgY29tbWEtc2VwYXJhdGVkIGxpc3Qgb2YgdGhlIG5hbWVzIG9mIHRoZSBncm91cHMgdG8gYmUNCiAgICAgICAgICAgICAgICAgICAgYWRkZWQgYXMgcmV2aWV3ZXJzLg0KICAgIC0tcmVwb3NpdG9yeSAgIFNldHMgdGhlIHJlcG9zaXRvcnkgdG8gYmUgdXNlZCBhcyBkZWZhdWx0Lg0KICAgICAgICAgICAgICAgICAgICAoVXNlICdjbSBoZWxwIG9iamVjdHNwZWMnIHRvIGxlYXJuIG1vcmUgYWJvdXQNCiAgICAgICAgICAgICAgICAgICAgcmVwb3NpdG9yeSBzcGVjcy4pDQogICAgcmV2aWV3X2lkICAgICAgIENvZGUgcmV2aWV3IElEIG9yIEdVSUQuDQoNClJlbWFya3M6DQoNCiAgICBQYXNzIC0tdXNlcnMsIC0tZ3JvdXBzLCBvciBib3RoOyBhdCBsZWFzdCBvbmUgaXMgcmVxdWlyZWQuIFRoZQ0KICAgIHJldmlld2VycyBhbHJlYWR5IG9uIHRoZSBjb2RlIHJldmlldyBhcmUga2VwdC4NCg0KRXhhbXBsZXM6DQoNCiAgICBjbSBjb2RlcmV2aWV3IHJldmlld2VyIGFkZCAxMzY3IC0tdXNlcnM9bWUNCiAgICBjbSBjciByZXZpZXdlciBhZGQgMTM2NyAtLXVzZXJzPXVzZXIxLHVzZXIyIC0tZ3JvdXBzPWRldmVsb3BlcnMNCg0KDQo=",
+          "nativeByteCount": 1001,
+          "selectedByteCount": 1001,
+          "nativeSha256": "8caea064dbed513e76aa488d8658ce4eb7af6afd1513ffea06bc0a2b06dc126a",
+          "selectedSha256": "8caea064dbed513e76aa488d8658ce4eb7af6afd1513ffea06bc0a2b06dc126a"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "help-reviewer-list",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "reviewer",
+          "list",
+          "--help"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 1385,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "TGlzdHMgdGhlIHJldmlld2VycyBvZiBhIGNvZGUgcmV2aWV3Lg0KDQpVc2FnZToNCg0KICAgIGNtIGNvZGVyZXZpZXcgfCBjciByZXZpZXdlciBsaXN0IHwgbHMgPHJldmlld19pZD4NCiAgICAgICAgICAgICAgICBbLS1mb3JtYXQ9PHN0cl9mb3JtYXQ+XSBbLS1yZXBvc2l0b3J5PTxyZXBfc3BlYz5dDQoNCk9wdGlvbnM6DQoNCiAgICAtLWZvcm1hdCAgICAgICBSZXRyaWV2ZXMgdGhlIG91dHB1dCBtZXNzYWdlIGluIGEgc3BlY2lmaWMgZm9ybWF0LiBTZWUNCiAgICAgICAgICAgICAgICAgICAgUmVtYXJrcyBmb3IgYWRkaXRpb25hbCBpbmZvcm1hdGlvbi4NCiAgICAtLXJlcG9zaXRvcnkgICBTZXRzIHRoZSByZXBvc2l0b3J5IHRvIGJlIHVzZWQgYXMgZGVmYXVsdC4NCiAgICAgICAgICAgICAgICAgICAgKFVzZSAnY20gaGVscCBvYmplY3RzcGVjJyB0byBsZWFybiBtb3JlIGFib3V0DQogICAgICAgICAgICAgICAgICAgIHJlcG9zaXRvcnkgc3BlY3MuKQ0KICAgIHJldmlld19pZCAgICAgICBDb2RlIHJldmlldyBJRCBvciBHVUlELg0KDQpSZW1hcmtzOg0KDQogICAgUHJpbnRzIG9uZSBsaW5lIHBlciByZXZpZXdlciB3aXRoIHRoZSBzdGF0dXMgdGhhdCByZXZpZXdlciBnYXZlLiBBIGNvZGUNCiAgICByZXZpZXcgd2l0aCBubyByZXZpZXdlcnMgcHJpbnRzIG5vdGhpbmcgYXQgYWxsLg0KDQogICAgT3V0cHV0IGZvcm1hdCBwYXJhbWV0ZXJzICgtLWZvcm1hdCBvcHRpb24pOg0KDQogICAgVGhpcyBjb21tYW5kIGFjY2VwdHMgYSBmb3JtYXQgc3RyaW5nIHRvIHNob3cgdGhlIG91dHB1dC4NCg0KICAgIFRoZSBvdXRwdXQgcGFyYW1ldGVycyBvZiB0aGlzIGNvbW1hbmQgYXJlIHRoZSBmb2xsb3dpbmc6DQogICAge3VzZXJ9IHwgezB9ICAgICAgUmV2aWV3ZXIgbmFtZS4NCiAgICB7c3RhdHVzfSB8IHsxfSAgICBSZXZpZXdlciBzdGF0dXM6ICJVbmRlciByZXZpZXciLCAiUmV2aWV3ZWQiIG9yDQogICAgICAgICAgICAgICAgICAgICAgICJSZXdvcmsgcmVxdWlyZWQiLg0KICAgIHt0eXBlfSB8IHsyfSAgICAgICJ1c2VyIiBvciAiZ3JvdXAiLg0KICAgIHt0YWJ9ICAgICAgICAgICAgIEluc2VydHMgYSB0YWIgc3BhY2UuDQogICAge25ld2xpbmV9ICAgICAgICAgSW5zZXJ0cyBhIG5ldyBsaW5lLg0KDQogICAgJy0tZm9ybWF0PVRBQkxFJyBwcmludHMge3VzZXJ9LCB7c3RhdHVzfSBhbmQge3R5cGV9IGluIGNvbHVtbnMuIFRoYXQNCiAgICBpcyBhbHNvIHdoYXQgeW91IGdldCB3aGVuIHlvdSBwYXNzIG5vIC0tZm9ybWF0IGF0IGFsbC4NCg0KRXhhbXBsZXM6DQoNCiAgICBjbSBjb2RlcmV2aWV3IHJldmlld2VyIGxpc3QgMTM2Nw0KICAgIGNtIGNyIHJldmlld2VyIGxzIDEzNjcgLS1mb3JtYXQ9Int1c2VyfSN7c3RhdHVzfSINCg0KDQo=",
+          "nativeByteCount": 1385,
+          "selectedByteCount": 1385,
+          "nativeSha256": "f9d91c7cb128f1aa103fb69465a3a5abc72d862928de98190750f66f06d18dd9",
+          "selectedSha256": "f9d91c7cb128f1aa103fb69465a3a5abc72d862928de98190750f66f06d18dd9"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "help-reviewer-remove",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "reviewer",
+          "remove",
+          "--help"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 999,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "UmVtb3ZlcyByZXZpZXdlcnMgZnJvbSBhIGNvZGUgcmV2aWV3Lg0KDQpVc2FnZToNCg0KICAgIGNtIGNvZGVyZXZpZXcgfCBjciByZXZpZXdlciByZW1vdmUgPHJldmlld19pZD4NCiAgICAgICAgICAgICAgICBbLS11c2Vycz08dXNlcnMtbGlzdD5dIFstLWdyb3Vwcz08Z3JvdXBzLWxpc3Q+XQ0KICAgICAgICAgICAgICAgIFstLXJlcG9zaXRvcnk9PHJlcF9zcGVjPl0NCg0KT3B0aW9uczoNCg0KICAgIC0tdXNlcnMgICAgICAgIEEgY29tbWEtc2VwYXJhdGVkIGxpc3Qgb2YgdGhlIG5hbWVzIG9mIHRoZSB1c2VycyB0byBiZQ0KICAgICAgICAgICAgICAgICAgICByZW1vdmVkIGZyb20gdGhlIHJldmlld2Vycy4gVGhlIHNwZWNpYWwgdXNlciAnbWUnIHJlbW92ZXMNCiAgICAgICAgICAgICAgICAgICAgdGhlIGN1cnJlbnQgdXNlci4NCiAgICAtLWdyb3VwcyAgICAgICBBIGNvbW1hLXNlcGFyYXRlZCBsaXN0IG9mIHRoZSBuYW1lcyBvZiB0aGUgZ3JvdXBzIHRvIGJlDQogICAgICAgICAgICAgICAgICAgIHJlbW92ZWQgZnJvbSB0aGUgcmV2aWV3ZXJzLg0KICAgIC0tcmVwb3NpdG9yeSAgIFNldHMgdGhlIHJlcG9zaXRvcnkgdG8gYmUgdXNlZCBhcyBkZWZhdWx0Lg0KICAgICAgICAgICAgICAgICAgICAoVXNlICdjbSBoZWxwIG9iamVjdHNwZWMnIHRvIGxlYXJuIG1vcmUgYWJvdXQNCiAgICAgICAgICAgICAgICAgICAgcmVwb3NpdG9yeSBzcGVjcy4pDQogICAgcmV2aWV3X2lkICAgICAgIENvZGUgcmV2aWV3IElEIG9yIEdVSUQuDQoNClJlbWFya3M6DQoNCiAgICBQYXNzIC0tdXNlcnMsIC0tZ3JvdXBzLCBvciBib3RoOyBhdCBsZWFzdCBvbmUgaXMgcmVxdWlyZWQuIFRoZSBvdGhlcg0KICAgIHJldmlld2VycyBhcmUgbGVmdCBhbG9uZS4NCg0KRXhhbXBsZXM6DQoNCiAgICBjbSBjb2RlcmV2aWV3IHJldmlld2VyIHJlbW92ZSAxMzY3IC0tdXNlcnM9bWUNCiAgICBjbSBjciByZXZpZXdlciByZW1vdmUgMTM2NyAtLWdyb3Vwcz1kZXZlbG9wZXJzDQoNCg0K",
+          "nativeByteCount": 999,
+          "selectedByteCount": 999,
+          "nativeSha256": "266426b44b36f7166131f4ce53ee8f755adc9320ceb88e645ff590e2da02838c",
+          "selectedSha256": "266426b44b36f7166131f4ce53ee8f755adc9320ceb88e645ff590e2da02838c"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "own-status-reviewed",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "review",
+          "1110",
+          "--reviewed",
+          "-c=synthetic-status-reviewed"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 0,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "rerequest-self",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "review",
+          "1110",
+          "--re-request",
+          "--users=me"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "review-create",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "br:/main/cm10512-evidence-24976989",
+          "synthetic-review-24976989",
+          "--users=me"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 6,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "MTExMA0K",
+          "nativeByteCount": 6,
+          "selectedByteCount": 6,
+          "nativeSha256": "cce637abbe9a060b6ef4b5312d5f6829432a30b962eb8142e38a493a222f11b4",
+          "selectedSha256": "cce637abbe9a060b6ef4b5312d5f6829432a30b962eb8142e38a493a222f11b4"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "review-title",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "-e",
+          "1110",
+          "--title=synthetic-title-updated"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 0,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "reviewer-add-self",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "reviewer",
+          "add",
+          "1110",
+          "--users=me"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 0,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "reviewer-list-created",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "reviewer",
+          "list",
+          "1110"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 41
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "IHJldmlld2VyQGV4YW1wbGUuaW52YWxpZCBVbmRlciByZXZpZXcgdXNlcg0K",
+          "nativeByteCount": 41,
+          "selectedByteCount": 45,
+          "nativeSha256": "2b13da34e448b52c1b88812d16fefc09b380a84acb6617792bd020c6fb640506",
+          "selectedSha256": "a9bc95e38eee992fa46bbc892e0f055bf05570dfca59f3e11d7097d47e1c5035"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "reviewer-list-custom",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "reviewer",
+          "list",
+          "1110",
+          "--format={user}{tab}{status}{tab}{type}"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 40,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "cmV2aWV3ZXJAZXhhbXBsZS5pbnZhbGlkCVVuZGVyIHJldmlldwl1c2VyDQo=",
+          "nativeByteCount": 40,
+          "selectedByteCount": 44,
+          "nativeSha256": "4842d0f3e04802a2963b48a2492c34f18d7178e1059fccf5204d111cc3e1a7c4",
+          "selectedSha256": "0b77979fa364e5c821b31cfc9ddb9584a5132f6da6761be72fc7b00e55b5aefd"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "reviewer-list-empty",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "reviewer",
+          "list",
+          "1110"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "reviewer-list-readded",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "reviewer",
+          "list",
+          "1110"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 41
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "IHJldmlld2VyQGV4YW1wbGUuaW52YWxpZCBVbmRlciByZXZpZXcgdXNlcg0K",
+          "nativeByteCount": 41,
+          "selectedByteCount": 45,
+          "nativeSha256": "2b13da34e448b52c1b88812d16fefc09b380a84acb6617792bd020c6fb640506",
+          "selectedSha256": "a9bc95e38eee992fa46bbc892e0f055bf05570dfca59f3e11d7097d47e1c5035"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "reviewer-list-rerequest",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "reviewer",
+          "list",
+          "1110"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 41
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "IHJldmlld2VyQGV4YW1wbGUuaW52YWxpZCBVbmRlciByZXZpZXcgdXNlcg0K",
+          "nativeByteCount": 41,
+          "selectedByteCount": 45,
+          "nativeSha256": "2b13da34e448b52c1b88812d16fefc09b380a84acb6617792bd020c6fb640506",
+          "selectedSha256": "a9bc95e38eee992fa46bbc892e0f055bf05570dfca59f3e11d7097d47e1c5035"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "reviewer-list-reviewed",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "reviewer",
+          "list",
+          "1110"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stderr": 0,
+          "stdout": 37
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "IHJldmlld2VyQGV4YW1wbGUuaW52YWxpZCBSZXZpZXdlZCB1c2VyDQo=",
+          "nativeByteCount": 37,
+          "selectedByteCount": 41,
+          "nativeSha256": "23226f4ff015ddf74a687ae0bbe8a188132606d74c960ca61fd334b1a4618b52",
+          "selectedSha256": "68d2b6a293c8753b5b2e71ac0d904ff79a4667dca4d6cad9ebb82f4a1caf2336"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "reviewer-remove-self",
+      "receipt": {
+        "argv": [
+          "cm",
+          "codereview",
+          "reviewer",
+          "remove",
+          "1110",
+          "--users=me"
+        ],
+        "exitCode": 0,
+        "timeout": false,
+        "overflow": [],
+        "bytes": {
+          "stdout": 0,
+          "stderr": 0
+        }
+      },
+      "streams": {
+        "stdout": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "base64": "",
+          "nativeByteCount": 0,
+          "selectedByteCount": 0,
+          "nativeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "selectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    }
+  ]
+}

@@ -45,6 +45,18 @@ export const PLASTIC_SEARCH_CATALOG: readonly PlasticSearchCatalogEntry[] = [
   { name: "plastic_codeReviewDelete", aliases: ["delete code review", "remove review"], tags: ["review", "code review", "mutation", "destructive"], guidance: ["Confirm review IDs before deleting code reviews."] },
   { name: "plastic_codeReviewFind", aliases: ["find code review", "list reviews", "search reviews"], tags: ["review", "code review", "inspect", "query"], guidance: ["Use filters to identify the intended review before changing or deleting it."] },
   { name: "plastic_workspaceList", aliases: ["list workspaces", "find workspace", "workspaces"], tags: ["workspace", "inspect", "query"], guidance: ["Inspect workspace paths and repository identity before using a workspace in a mutation."] },
+  { name: "plastic_branchEditComment", aliases: ["edit branch comment"], tags: ["comment", "mutation"], guidance: ["Require explicit targets and intent; command completion is not stored-state verification. Never retry automatically."] },
+  { name: "plastic_labelEditComment", aliases: ["edit label comment"], tags: ["comment", "mutation"], guidance: ["Require explicit targets and intent; command completion is not stored-state verification. Never retry automatically."] },
+  { name: "plastic_codeReviewCommentFind", aliases: ["find review comments"], tags: ["review", "inspect"], guidance: ["Read scoped external evidence; do not infer stored identity from completion."] },
+  { name: "plastic_codeReviewCommentAdd", aliases: ["add review comment"], tags: ["review", "mutation"], guidance: ["Require explicit targets and intent; command completion is not stored-state verification. Never retry automatically."] },
+  { name: "plastic_codeReviewCommentReply", aliases: ["reply review comment"], tags: ["review", "mutation"], guidance: ["Require explicit targets and intent; command completion is not stored-state verification. Never retry automatically."] },
+  { name: "plastic_codeReviewCommentEdit", aliases: ["edit review comment"], tags: ["review", "mutation"], guidance: ["Require explicit targets and intent; command completion is not stored-state verification. Never retry automatically."] },
+  { name: "plastic_codeReviewCommentDelete", aliases: ["delete review comments"], tags: ["review", "mutation"], guidance: ["Require explicit targets and intent; command completion is not stored-state verification. Never retry automatically."] },
+  { name: "plastic_codeReviewReviewerAdd", aliases: ["add reviewers"], tags: ["review", "mutation"], guidance: ["Require explicit targets and intent; command completion is not stored-state verification. Never retry automatically."] },
+  { name: "plastic_codeReviewReviewerRemove", aliases: ["remove reviewers"], tags: ["review", "mutation"], guidance: ["Require explicit targets and intent; command completion is not stored-state verification. Never retry automatically."] },
+  { name: "plastic_codeReviewReviewerList", aliases: ["list reviewers"], tags: ["review", "inspect"], guidance: ["Read scoped external evidence; do not infer stored identity from completion."] },
+  { name: "plastic_codeReviewSetStatus", aliases: ["set own review status"], tags: ["review", "mutation"], guidance: ["Require explicit targets and intent; command completion is not stored-state verification. Never retry automatically."] },
+  { name: "plastic_codeReviewRequestReview", aliases: ["request review again"], tags: ["review", "mutation"], guidance: ["Require explicit targets and intent; command completion is not stored-state verification. Never retry automatically."] },
 ] as const;
 
 export const PLASTIC_SEARCHABLE_TOOL_NAMES = new Set(PLASTIC_SEARCH_CATALOG.map((entry) => entry.name));

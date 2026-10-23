@@ -58,6 +58,19 @@ Argument descriptions in the loaded tool schema are the source for exact call pa
 | `plastic_codeReviewUpdate` | [Review update](2026-10-06-shelvesets-and-reviews.md#codereviewupdate) |
 | `plastic_codeReviewDelete` | [Object deletion](2026-10-06-shelvesets-and-reviews.md#object-deletion) |
 
+| `plastic_branchEditComment` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_labelEditComment` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewCommentFind` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewCommentAdd` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewCommentReply` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewCommentEdit` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewCommentDelete` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewReviewerAdd` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewReviewerRemove` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewReviewerList` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewSetStatus` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewRequestReview` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+
 ## Reading results as an agent
 
 1. Load the smallest sufficient capability through `plastic_tool_search` when it is inactive.

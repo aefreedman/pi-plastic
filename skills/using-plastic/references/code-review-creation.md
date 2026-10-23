@@ -2,7 +2,7 @@
 
 ## Tool-first flow
 
-Use `plastic_codeReviewCreate` with an explicitly inspected target and title. Optional `status`, `assignee`, and `repository` retain their CLI meanings. Set an assignee only when the user requests that assignment; creating a review does not authorize assigning another person.
+Use `plastic_codeReviewCreate` with an explicitly inspected target and title. Optional `status`, `users`, `groups`, and `repository` retain their native meanings. Legacy singular assignee is removed, with no fallback. Select people/groups only when explicitly requested. Use [review workflow and comments](../../../docs/2026-10-23-comments-and-review-workflow.md) for reviewer membership, caller own status and discussions.
 
 ```text
 plastic_codeReviewCreate(target="br:/main/owned-feature", title="Feature: Brief description", output="json")
@@ -22,8 +22,8 @@ Inspect the exact branch/changeset/shelveset selector first. Do not derive it by
 cm codereview "br:/main/owned-feature" "Feature: Brief description"
 # Only if separately authorized, using an observed ID:
 cm codereview -e "<observed ID>" --status="Reviewed"
-# Only when an assignment was explicitly requested:
-cm codereview -e "<observed ID>" --assignee="<requested user>"
+# Only when reviewer membership was explicitly requested:
+cm codereview reviewer add "<observed ID>" --users="<requested user>" --repository="<explicit repository>"
 ```
 
 Installed CM11 help documents creation formatter `{0}` as ID and `{1}` as GUID. A bounded owned fixture validated `--format="{0}|{1}"`; a named `{id}|{title}` creation formatter failed with `Invalid format string`. Creation formatting and `cm find review` field formatting are different protocols: the tested find query accepts `{id}|{status}|{title}`, but `{guid}` failed. Do not infer support from an inconsistent help example.
@@ -34,4 +34,4 @@ cm codereview "br:/main/owned-feature" "Owned review title" --format="{0}|{1}"
 cm find review "where title='Owned review title'" --format="{id}|{status}|{title}" --nototal
 ```
 
-Failed commands may have effects; retain receipts and inspect the exact owned fixture before deciding what to do. If CLI access is unavailable, report that limitation or use the GUI only when requested. Do not silently create or assign a replacement review.
+Failed commands may have effects; retain receipts and inspect the exact owned fixture before deciding what to do. If CLI access is unavailable, report that limitation; do not use editor/GUI fallback. Do not silently create or assign a replacement review.

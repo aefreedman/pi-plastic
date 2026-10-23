@@ -15,3 +15,6 @@ export { mergeBranches } from "./operations/server-merge";
 export { mergeToBranch } from "./operations/closeout";
 
 export { mergeListConflictMarkers, mergeMarkResolved } from "./operations/marker-lifecycle";
+export { branchEditComment, labelEditComment } from "./operations/object-comments";
+export { codeReviewCommentFind, codeReviewCommentAdd, codeReviewCommentReply, codeReviewCommentEdit, codeReviewCommentDelete } from "./operations/review-comments";
+export { codeReviewReviewerAdd, codeReviewReviewerRemove, codeReviewReviewerList, codeReviewSetStatus, codeReviewRequestReview } from "./operations/review-workflow";
