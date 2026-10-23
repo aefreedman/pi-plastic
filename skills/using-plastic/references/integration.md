@@ -5,7 +5,7 @@
 - Create feature branch following detected conventions.
 - Use incremental checkins.
 - Never use `cm diff`. Do not diff routinely; use a text-only diff tool only when review needs change-boundary evidence.
-- Use `plastic_merge` (or `cm merge ... --nointeractiveresolution --mergetype=try`) for autonomous merges.
+- Use `plastic_merge` (or `cm merge ... --nointeractiveresolution --mergetype=try --conflict-markers`) for autonomous merges.
 
 ## Autonomous Merge Workflow
 
@@ -17,6 +17,7 @@ Plastic does not perform a Git-style fast-forward. It applies the merge into the
 - Immediately run `plastic_status()` and treat it as the source of truth.
 - Do not treat merge-tool success alone as proof that the merge is finished.
 - If `plastic_status()` still shows `Pending merge links`, merge-in-progress state, or conflict-like pending items, stop and follow troubleshooting before any checkin.
+- List native markers with `plastic_mergeListConflictMarkers()`, edit/validate, then re-inspect markers AND remaining conflicts/scope. Unknown evidence blocks; never force-finalize or reapply automatically.
 - After compile/tests, run `plastic_status()` again so Unity-generated private artifacts are not mistaken for merge fallout.
 - Only then create the merge checkin.
 - Verify the merge checkin was created on the target branch. If the workspace or changeset is on the source branch, stop: do not switch to the target and claim completion. Inspect target history and rerun the merge while the target is actually loaded.

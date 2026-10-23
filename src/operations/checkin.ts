@@ -73,7 +73,7 @@ export const buildMergeInProgressCheckinMessage = async (originalMessage: string
         "",
         "Next steps:",
         "- If files still need manual work, resolve and validate them first.",
-        "- If files are already resolved and validated, run plastic_finalizeMerge(source=<original source>, strategy=destination) to finalize Plastic merge metadata, then retry plastic_checkin.",
+        "- List native markers with plastic_mergeListConflictMarkers; edit/validate, then re-inspect markers and remaining conflicts/scope. Never force-finalize or automatically reapply.",
         "- Use strategy=source/destination only when that conflict policy is intentional.",
     );
 

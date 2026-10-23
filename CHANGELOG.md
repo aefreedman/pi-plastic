@@ -7,6 +7,12 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Added
+
+- Native CM 11.0.16.10512+ conflict markers in default auto workspace merges, with independent marker/pending/source-state gates before checkin or closeout. Replaced the unreleased separate marker strategy and removed duplicate forced-finalization API.
+- `plastic_changesetEditComment` for exact replacement, empty-comment clearing, or explicit comment files, with strict selectors and producer-owned receipts.
+- Typed read-only `plastic_mergeListConflictMarkers` and exact-file `plastic_mergeMarkResolved` intentional-marker bypass requiring explicit acknowledgement; compact marker evidence propagates through merge/checkin/closeout. Unknown marker or remaining conflict state blocks mutation without retries.
+
 ## [0.8.5] - 2026-10-21
 
 ### Fixed

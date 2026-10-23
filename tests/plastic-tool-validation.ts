@@ -49,7 +49,6 @@ const main = (): void => {
   ]);
   failures += checkRequired(readText(new URL("../src/operations/merge.ts", import.meta.url)), "pi-plastic/src/operations/merge.ts", [
     "export const merge = tool({",
-    "export const finalizeMerge = tool({",
     "assembleWorkspaceMergeReceipt",
 ]);
   failures += checkRequired(readText(new URL("../src/domain/workspace-merge-contract.ts", import.meta.url)), "workspace merge contract", ["--nointeractiveresolution", "--mergetype=try", "--automaticresolution=all-"]);

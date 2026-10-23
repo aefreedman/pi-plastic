@@ -11,7 +11,7 @@ export const formatStatusText = (output: string, mergeState: ReturnType<typeof a
         "## Merge State",
         `- Pending merge links: ${mergeState.pendingMergeLinks.length}`,
         `- Merge-in-progress hints: ${mergeState.mergeInProgressHints.length}`,
-        ...(mergeState.hasMergeInProgress ? ["- Checkin may be blocked until merge metadata is finalized. If files are resolved, run plastic_finalizeMerge(...)."] : []),
+        ...(mergeState.hasMergeInProgress ? ["- Checkin is blocked by unresolved merge state. List native markers, edit/validate, then re-inspect markers and remaining conflicts/scope; do not force-finalize or reapply."] : []),
     ].join("\n")
     : output;
 };

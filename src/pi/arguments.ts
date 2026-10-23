@@ -128,15 +128,6 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       return input;
     },
   },
-  finalizeMerge: {
-    prepareArguments(args) {
-      const input = normalizeOutputFormatAlias(normalizeArgs(args));
-      normalizeWorkdirAliases(input);
-      assignAlias(input, "source", ["mergeSource", "merge_source"]);
-      for (const key of ["cwd", "workingDirectory", "working_directory", "mergeSource", "merge_source"]) delete input[key];
-      return input;
-    },
-  },
   currentBranch: {
     prepareArguments(args) {
       const input = normalizeOutputFormatAlias(normalizeArgs(args));

@@ -38,14 +38,16 @@ Argument descriptions in the loaded tool schema are the source for exact call pa
 | `plastic_add` | [Add](2026-10-06-workspace-operations.md#add) |
 | `plastic_update` | [Update](2026-10-06-workspace-operations.md#update) |
 | `plastic_undo` | [Undo](2026-10-06-workspace-operations.md#undo) |
+| `plastic_changesetEditComment` | [Comment replacement](2026-10-23-marker-merges-and-comments.md#changeset-comments) |
 | `plastic_checkin` | [Checkin](2026-10-06-workspace-operations.md#checkin) |
 | `plastic_branchCreate` | [Branch creation](2026-10-06-workspace-operations.md#branchcreate) |
 | `plastic_branchDelete` | [Branch deletion](2026-10-06-workspace-operations.md#branchdelete) |
 | `plastic_switchBranch` | [Switching](2026-10-06-workspace-operations.md#switchbranch) |
 | `plastic_resolveDeleteChangeConflict` | [Delete/change removal](2026-10-06-workspace-operations.md#resolvedeletechangeconflict) |
-| `plastic_merge` | [Workspace merge](2026-10-06-merging.md#merge-and-finalizemerge) |
-| `plastic_finalizeMerge` | [Finalization](2026-10-06-merging.md#merge-and-finalizemerge) |
+| `plastic_merge` | [Workspace merge](2026-10-06-merging.md#merge) |
 | `plastic_mergeBranches` | [Server merge](2026-10-06-merging.md#mergebranches) |
+| `plastic_mergeListConflictMarkers` | [Native marker inspection](2026-10-23-marker-merges-and-comments.md#resolve-and-inspect) |
+| `plastic_mergeMarkResolved` | [Intentional marker bypass](2026-10-23-marker-merges-and-comments.md#resolve-and-inspect) |
 | `plastic_mergeToBranch` | [Closeout](2026-10-06-merging.md#mergetobranch) |
 | `plastic_diff` | [Diff modes](2026-10-06-diffs-and-patches.md#diff-modes) |
 | `plastic_patch` | [Patch generation](2026-10-06-diffs-and-patches.md#patch-generation) |

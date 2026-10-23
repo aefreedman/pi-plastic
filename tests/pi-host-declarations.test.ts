@@ -70,7 +70,7 @@ try {
   await session.bindExtensions({});
   for (const name of names) assert.equal(resolve(session.getAllTools().find((t: any) => t.name === name).sourceInfo.path), resolve(extensionPath));
   const coreTools = session.getAllTools().filter((t: any) => t.name.startsWith("plastic_") && t.name !== "plastic_tool_search");
-  assert.equal(coreTools.length, 27);
+  assert.equal(coreTools.length, getRegisteredPlasticExportNames().length);
   const keywords = new Set<string>();
   const inspect = (value: unknown) => {
     if (!value || typeof value !== "object") return;

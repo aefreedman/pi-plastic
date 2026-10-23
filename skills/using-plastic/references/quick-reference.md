@@ -13,8 +13,7 @@ Note: command examples target current `cm` 11.x CLI syntax; legacy aliases may d
 | Add files | `plastic_add(paths=[...])` | `cm add <files>` | Stage for checkin |
 | Checkin | `plastic_checkin(message="...")` | `cm checkin -c="message"` | Commit changes (`includeAll` excludes private unless added/`includePrivate`) |
 | Update | `plastic_update()` | `cm update --dontmerge --noinput` | Pull latest without interactive merge |
-| Merge | `plastic_merge(source="<source-branch-spec>")` | `cm merge <source-branch-spec> --merge --nointeractiveresolution --mergetype=try` | Surfaces `FILE_CONFLICT`; run `plastic_status()` before checkin |
-| Finalize merge metadata | `plastic_finalizeMerge(source="<source-branch-spec>", strategy="destination")` | `cm merge <source-branch-spec> --merge --nointeractiveresolution --mergetype=forced --keepdestination` | Use after manual/reviewed resolution when checkin says merge is still in progress |
+| Merge | `plastic_merge(source="<source-branch-spec>")` | `cm merge <source-branch-spec> --merge --nointeractiveresolution --mergetype=try --conflict-markers` | Native text markers; inspect remaining conflict/scope state before checkin |
 | Shelve | `plastic_shelvesetCreate(comment="description")` | `cm shelveset create -c="description"` | Save work temporarily |
 | Patch for review | `plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<new-patch-file>")` | `cm patch <branch-spec> --clean --integration --output=<patch-file>` | Uses `toolPath` then `PI_PLASTIC_PATCH_EXECUTABLE`; Windows requires a verified patch-capable non-GUI executable. New output is staged and atomically published without overwrite; use repository-qualified `br:/...@<repository>@<server>` if selector resolution is unavailable |
 | Changed-file listing | `plastic_status(machineReadable=true)` | `cm status --all` | Lists changed, added, moved, deleted, and private items without GUI diff |
@@ -28,9 +27,8 @@ Note: command examples target current `cm` 11.x CLI syntax; legacy aliases may d
 Plastic merges into the branch currently loaded in the workspace; switching afterward does not move a source-branch changeset to the target.
 
 - Run `plastic_merge(...)`.
-- If `plastic_merge(...)` reports `FILE_CONFLICT`, inspect/resolve the listed paths and validate before finalizing.
-- Immediately run `plastic_status()`.
+- If `plastic_merge(...)` reports `FILE_CONFLICT`, inspect/resolve the listed paths and validate before re-inspecting markers and remaining conflicts.
+- Run `plastic_mergeListConflictMarkers()` and `plastic_status()`; edit/validate and re-inspect before checkin. Unknown or nonempty marker evidence blocks. Never force-finalize or reapply after uncertainty.
 - Pending merge links are expected until the merge result is checked in; merge-in-progress hints are blockers.
 - If validation/tests were run after the merge, run `plastic_status()` again before checkin so generated private artifacts do not muddy the result.
-- If `plastic_checkin(...)` says a merge is still in progress after files are resolved and validated, run `plastic_finalizeMerge(source=..., strategy="destination")`, then retry checkin.
 - Confirm the merge changeset and final workspace branch are the intended target. A source/target mismatch is failure, even when the command returned success or the workspace is clean.

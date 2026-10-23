@@ -1,3 +1,5 @@
+import { mergeListConflictMarkers, mergeMarkResolved } from "../operations/marker-lifecycle";
+import { changesetEditComment } from "../operations/changeset-comment";
 import { status } from "../operations/status";
 import { update, add, undo, resolveDeleteChangeConflict, workspaceList } from "../operations/workspace";
 import { checkin } from "../operations/checkin";
@@ -5,7 +7,7 @@ import { diff } from "../operations/diff";
 import { patch } from "../operations/patch";
 import { branchCreate, currentBranch, branchList, branchExists, branchDelete } from "../operations/branches";
 import { switchBranch } from "../operations/switch";
-import { merge, finalizeMerge } from "../operations/merge";
+import { merge } from "../operations/merge";
 import { mergeBranches } from "../operations/server-merge";
 import { mergeToBranch } from "../operations/closeout";
 import { shelvesetCreate, shelvesetApply, shelvesetDelete, shelvesetList } from "../operations/shelvesets";
@@ -20,6 +22,7 @@ type CoreTool = {
 
 export const PLASTIC_TOOL_REGISTRY = {
   status,
+  changesetEditComment,
   update,
   add,
   checkin,
@@ -32,7 +35,8 @@ export const PLASTIC_TOOL_REGISTRY = {
   merge,
   mergeBranches,
   mergeToBranch,
-  finalizeMerge,
+  mergeListConflictMarkers,
+  mergeMarkResolved,
   currentBranch,
   branchList,
   branchExists,

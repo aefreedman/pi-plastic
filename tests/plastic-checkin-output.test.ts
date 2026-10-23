@@ -1,3 +1,4 @@
+import { syntheticClearMarkerRead } from "./synthetic-marker-read";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
@@ -22,7 +23,7 @@ async function invoke(scenario: Scenario = {}, args: any = input, core = false, 
     let reads = 0, checkins = 0;
     if (scenario.preabort) controller.abort();
     const deps = { spawn: ((_: string, argv: string[], options: any) => {
-        calls.push(argv); assert.equal(options.cwd, cwd); assert.equal(options.shell, false);
+        const markerRead=syntheticClearMarkerRead(argv);if(markerRead)return markerRead;calls.push(argv); assert.equal(options.cwd, cwd); assert.equal(options.shell, false);
         if (argv[0] === "checkin" && scenario.launch === "sync") throw Error("PRIVATE_PATH");
         const c = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), kill(signal: string) { if (scenario.ignoreTerm && signal === "SIGTERM") return true; queueMicrotask(() => { c.stdout.end(); c.stderr.end(); c.emit("close", null, signal); }); return true; } }); children.push(c);
         if (scenario.decoded && argv[0] === "checkin") c.stdout.setEncoding("utf8");

@@ -78,11 +78,17 @@ try {
   assert.match(invalidRemovalView,/Removal: failed/);assert.match(invalidRemovalView,/bare\s+private\/controlled/);assert.doesNotMatch(invalidRemovalView,/Preview returned|Preview: would/);assert(colors.some(c=>c.color==="error"));
   const validRemoval=await executeRemovalOutput({paths:["./private"],preflight:true});assert.match(render("resolveDeleteChangeConflict",validRemoval),/Removal: preflight/);
   const {executeWorkspaceMergeOutput}=await import("../src/pi/workspace-merge-output");
-  for(const [name,action] of [["merge","merge"],["finalizeMerge","finalize-merge"]] as const){
+  for(const [name,action] of [["merge","merge"]] as const){
     colors.length=0;const invalid=await executeWorkspaceMergeOutput(action,{source:"--to=br:/other",preflight:true});const view=render(name,invalid,false,{args:{preflight:true},isError:true});assert.match(view,/Workspace merge: failed/);assert.doesNotMatch(view,/Preview returned|Preview: would/);assert(colors.some(c=>c.color==="error"));
     const valid=await executeWorkspaceMergeOutput(action,{source:"br:/main/source",preflight:true});assert.match(render(name,valid),/Workspace merge: preflight/);
   }
 
+  const {executeMarkerLifecycleOutput}=await import("../src/pi/marker-lifecycle-output");
+  const markerInvalid=await executeMarkerLifecycleOutput("merge-mark-resolved",{paths:["../escape"],preflight:true});
+  const markerView=render("mergeMarkResolved",markerInvalid,false,{args:{preflight:true},isError:true});
+  assert.match(markerView,/Merge markers: failed/);assert.match(markerView,/Intentional-marker bypass only/);assert.doesNotMatch(markerView,/Preview returned/);
+  const markerClear=structured("merge-list-conflict-markers",{inspection:{state:"clear",attempt:{state:"started"}},effect:"not-attempted"},{outcome:"clear"});
+  assert.match(render("mergeListConflictMarkers",markerClear),/Marker state: clear/);assert.match(render("mergeListConflictMarkers",markerClear),/never all-conflict readiness/);
   const {executeCloseoutOutput}=await import("../src/pi/closeout-output");colors.length=0;
   const invalidCloseout=await executeCloseoutOutput({source:"cs:16",preflight:true});
   const invalidCloseoutView=render("mergeToBranch",invalidCloseout,false,{args:{preflight:true},isError:true});
@@ -215,7 +221,7 @@ try {
   // Verify the registration boundary and a real command-only preflight without launching cm.
   const tools: ToolDefinition[] = [];
   registerPlastic({ registerTool: tool => tools.push(tool), on() {} } as ExtensionAPI);
-  assert.equal(tools.length, 28);
+  assert.equal(tools.length, 30);
   for (const tool of tools) assert(tool.renderCall && tool.renderResult, `${tool.name} needs both renderers`);
   const serverMerge = tools.find(tool => tool.name === "plastic_mergeBranches")!;
   const actual = await serverMerge.execute("preview", { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", message: "Review", preflight: true, format: "json" }, undefined, undefined, { cwd: "C:/Projects/MyGame" } as ExtensionContext);

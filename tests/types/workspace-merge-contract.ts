@@ -4,5 +4,5 @@ import type { WorkspaceMergeReceipt } from "../../src/domain/workspace-merge-con
 type Expect<T extends true> = T;
 type Same<A,B> = (<T>()=>T extends A?1:2) extends (<T>()=>T extends B?1:2)?true:false;
 type Native = Expect<Same<Static<typeof workspaceMergeOutputSchema>,WorkspaceMergeReceipt>>;
-function facts(d:WorkspaceMergeReceipt){const finalized:null=d.data.observedFinalizedMetadata;const preserved:null=d.data.observedPreservation;const readiness:"unknown"|"blocked"|"supported-no-unresolved-signals"=d.data.checkinReadiness; if(!d.ok){const error:string=d.error.message;return error;} return {finalized,preserved,readiness};}
+function facts(d:WorkspaceMergeReceipt){const markers:"unknown"|"clear"|"pending"|undefined=d.data.markers?.state;const readiness:"unknown"|"blocked"|"supported-no-unresolved-signals"=d.data.checkinReadiness; if(!d.ok){const error:string=d.error.message;return error;} return {markers,readiness};}
 void facts;

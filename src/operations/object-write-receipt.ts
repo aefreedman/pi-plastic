@@ -1,9 +1,10 @@
 import { captureWorkspaceMergeCommand, emptyWorkspaceMergeAttempt } from "../execution/workspace-merge-command";
 
-export const OBJECT_WRITE_ACTIONS = ["shelveset-create", "shelveset-apply", "code-review-create", "code-review-update"] as const;
+export const OBJECT_WRITE_ACTIONS = ["shelveset-create", "shelveset-apply", "code-review-create", "code-review-update", "changeset-edit-comment"] as const;
 export type ObjectWriteAction = typeof OBJECT_WRITE_ACTIONS[number];
 type Common = { workdir: string; preflight: boolean; output: "text"|"json" };
 export type ObjectWriteRequests = {
+    "changeset-edit-comment": Common & { changeset: string; comment: string|null; commentsFile: string|null };
     "shelveset-create": Common & { paths: string[]|null; comment: string|null; commentsFile: string|null; all: boolean; dependencies: boolean; summaryFormat: boolean };
     "shelveset-apply": Common & { shelveset: string; changePaths: string[]|null; preview: boolean; dontCheckout: boolean; comparisonMethod: string|null };
     "code-review-create": Common & { target: string; title: string; status: string|null; assignee: string|null; repository: string|null; format: string|null };
@@ -27,6 +28,7 @@ export type ObjectWriteReceipt<A extends ObjectWriteAction=ObjectWriteAction> = 
     data: ObjectWriteData & {requested:ObjectWriteRequests[A]|null};
 } & ({ok:true;outcome:"preflight"|"command-completed"}|{ok:false;outcome:"failed"|"uncertain";error:{code:"invalid_request"|"editor_configured"|"launch_failed"|"aborted"|"uncertain"|"producer_failed";message:string}});
 const keys = {
+    "changeset-edit-comment": ["changeset","comment","commentsFile"],
     "shelveset-create": ["paths","comment","commentsFile","all","dependencies","summaryFormat"],
     "shelveset-apply": ["shelveset","changePaths","preview","dontCheckout","comparisonMethod"],
     "code-review-create": ["target","title","status","assignee","repository","format"],
@@ -41,15 +43,18 @@ export function validWritePaths(v:unknown):v is string[] {return Array.isArray(v
 export function validObjectWriteRequest(a:ObjectWriteAction,r:ObjectWriteRequest):boolean {
     if(!validWriteText(r.workdir)||typeof r.preflight!=="boolean"||!["text","json"].includes(r.output)||Buffer.byteLength(JSON.stringify(r),"utf8")>32768)return false;
     const v=r as unknown as Record<string,unknown>;
+    if(a==="changeset-edit-comment")return validWriteOperand(v.changeset)&&/^cs:(?:[0-9]+|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})(?:@[^@]+(?:@[^@]+(?:@(cloud|unity))?)?)?$/i.test(v.changeset)&&(v.comment!==null)!==(v.commentsFile!==null)&&(v.comment===null||validWriteText(v.comment,true,true)&&!v.comment.trimStart().startsWith("-"))&&(v.commentsFile===null||validWriteText(v.commentsFile));
     if(a==="shelveset-create")return (v.paths===null||validWritePaths(v.paths))&&(v.comment===null||validWriteText(v.comment,true))&&(v.commentsFile===null||validWriteText(v.commentsFile))&&!(v.comment!==null&&v.commentsFile!==null)&&[v.all,v.dependencies,v.summaryFormat].every(x=>typeof x==="boolean");
     if(a==="shelveset-apply")return validWriteOperand(v.shelveset)&&(v.changePaths===null||validWritePaths(v.changePaths))&&[v.preview,v.dontCheckout].every(x=>typeof x==="boolean")&&(v.comparisonMethod===null||comparisons.includes(v.comparisonMethod as string));
     if(![v.status,v.assignee,v.repository].every(x=>x===null||validWriteText(x,false,true)))return false;
     return a==="code-review-create"?validWriteOperand(v.target)&&validWriteOperand(v.title)&&(v.format===null||validWriteText(v.format,true,true)):validWriteOperand(v.id);
 }
-export function objectWritePrefix(a:ObjectWriteAction) {return a==="shelveset-create"?["shelveset","create"]:a==="shelveset-apply"?["shelveset","apply"]:a==="code-review-create"?["codereview"]:["codereview","-e"];}
+export function objectWritePrefix(a:ObjectWriteAction) {return a==="changeset-edit-comment"?["changeset","editcomment"]:a==="shelveset-create"?["shelveset","create"]:a==="shelveset-apply"?["shelveset","apply"]:a==="code-review-create"?["codereview"]:["codereview","-e"];}
 export function objectWriteArgv(a:ObjectWriteAction,r:ObjectWriteRequest):string[] {
     const v=r as any,argv=objectWritePrefix(a);
-    if(a==="shelveset-create") {
+    if(a==="changeset-edit-comment") {
+        argv.push(v.changeset,v.comment!==null?v.comment:`-commentsfile=${v.commentsFile}`);
+    } else if(a==="shelveset-create") {
         argv.push(...(v.paths??[]));if(v.all)argv.push("--all");if(v.dependencies)argv.push("--dependencies");if(v.summaryFormat)argv.push("--summaryformat");if(v.comment!==null)argv.push(`-c=${v.comment}`);if(v.commentsFile!==null)argv.push(`-commentsfile=${v.commentsFile}`);
     } else if(a==="shelveset-apply") {
         argv.push(v.shelveset,...(v.changePaths??[]));if(v.preview)argv.push("--preview");if(v.dontCheckout)argv.push("--dontcheckout");if(v.comparisonMethod!==null)argv.push(`--comparisonmethod=${v.comparisonMethod}`);
@@ -101,5 +106,5 @@ export function presentObjectWriteReceipt(d:ObjectWriteReceipt):string {
     if(!d.ok)return `${d.action} ${d.outcome}: ${d.error.message} Effect: ${d.data.effect}.${identity}`;
     if(d.outcome==="preflight")return `${d.action} command-only preview (not executed): ${JSON.stringify(d.data.intendedArgv)}. No existence/conflict/state analysis.`;
     const opaque=d.data.commandOutput?.text?`\n${d.data.commandOutput.text}`:"";
-    return `${d.action} command completed.${identity} Applied items, requested review state, repository scope and rollback remain unverified.${opaque}`;
+    return `${d.action} command completed.${identity} Applied items, stored comment/review state, repository scope and rollback remain unverified.${opaque}`;
 }

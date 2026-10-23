@@ -5,16 +5,17 @@ import { runWithAbortSignal } from "../src/execution/context";
 import { executeObjectWriteOutput, validateObjectWriteOutput } from "../src/pi/object-write-output";
 import { OBJECT_WRITE_ACTIONS, objectWriteArgv, type ObjectWriteAction } from "../src/operations/object-write-receipt";
 import { shelvesetCreate, shelvesetApply } from "../src/operations/shelvesets";
+import { changesetEditComment } from "../src/operations/changeset-comment";
 import { codeReviewCreate, codeReviewUpdate } from "../src/operations/reviews";
 import { loadRegisteredTools } from "./pi-tool-harness";
 const cwd=process.cwd(),calls:string[][]=[];
-const bases={"shelveset-create":{comment:"Fixture",paths:["owned.txt"]},"shelveset-apply":{shelveset:"sh:7@Example Repository@example@unity"},"code-review-create":{target:"br:/main/fixture@Example Repository@example@unity",title:"Fixture"},"code-review-update":{id:"9007199254740993"}};
-const core={"shelveset-create":shelvesetCreate,"shelveset-apply":shelvesetApply,"code-review-create":codeReviewCreate,"code-review-update":codeReviewUpdate};
-const native={"shelveset-create":"plastic_shelvesetCreate","shelveset-apply":"plastic_shelvesetApply","code-review-create":"plastic_codeReviewCreate","code-review-update":"plastic_codeReviewUpdate"};
+const bases={"changeset-edit-comment":{changeset:"cs:7@Example Repository@example@unity",comment:"Is it ready?"},"shelveset-create":{comment:"Fixture",paths:["owned.txt"]},"shelveset-apply":{shelveset:"sh:7@Example Repository@example@unity"},"code-review-create":{target:"br:/main/fixture@Example Repository@example@unity",title:"Fixture"},"code-review-update":{id:"9007199254740993"}};
+const core={"changeset-edit-comment":changesetEditComment,"shelveset-create":shelvesetCreate,"shelveset-apply":shelvesetApply,"code-review-create":codeReviewCreate,"code-review-update":codeReviewUpdate};
+const native={"changeset-edit-comment":"plastic_changesetEditComment","shelveset-create":"plastic_shelvesetCreate","shelveset-apply":"plastic_shelvesetApply","code-review-create":"plastic_codeReviewCreate","code-review-update":"plastic_codeReviewUpdate"};
 type Reply={out?:Buffer|string;err?:Buffer|string;code?:number;start?:boolean;throw?:boolean;mutate?:()=>void};
 function deps(reply:Reply){return {spawn:((_:string,a:string[])=>{calls.push([...a]);if(reply.throw)throw Error("PRIVATE_LAUNCH_FAILURE");const c=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill:()=>false});queueMicrotask(()=>{if(reply.start!==false)c.emit("spawn");reply.mutate?.();c.stdout.end(reply.out??"");c.stderr.end(reply.err??"");c.emit("close",reply.code??0,null);});return c;})as any};}
 async function invoke(a:ObjectWriteAction,args:unknown,reply:Reply={}){calls.length=0;const d=await runWithAbortSignal(undefined,()=>executeObjectWriteOutput(a,args),deps(reply));assert(validateObjectWriteOutput(d.structuredContent),JSON.stringify(d));assert.deepEqual(d.details,{});return d;}
-const tools=await loadRegisteredTools();assert.equal([...tools.values()].filter(t=>t.outputSchema).length,27);
+const tools=await loadRegisteredTools();assert.equal([...tools.values()].filter(t=>t.outputSchema).length,29);
 for(const a of OBJECT_WRITE_ACTIONS){const request={...bases[a],workdir:cwd},out=a==="shelveset-create"?"sh:7@Example Repository@example@unity\r\n":a==="code-review-create"?"9007199254740993\r\n":"";
     for(const bad of [null,[],...(a==="shelveset-create"?[]:[{}]), {...request,preflight:"true"},{...request,output:"markdown"},{...request,extra:true},{...request,workdir:"x\n"},{...request,output:null}]){const d=await invoke(a,bad);assert(d.isError);assert.equal(calls.length,0);assert.equal(d.structuredContent.data.requested,null);}
     for(const output of ["text","json"]){const d=await invoke(a,{...request,preflight:true,output},{out});assert(!d.isError);assert.equal(d.structuredContent.outcome,"preflight");assert.equal(calls.length,0);assert.equal(d.structuredContent.data.commandOutput,null);assert.equal(d.structuredContent.data.effect,"not-attempted");}
@@ -40,4 +41,13 @@ for(const args of [{shelveset:"-"},{preview:"true"},{comparisonMethod:"force"},{
 for(const format of ["{0}","{1}","{id} -> {guid}","json","{0}\n{1}",""]){const d=await invoke("code-review-create",{...bases["code-review-create"],format,workdir:cwd},{out:"9007199254740993\r\n"});assert(!d.isError);assert.equal(d.structuredContent.data.commandOutput!.text,"9007199254740993\r\n");assert.equal(d.structuredContent.data.observedCreatedIdentity===null,!!format);assert.equal(calls[0].includes("--format="+format),!!format);}
 const options=await invoke("code-review-update",{id:"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",status:"Reviewed",assignee:"Fictional Reviewer",repository:"Example Repository@example@unity",workdir:cwd});assert(!options.isError);assert.deepEqual(calls[0],["codereview","-e","aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","--status=Reviewed","--assignee=Fictional Reviewer","--repository=Example Repository@example@unity"]);assert.equal(options.structuredContent.data.observedUpdatedState,null);
 for(const [name,args] of [["plastic_shelvesetCreate",{cwd,items:["one"],summary_format:true}],["plastic_shelvesetApply",{cwd,change_paths:["/one"],dont_checkout:true,comparison_method:"ignoreeol"}],["plastic_codeReviewUpdate",{cwd,review_id:"7",id:"9"}]]as const){const original=structuredClone(args),prepared=tools.get(name)!.prepareArguments!(args);assert.deepEqual(args,original);assert.equal(prepared.workdir,cwd);assert(!Object.hasOwn(prepared,"cwd"));if(name==="plastic_codeReviewUpdate")assert.equal(prepared.id,"9");}
-console.log("PASS: four typed object-write receipts, exact immutable requests/argv/defaults/aliases/formatting, scalar identity vs opaque progress/state, preflight vs CLI preview, editor barrier, uncertainty/bounds/retirement/core/native and no hidden reads/retries");
+for(const comment of ["Is it ready?", "", "Line one\nLine two", "café 日本 😀", "exists.txt"]){
+ const r=await invoke("changeset-edit-comment",{changeset:"cs:42@Example Repository@example@unity",comment});
+ assert(!r.isError);assert.deepEqual(calls,[["changeset","editcomment","cs:42@Example Repository@example@unity",comment]]);
+}
+const fileComment=await invoke("changeset-edit-comment",{changeset:"cs:42",commentsFile:"reviewed comment.txt",preflight:true});
+assert(!fileComment.isError);assert.deepEqual(fileComment.structuredContent.data.intendedArgv,["changeset","editcomment","cs:42","-commentsfile=reviewed comment.txt"]);assert.equal(calls.length,0);
+for(const input of [{changeset:"cs:42"},{changeset:"cs:42",comment:"x",commentsFile:"x"},{changeset:"cs:42",comment:null},{changeset:"--all",comment:"x"},{changeset:"42",comment:"x"},{changeset:"cs:42",comment:"--help"},{changeset:"cs:42",comment:"bad\u0000text"}]){
+ const r=await invoke("changeset-edit-comment",input);assert(r.isError);assert.equal(calls.length,0);
+}
+console.log("PASS: five typed object-write receipts, exact immutable requests/argv/defaults/aliases/formatting, scalar identity vs opaque progress/state, preflight vs CLI preview, editor barrier, uncertainty/bounds/retirement/core/native and no hidden reads/retries");

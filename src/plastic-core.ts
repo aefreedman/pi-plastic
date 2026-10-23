@@ -9,6 +9,9 @@ export { switchBranch, __plasticSwitchInternals } from "./operations/switch";
 export { getPatchBackendCapabilityWarning, __plasticPatchInternals, patch } from "./operations/patch";
 export { __plasticDiffInternals, diff } from "./operations/diff";
 export { __plasticProcessInternals } from "./execution/test-seams";
-export { merge, finalizeMerge } from "./operations/merge";
+export { changesetEditComment } from "./operations/changeset-comment";
+export { merge } from "./operations/merge";
 export { mergeBranches } from "./operations/server-merge";
 export { mergeToBranch } from "./operations/closeout";
+
+export { mergeListConflictMarkers, mergeMarkResolved } from "./operations/marker-lifecycle";

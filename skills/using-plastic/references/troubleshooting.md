@@ -93,12 +93,10 @@ plastic_resolveDeleteChangeConflict(paths=["<workspace-path>"], keepOnDisk=true)
   - `plastic_status()` still shows pending merge metadata.
 - Treat `plastic_status()` merge-state hints as the source of truth. Pending merge links are expected until checkin; explicit merge-in-progress hints are blockers.
 - Recovery flow:
-  1. Run `plastic_status()` and inspect merge-state details plus any `FILE_CONFLICT` paths reported by `plastic_merge(...)`.
-  2. Resolve/review the listed files manually and run compile/tests as appropriate.
-  3. Run `plastic_finalizeMerge(source="<source-branch-spec>", strategy="destination")` to finalize Plastic merge metadata while preserving the reviewed destination/manual result. Use `strategy="source"` only when accepting source is intentional.
-  4. Run `plastic_status()` again.
-  5. Retry `plastic_checkin(...)` after merge-in-progress hints are gone.
-- If you are unsure whether the reviewed workspace result will be preserved, create a shelveset before finalizing.
+  1. Run `plastic_mergeListConflictMarkers()` and inspect status/source links and remaining conflicts.
+  2. Reconcile files, remove real markers and validate. Binary/symlink/recursive/directory/delete-change conflicts need explicit decisions.
+  3. Re-inspect markers AND remaining pending/conflict/scope/branch state before any checkin. An empty list is not all-conflict readiness.
+  4. Stop on unknown evidence; no automatic retry, reapply or forced-finalization. Use `plastic_mergeMarkResolved` only for intentional text with exact files and explicit acknowledgement, never to silence real conflicts.
 
 ## Invalid cm diff --summary Usage
 

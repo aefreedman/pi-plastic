@@ -1,3 +1,4 @@
+import { syntheticClearMarkerRead } from "./synthetic-marker-read";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
@@ -51,7 +52,7 @@ for (const [applyLabel, pendingLabel, fullLabel, checkinLabel, sourceLeaf] of [
         for (const mode of ["success", "foreign-repository", "unknown-tail", "warning"]) {
             const calls: string[][] = []; let checked = false;
             const deps = { spawn: ((_: string, args: string[]) => {
-                calls.push([...args]); const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), kill() { return false; } });
+                const markerRead=syntheticClearMarkerRead(args);if(markerRead)return markerRead;calls.push([...args]); const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), kill() { return false; } });
                 queueMicrotask(() => {
                     child.emit("spawn"); let out = checked ? machine.split("\r\n")[0] + "\r\n" : machine, err = "";
                     if (args[0] === "status" && !args.includes("--machinereadable")) out = full;
@@ -66,14 +67,14 @@ for (const [applyLabel, pendingLabel, fullLabel, checkinLabel, sourceLeaf] of [
                 }); return child;
             }) as any };
             const r = await runWithAbortSignal(undefined, () => executeCheckinOutput({ message: "Synthetic merged fixture", workdir: cwd, includeAll: true, applyChanged: true }), deps);
-            assert(validateCheckinOutput(r.structuredContent)); assert.equal(r.structuredContent.ok, mode === "success", mode);
+            assert(validateCheckinOutput(r.structuredContent)); assert.equal(r.structuredContent.ok, ["success", "truncated"].includes(mode), mode);
             assert.equal(calls.filter(c => c[0] === "checkin").length, 1);
             if (mode === "success") assert.deepEqual(r.structuredContent.data.itemEvents.map(e => e.operation), parseCheckinEvidence(native, separators).events.map(e => e.operation));
         }
         for (const mode of ["success", "warning", "pending-fail", "full-fail", "nonzero", "truncated", "extra", "missing", "wrong-source", "duplicate-link", "unresolved"]) {
             const calls: string[][] = [];
             const deps = { spawn: ((_: string, args: string[]) => {
-                calls.push([...args]); const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), kill() { return false; } });
+                const markerRead=syntheticClearMarkerRead(args);if(markerRead)return markerRead;calls.push([...args]); const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), kill() { return false; } });
                 queueMicrotask(() => {
                     child.emit("spawn"); let out = "", err = "", code = 0;
                     if (args[0] === "merge") {
@@ -81,6 +82,7 @@ for (const [applyLabel, pendingLabel, fullLabel, checkinLabel, sourceLeaf] of [
                         for (const [key, old] of [["--startlineseparator", "__EV_S__"], ["--endlineseparator", "__EV_E__"], ["--fieldseparator", "__EV_F__"]]) out = out.replaceAll(old, args.find(a => a.startsWith(key + "="))!.slice(key.length + 1));
                         if (mode === "warning") err = "Synthetic unknown warning";
                         if (mode === "nonzero") code = 1;
+                        // Complete transport with unfamiliar apply text is NOT a truncated capture.
                         if (mode === "truncated") out = out.slice(0, -12);
                     } else if (args.includes("--machinereadable")) {
                         out = mode === "unresolved" ? get("54-unresolved-machine") : machine; if (mode === "pending-fail") code = 1;
@@ -91,9 +93,9 @@ for (const [applyLabel, pendingLabel, fullLabel, checkinLabel, sourceLeaf] of [
                 }); return child;
             }) as any };
             const r = await runWithAbortSignal(undefined, () => executeWorkspaceMergeOutput("merge", { source, workdir: cwd }), deps);
-            assert(validateWorkspaceMergeOutput(r.structuredContent), mode); assert.equal(r.structuredContent.ok, mode === "success", mode);
+            assert(validateWorkspaceMergeOutput(r.structuredContent), mode); assert.equal(r.structuredContent.ok, ["success", "truncated"].includes(mode), mode);
             assert.equal(calls.filter(c => c[0] === "merge").length, 1); assert(!calls.some(c => c[0] === "checkin"));
-            if (mode !== "success") { assert.equal(r.structuredContent.data.effect, "uncertain"); assert.equal(r.structuredContent.data.checkinReadiness, "unknown"); }
+            if (!["success", "truncated"].includes(mode)) { assert.equal(r.structuredContent.data.effect, "uncertain"); assert.equal(r.structuredContent.data.checkinReadiness, "unknown"); }
             else {
                 for (const mutate of [(d: any) => d.data.pendingReadMode = "short", (d: any) => d.data.fileConflictCount = 129, (d: any) => d.data.shortStatus.admission = "unsupported", (d: any) => d.data.checkinReadiness = "blocked"]) {
                     const forged = structuredClone(r.structuredContent); mutate(forged); assert(!validateWorkspaceMergeOutput(forged));

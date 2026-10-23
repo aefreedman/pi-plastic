@@ -1,3 +1,4 @@
+import { markerGateSchema, validateMarkerGate } from "./marker-gate-output";
 import { Type, type TProperties } from "typebox";
 import { Check } from "typebox/value";
 import { assembleCheckinReceipt, presentCheckinReceipt, checkinSafeValue, parseCheckinChangeset, type CheckinReceipt } from "../operations/checkin-receipt";
@@ -13,7 +14,7 @@ const capture = object({ stdoutBytes: uint(), stderrBytes: uint(), stdoutRetaine
 const step = object({ name: enumOf(["pending-before", "initial-checkin", "private-add", "private-retry", "pending-recovery", "fallback-checkin", "pending-after", "merge-diagnostic", "merge-readiness"]), operation: enumOf(["status", "checkin", "add"]), attempt, capture, effect: enumOf(["not-attempted", "uncertain", "command-completed", "changeset-created", "read-observed"]), evidence: enumOf(["unadmitted", "admitted"]), records: uint(501), summary: nullable(summary), changeset: nullable(cs) });
 const paths = Type.Array(str(), { maxItems: 100 });
 const reasons = Type.Array(object({ path: str(), reason: str(256) }), { maxItems: 100 });
-const data = { sourceAdmission: Type.Literal("windows-cm11.0.16.10371-observed"), requestedPaths: paths, includedPaths: paths, fallbackPaths: paths, excludedPaths: reasons, privateAddPaths: paths, blockedPrivatePaths: reasons, itemEvents: Type.Array(Type.Union([object({ operation: enumOf(["CO", "AD", "DE", "CP", "RP"]), path: str() }), object({ operation: Type.Literal("MV"), sourcePath: str(), path: str() })]), { maxItems: 100 }), observedChangesets: Type.Array(cs, { maxItems: 100 }), command: nullable(Type.Array(str(8192), { maxItems: 120 })), steps: Type.Array(step, { maxItems: 8 }), autoEnabledApplyChanged: Type.Boolean(), usedFallbackRetry: Type.Boolean(), usedPrivateAutoAddRecovery: Type.Boolean(), pendingBefore: nullable(summary), pendingAfter: nullable(summary), wouldRun: Type.Boolean(), omittedReferences: uint(10000), scopeExhaustion: Type.Literal("unverified"), branchHead: Type.Literal("unverified"), serverAliasEquivalence: Type.Literal("unverified"), xlinkEffects: Type.Literal("unverified"), mergeLinkIdentity: Type.Literal("unverified") };
+const data = { markers: Type.Union([markerGateSchema, Type.Null()]), sourceAdmission: Type.Literal("windows-cm11.0.16.10371-observed"), requestedPaths: paths, includedPaths: paths, fallbackPaths: paths, excludedPaths: reasons, privateAddPaths: paths, blockedPrivatePaths: reasons, itemEvents: Type.Array(Type.Union([object({ operation: enumOf(["CO", "AD", "DE", "CP", "RP"]), path: str() }), object({ operation: Type.Literal("MV"), sourcePath: str(), path: str() })]), { maxItems: 100 }), observedChangesets: Type.Array(cs, { maxItems: 100 }), command: nullable(Type.Array(str(8192), { maxItems: 120 })), steps: Type.Array(step, { maxItems: 8 }), autoEnabledApplyChanged: Type.Boolean(), usedFallbackRetry: Type.Boolean(), usedPrivateAutoAddRecovery: Type.Boolean(), pendingBefore: nullable(summary), pendingAfter: nullable(summary), wouldRun: Type.Boolean(), omittedReferences: uint(10000), scopeExhaustion: Type.Literal("unverified"), branchHead: Type.Literal("unverified"), serverAliasEquivalence: Type.Literal("unverified"), xlinkEffects: Type.Literal("unverified"), mergeLinkIdentity: Type.Literal("unverified") };
 const header = { schemaVersion: Type.Literal(1), action: Type.Literal("checkin"), provenance: object({ source: Type.Literal("plastic"), producer: Type.Literal("@aefree/pi-plastic"), contentTrust: Type.Literal("external") }), completeness: object({ capture: enumOf(["complete", "incomplete", "unknown"]), projection: Type.Boolean() }) };
 const error = object({ code: str(64), stage: enumOf(["input", "pending", "checkin", "producer"]), message: str(512) });
 export const checkinOutputSchema = Type.Unsafe<CheckinReceipt>(Type.Union([
@@ -24,6 +25,8 @@ export const checkinOutputSchema = Type.Unsafe<CheckinReceipt>(Type.Union([
 export function validateCheckinOutput(value: unknown): value is CheckinReceipt {
     if (!Check(checkinOutputSchema, value) || Buffer.byteLength(JSON.stringify(value), "utf8") > 131072) return false;
     const d = (value as CheckinReceipt).data, dto = value as CheckinReceipt;
+    if (d.markers !== null && !validateMarkerGate(d.markers)) return false;
+    if ((dto.ok || d.steps.some(s => s.operation !== "status")) && d.markers?.state !== "clear") return false;
     const lists = [d.requestedPaths, d.includedPaths, d.fallbackPaths, d.excludedPaths, d.privateAddPaths, d.blockedPrivatePaths, d.itemEvents, d.observedChangesets, d.command ?? []];
     if (lists.reduce((n, a) => n + a.length, 0) > 100 || dto.completeness.projection !== (d.omittedReferences === 0)) return false;
     if (![...d.requestedPaths, ...d.includedPaths, ...d.fallbackPaths, ...d.privateAddPaths, ...d.excludedPaths.map(p => p.path), ...d.blockedPrivatePaths.map(p => p.path)].every(checkinSafeValue)) return false;
@@ -58,7 +61,7 @@ export function validateCheckinOutput(value: unknown): value is CheckinReceipt {
     if ((dto.outcome === "failed" || dto.outcome === "unsupported") && mutations.length) return false;
     if (d.usedFallbackRetry !== d.steps.some(s => s.name === "fallback-checkin")) return false;
     if (d.usedPrivateAutoAddRecovery !== d.steps.some(s => s.name === "private-add" && s.effect === "command-completed")) return false;
-    if (dto.completeness.capture !== (d.steps.length ? d.steps.every(s => s.capture.complete) ? "complete" : "incomplete" : "unknown")) return false;
+    if (dto.completeness.capture !== (d.steps.length ? d.steps.every(s => s.capture.complete) && (!d.markers || d.markers.capture?.complete === true) ? "complete" : "incomplete" : "unknown")) return false;
     if (d.pendingBefore && !same(d.pendingBefore, d.steps.find(s => s.name === "pending-before")?.summary)) return false;
     if (d.pendingAfter && !d.steps.some(s => ["pending-recovery", "pending-after"].includes(s.name) && same(s.summary, d.pendingAfter))) return false;
     return true;

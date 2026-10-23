@@ -6,7 +6,7 @@ Use it to inspect a workspace, review changes without opening a GUI, and perform
 
 ## What you get
 
-- **27 core tools** with producer-owned structured results, plus an on-demand capability loader.
+- **29 core tools** with producer-owned structured results, plus an on-demand capability loader.
 - **Text-only diffs and generated review patches**, with explicit scope and bounded output.
 - **Agent-driven server conflict resolution:** inspect conflicts, validate merged files, and submit per-file JSON decisions without a merge UI.
 - **Truthful mutation receipts:** command completion, observed identities, partial effects, and uncertainty stay separate.

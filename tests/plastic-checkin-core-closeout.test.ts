@@ -1,3 +1,4 @@
+import { syntheticClearMarkerRead } from "./synthetic-marker-read";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
@@ -6,16 +7,16 @@ import { loadRegisteredTools } from "./pi-tool-harness";
 const cwd="C:\\Example\\workspace",us="\x1f";
 const header=["STATUS","123","Example Repository","example@unity"].join(us)+"\r\n";
 const row=["CH",cwd+"\\fixture.txt","False","125","NO_MERGES"].join(us)+"\r\n";
-let branch="/main/source",pending=true,mode="permission",reads=0;
+let branch="/main/source",pending=true,mode="permission",reads=0, mergePendingRead=false;
 const calls:string[][]=[];
 const deps={spawn:((_:string,argv:string[])=>{
-  calls.push(argv);const child=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill(){return false;}});
+  const markerRead=syntheticClearMarkerRead(argv);if(markerRead)return markerRead;calls.push(argv);const child=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill(){return false;}});
   queueMicrotask(()=>{child.emit("spawn");let out="",err="",code=0;
     if(argv[0]==="status") {
-      if(argv.includes("--machinereadable")) {reads++;out=mode==="unsupported"?"UNKNOWN":header+(pending?row:"");if(mode==="completed-post-failed"&&reads>1){err="Synthetic post-read failure";code=1;}}
+      if(argv.includes("--machinereadable")) {reads++;out=mode==="unsupported"?"UNKNOWN":header+(pending&&!mergePendingRead?row:"");mergePendingRead=false;if(mode==="completed-post-failed"&&reads>1){err="Synthetic post-read failure";code=1;}}
       else out=argv.includes("--short")?"":`${branch}@Example Repository@example@unity (cs:123 - head)\r\n`;
     } else if(argv[0]==="switch") {branch="/main/target";}
-    else if(argv[0]==="merge") {pending=true;const sep=(k:string)=>argv.find(a=>a.startsWith(k+"="))!.slice(k.length+1);out=sep("--startlineseparator")+["STATUS","ALREADY_CONNECTED","No merges detected"].join(sep("--fieldseparator"))+sep("--endlineseparator")+"\r\n";}
+    else if(argv[0]==="merge") {pending=true;mergePendingRead=true;const sep=(k:string)=>argv.find(a=>a.startsWith(k+"="))!.slice(k.length+1);out=sep("--startlineseparator")+["STATUS","ALREADY_CONNECTED","No merges detected"].join(sep("--fieldseparator"))+sep("--endlineseparator")+"\r\n";}
     else if(argv[0]==="checkin") {
       const sep=(k:string)=>argv.find(a=>a.startsWith(k+"="))!.slice(k.length+1);
       const frame=(op:string,values:string[]=[])=>sep("--startlineseparator")+[op,...values].join(sep("--fieldseparator"))+sep("--endlineseparator")+"\r\n";

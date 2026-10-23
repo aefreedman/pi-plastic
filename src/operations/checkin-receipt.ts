@@ -1,3 +1,5 @@
+import { inspectConflictMarkers } from "./marker-lifecycle";
+import { compactMarkerGate } from "../domain/marker-gate";
 import { win32 } from "node:path";
 import { admitMergedStandardStatus, correlateMergedCheckin } from "../domain/merged-workspace";
 import { parseSwitchLoadedBranch } from "../domain/switch-contract";
@@ -48,7 +50,7 @@ function validateRequest(input: unknown): asserts input is CheckinRequest {
     if (values.reduce((n, s) => n + s.length, 0) > 16384 || Buffer.byteLength(JSON.stringify(values), "utf8") > 32768) throw Error("Checkin input exceeds aggregate bound.");
 }
 export async function assembleCheckinReceipt(input: unknown): Promise<CheckinReceipt> {
-    const data: CheckinData = { sourceAdmission: "windows-cm11.0.16.10371-observed", requestedPaths: [], includedPaths: [], fallbackPaths: [], excludedPaths: [], privateAddPaths: [], blockedPrivatePaths: [], itemEvents: [], observedChangesets: [], command: null, steps: [], autoEnabledApplyChanged: false, usedFallbackRetry: false, usedPrivateAutoAddRecovery: false, pendingBefore: null, pendingAfter: null, wouldRun: false, omittedReferences: 0, scopeExhaustion: "unverified", branchHead: "unverified", serverAliasEquivalence: "unverified", xlinkEffects: "unverified", mergeLinkIdentity: "unverified" };
+    const data: CheckinData = { markers: null, sourceAdmission: "windows-cm11.0.16.10371-observed", requestedPaths: [], includedPaths: [], fallbackPaths: [], excludedPaths: [], privateAddPaths: [], blockedPrivatePaths: [], itemEvents: [], observedChangesets: [], command: null, steps: [], autoEnabledApplyChanged: false, usedFallbackRetry: false, usedPrivateAutoAddRecovery: false, pendingBefore: null, pendingAfter: null, wouldRun: false, omittedReferences: 0, scopeExhaustion: "unverified", branchHead: "unverified", serverAliasEquivalence: "unverified", xlinkEffects: "unverified", mergeLinkIdentity: "unverified" };
     let created: CheckinReceipt["data"]["createdChangeset"] = null;
     const finish = (outcome: CheckinReceipt["outcome"], code = "uncertain", stage: "input" | "pending" | "checkin" | "producer" = "checkin", message = "Checkin evidence is uncertain; inspect workspace/repository state before deciding whether to retry."): CheckinReceipt => {
         const effects = data.steps.filter(s => s.operation !== "status").map(s => s.effect);
@@ -59,7 +61,7 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         data.requestedPaths = project(data.requestedPaths); data.includedPaths = project(data.includedPaths); data.fallbackPaths = project(data.fallbackPaths); data.excludedPaths = project(data.excludedPaths); data.privateAddPaths = project(data.privateAddPaths); data.blockedPrivatePaths = project(data.blockedPrivatePaths); data.itemEvents = project(data.itemEvents); data.observedChangesets = project(data.observedChangesets);
         if (data.command) { if (data.command.length > remaining) { data.omittedReferences += data.command.length; data.command = null; } else remaining -= data.command.length; }
         const ok = outcome === "preflight" || outcome === "completed";
-        const dto = { schemaVersion: 1, action: "checkin", provenance: { source: "plastic", producer: "@aefree/pi-plastic", contentTrust: "external" }, ok, outcome, completeness: { capture: data.steps.length ? data.steps.every(s => s.capture.complete) ? "complete" : "incomplete" : "unknown", projection: data.omittedReferences === 0 }, data: { ...data, effect, createdChangeset: created }, ...(!ok ? { error: { code, stage, message } } : {}) } as CheckinReceipt;
+        const dto = { schemaVersion: 1, action: "checkin", provenance: { source: "plastic", producer: "@aefree/pi-plastic", contentTrust: "external" }, ok, outcome, completeness: { capture: data.steps.length ? data.steps.every(s => s.capture.complete) && (!data.markers || data.markers.capture?.complete === true) ? "complete" : "incomplete" : "unknown", projection: data.omittedReferences === 0 }, data: { ...data, effect, createdChangeset: created }, ...(!ok ? { error: { code, stage, message } } : {}) } as CheckinReceipt;
         if (Buffer.byteLength(JSON.stringify(dto), "utf8") > 131072) {
             const d = dto.data;
             for (const key of ["requestedPaths", "includedPaths", "fallbackPaths", "excludedPaths", "privateAddPaths", "blockedPrivatePaths", "itemEvents", "observedChangesets"] as const) { d.omittedReferences += d[key].length; d[key] = [] as any; }
@@ -97,6 +99,8 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         const before = await read("pending-before");
         if (!before) return finish("unsupported", "pending_source_unadmitted", "pending", "Pending selection could not be admitted; no mutation was dispatched.");
         data.pendingBefore = summary(before.items, cwd);
+        data.markers = compactMarkerGate(await inspectConflictMarkers(cwd));
+        if (data.markers.state !== "clear") return finish("unsupported", "marker_readiness_unknown", "pending", "Native marker listing is unknown or pending; edit/validate and re-inspect. No mutation or automatic retry.");
         const merged = before.merged;
         let loaded: ReturnType<typeof parseSwitchLoadedBranch> = null;
         // CO/-1/NO_MERGES also occurs during an unresolved merge. Read the
@@ -154,7 +158,7 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         if (!result.completed && !result.retryEligible) return finish("uncertain");
         if (!result.completed && /checkin operation cannot be started because there is a merge in progress|finish it before checkin|in progress merge/i.test(result.message)) {
             await record("merge-diagnostic", ["status"]);
-            return finish("uncertain", "merge_in_progress", "checkin", "Checkin blocked by a merge in progress. Resolve files and use plastic_finalizeMerge(source=<original source>, strategy=destination) only when that conflict policy is intentional, then inspect before retrying.");
+            return finish("uncertain", "merge_in_progress", "checkin", "Checkin blocked by a merge in progress. List native markers, edit/validate, then re-inspect markers and remaining conflict/scope state. Do not force-finalize or reapply.");
         }
         const scopedSummary = summary(scoped, cwd), noChanges = (m: string) => /no changes in the workspace/i.test(m);
         if (!result.completed && noChanges(result.message) && !input.includePrivate && scopedSummary.private > 0 && scopedSummary.tracked === 0 && (input.includeAll || data.requestedPaths.length)) {

@@ -1,3 +1,4 @@
+import { syntheticClearMarkerRead } from "./synthetic-marker-read";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
@@ -28,7 +29,7 @@ if (process.platform === "win32") {
             let branch = parseSwitchTarget(source)!.branch, pending = false, checked = false, machineReads = 0, fullReads = 0;
             const calls: string[][] = [];
             const deps = { spawn: ((_: string, argv: string[]) => {
-                calls.push([...argv]);
+                const markerRead=syntheticClearMarkerRead(argv);if(markerRead)return markerRead;calls.push([...argv]);
                 const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), kill() { return false; } });
                 queueMicrotask(() => {
                     child.emit("spawn"); let out = "", err = "", code = 0;

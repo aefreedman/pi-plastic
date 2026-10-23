@@ -1,3 +1,4 @@
+import { syntheticClearMarkerRead } from "./synthetic-marker-read";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
@@ -14,7 +15,7 @@ const request = { message: "Fixture", preflight: true, format: "json" as const, 
 const branchRequest = { branch: "/main/fixture", workdir: cwd };
 const calls: string[][] = [];
 const deps = { spawn: ((_: string, argv: string[]) => {
-  calls.push(argv);
+  const markerRead=syntheticClearMarkerRead(argv);if(markerRead)return markerRead;calls.push(argv);
   const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), kill() { return true; } });
   queueMicrotask(() => {
     child.emit("spawn");
@@ -40,8 +41,8 @@ checkin.execute = async () => { throw Error("Core presentation must not execute"
 branchCreate.execute = async () => { throw Error("Core presentation must not execute"); };
 try {
   const harness = new PiToolHarness({activeTools:[]}); await harness.load();
-  assert.equal(harness.registry.size,28);
-  assert.equal([...harness.registry.values()].filter(t => t.outputSchema).length,27);
+  assert.equal(harness.registry.size,30);
+  assert.equal([...harness.registry.values()].filter(t => t.outputSchema).length,29);
   const registeredCheckin = await runWithAbortSignal(undefined, () => harness.registry.get("plastic_checkin")!.execute("fixture",request),deps);
   const registeredBranch = await runWithAbortSignal(undefined, () => harness.registry.get("plastic_branchCreate")!.execute("fixture",branchRequest),deps);
   assert(validateCheckinOutput(registeredCheckin.structuredContent));

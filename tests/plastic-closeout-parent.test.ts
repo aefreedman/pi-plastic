@@ -1,3 +1,4 @@
+import { syntheticClearMarkerRead } from "./synthetic-marker-read";
 import assert from "node:assert/strict";
 import {EventEmitter} from "node:events";
 import {PassThrough} from "node:stream";
@@ -7,7 +8,7 @@ import {validateCloseoutOutput} from "../src/pi/closeout-output";
 import {loadRegisteredTools} from "./pi-tool-harness";
 const cwd="C:\\Example\\workspace",source="/main/parent/owned-source",parent="/main/parent",repo="Example Repository",server="example@unity";
 let mode="valid";const calls:string[][]=[];
-const deps={spawn:((_:string,args:string[])=>{calls.push([...args]);const p=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill(){return false;}});queueMicrotask(()=>{p.emit("spawn");let out:string|Buffer="",err="",exit=0;if(args[0]==="status")out=args.includes("--machinereadable")?`STATUS\x1f16\x1f${repo}\x1f${server}\r\n`:`${source}@${repo}@${server} (cs:16 - head)\r\n\r\n`;else if(args[0]==="find"){
+const deps={spawn:((_:string,args:string[])=>{const markerRead=syntheticClearMarkerRead(args);if(markerRead)return markerRead;calls.push([...args]);const p=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill(){return false;}});queueMicrotask(()=>{p.emit("spawn");let out:string|Buffer="",err="",exit=0;if(args[0]==="status")out=args.includes("--machinereadable")?`STATUS\x1f16\x1f${repo}\x1f${server}\r\n`:`${source}@${repo}@${server} (cs:16 - head)\r\n\r\n`;else if(args[0]==="find"){
  // Installed CM: filter name is leaf; format name is full hierarchy. Old full-path filter returns no rows.
  if(args[2].startsWith("where name = 'owned-source'"))out=source+"|"+parent+"\r\n";
  if(mode==="empty")out="";if(mode==="ambiguous")out=source+"|"+parent+"\r\n/main/other/owned-source|/main/other\r\n";if(mode==="wrong-source")out="/main/other/owned-source|/main/other\r\n";if(mode==="wrong-parent")out=source+"|/main/elsewhere\r\n";if(mode==="qualified-parent")out=source+"|"+parent+"@"+repo+"@"+server+"\r\n";if(mode==="root")out=source+"|\r\n";if(mode==="malformed")out=source+"|"+parent+"|extra\r\n";if(mode==="warning")err="Unknown warning";if(mode==="error"){exit=1;err="Owned synthetic unavailable query";}if(mode==="invalid")out=Buffer.from([255]);if(mode==="overflow")out=Buffer.alloc(65537);

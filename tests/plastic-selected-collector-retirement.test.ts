@@ -1,3 +1,4 @@
+import { syntheticClearMarkerRead } from "./synthetic-marker-read";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
@@ -96,7 +97,7 @@ if (process.platform === "win32") {
       abortKillDelayMs:3,
       setTimeout:((cb:()=>void,ms:number)=>setTimeout(cb,Math.min(ms,3))) as any,
       spawn:((_:string,argv:string[])=>{
-        calls.push(argv);const c=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill(){return false;}});
+        const markerRead=syntheticClearMarkerRead(argv);if(markerRead)return markerRead;calls.push(argv);const c=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill(){return false;}});
         queueMicrotask(()=>{c.emit("spawn");if(argv[0]==="status"){c.stdout.end("STATUS\x1f1\x1fExample Repository\x1fexample@unity\r\n");c.stderr.end();c.emit("close",0,null);}else if(argv[0]==="checkin") { const sep=(k:string)=>argv.find(a=>a.startsWith(k+"="))!.slice(k.length+1);c.stdout.write(sep("--startlineseparator")+"CI_START"+sep("--endlineseparator")+"\r\n"); } if (terminal && argv[0] !== "status") c.emit("close",0,null); });return c;
       }) as any,
     });

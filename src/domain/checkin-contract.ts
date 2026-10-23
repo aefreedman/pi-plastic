@@ -1,3 +1,4 @@
+import type { MarkerGate } from "./marker-gate";
 import { parseMergedPending } from "./merged-workspace";
 import { parseMachineReadablePendingItems, type PendingItem } from "./pending";
 import { parseCopiedPending } from "./copied-merge";
@@ -8,7 +9,8 @@ export type CheckinChangeset = { id: string; branch: string; repository: string;
 export type CheckinSummary = { totalPending: number; tracked: number; private: number; added: number; changed: number; moved: number; deleted: number; other: number };
 export type CheckinStep = { name: "pending-before" | "initial-checkin" | "private-add" | "private-retry" | "pending-recovery" | "fallback-checkin" | "pending-after" | "merge-diagnostic" | "merge-readiness"; operation: "status" | "checkin" | "add"; attempt: CheckinAttempt; capture: CheckinCapture; effect: "not-attempted" | "uncertain" | "command-completed" | "changeset-created" | "read-observed"; evidence: "unadmitted" | "admitted"; records: number; summary: CheckinSummary | null; changeset: CheckinChangeset | null };
 export type CheckinItemEvent = { operation: "CO" | "AD" | "DE" | "CP" | "RP"; path: string } | { operation: "MV"; sourcePath: string; path: string };
-export type CheckinData = { sourceAdmission: "windows-cm11.0.16.10371-observed"; requestedPaths: string[]; includedPaths: string[]; fallbackPaths: string[]; excludedPaths: Array<{ path: string; reason: string }>; privateAddPaths: string[]; blockedPrivatePaths: Array<{ path: string; reason: string }>; itemEvents: CheckinItemEvent[]; observedChangesets: CheckinChangeset[]; command: string[] | null; steps: CheckinStep[]; autoEnabledApplyChanged: boolean; usedFallbackRetry: boolean; usedPrivateAutoAddRecovery: boolean; pendingBefore: CheckinSummary | null; pendingAfter: CheckinSummary | null; wouldRun: boolean; omittedReferences: number; scopeExhaustion: "unverified"; branchHead: "unverified"; serverAliasEquivalence: "unverified"; xlinkEffects: "unverified"; mergeLinkIdentity: "unverified" };
+export type CheckinData = {
+    markers: MarkerGate | null; sourceAdmission: "windows-cm11.0.16.10371-observed"; requestedPaths: string[]; includedPaths: string[]; fallbackPaths: string[]; excludedPaths: Array<{ path: string; reason: string }>; privateAddPaths: string[]; blockedPrivatePaths: Array<{ path: string; reason: string }>; itemEvents: CheckinItemEvent[]; observedChangesets: CheckinChangeset[]; command: string[] | null; steps: CheckinStep[]; autoEnabledApplyChanged: boolean; usedFallbackRetry: boolean; usedPrivateAutoAddRecovery: boolean; pendingBefore: CheckinSummary | null; pendingAfter: CheckinSummary | null; wouldRun: boolean; omittedReferences: number; scopeExhaustion: "unverified"; branchHead: "unverified"; serverAliasEquivalence: "unverified"; xlinkEffects: "unverified"; mergeLinkIdentity: "unverified" };
 type Base = { schemaVersion: 1; action: "checkin"; provenance: { source: "plastic"; producer: "@aefree/pi-plastic"; contentTrust: "external" }; completeness: { capture: "complete" | "incomplete" | "unknown"; projection: boolean } };
 export type CheckinReceipt = Base & (
     { ok: true; outcome: "completed"; data: CheckinData & { effect: "changeset-created"; createdChangeset: CheckinChangeset } } |
@@ -49,12 +51,15 @@ export function parseCheckinEvidence(text: string, s: CheckinSeparators) {
 export function parseCheckinPending(text: string, cwd: string) {
     // statusCode CP retained; added kind is local checkin selection, not legacy migration.
     const candidate = parseMergedPending(text, cwd);
-    const merged = candidate?.rows.some(r => r.status !== "CP") ? candidate : null;
+    const copied = parseCopiedPending(text, cwd);
+    // Prefer the narrow copied-file profile when it represents the snapshot.
+    // All-copy directories/private exclusions still need merged scope/link/event
+    // correlation; do not discard that strict candidate merely for being CP-only.
+    const merged = candidate && (candidate.rows.some(r => r.status !== "CP") || !copied) ? candidate : null;
     if (merged) {
         const items = parseMachineReadablePendingItems(text, cwd).map(item => ({ ...item, kind: item.statusCode === "CP" ? "added" as const : item.kind }));
         return { admitted: items.length === merged.rows.length + merged.privateRows.length, records: merged.rows.length + merged.privateRows.length + 1, items, repository: merged.repository, server: merged.server, merged };
     }
-    const copied = parseCopiedPending(text, cwd);
     if (copied) {
         const items = parseMachineReadablePendingItems(text, cwd).map(item => ({ ...item, kind: "added" as const }));
         return { admitted: items.length === copied.paths.length, records: copied.paths.length + 1, items, repository: copied.repository, server: copied.server };
