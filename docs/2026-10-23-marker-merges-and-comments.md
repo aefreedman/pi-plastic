@@ -6,7 +6,7 @@
 
 These additions target Unity VCS **11.0.16.10512** (October 22, 2026). Installed `cm help merge` and `cm changeset editcomment --help` advertise these contracts. See [release notes](https://docs.unity.com/unity-version-control/release-notes/11) and [merge documentation](https://docs.unity.com/unity-version-control/uvcs-cli/merge).
 
-No older-client fallback, automatic retry, installation or policy substitution exists. Unsupported flags mean failure/uncertainty, not permission to run another merge. Package Pi validation dependencies are unchanged; this CLI baseline is not a new Pi validation claim.
+No older-client fallback, automatic retry, installation or policy substitution exists. Unsupported flags mean failure/uncertainty, not permission to run another merge. The CLI client version and Pi validation baseline are independent; the package manifest declares the Pi validation dependencies.
 
 ## Workspace conflict markers
 
