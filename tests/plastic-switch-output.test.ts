@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { Check } from "typebox/value";
@@ -9,9 +10,9 @@ import { runWithAbortSignal } from "../src/execution/context";
 import { parseSwitchPending, parseSwitchLoadedBranch } from "../src/domain/switch-contract";
 import { loadRegisteredTools } from "./pi-tool-harness";
 const behind: string = JSON.parse(readFileSync(new URL("./fixtures/plastic-behind-head-header.json", import.meta.url), "utf8")).stdout;
-const cwd="C:\\Example\\workspace",us="\x1f",repo="Example Repository",server="example@unity";
+const cwd=resolve("fixture-workspace"),us="\x1f",repo="Example Repository",server="example@unity";
 const header=(b="/main/source",r=repo,s=server)=>`${b}@${r}@${s} (cs:123 - head)\r\n`;
-const pending=(kind="")=>["STATUS","123",repo,server].join(us)+"\r\n"+(kind?kind.split(",").map((k,i)=>[k,cwd+`\\fixture-${i}.txt`,"False",k==="PR"||k==="AD"?"-1":"125","NO_MERGES"].join(us)+"\r\n").join(""):"");
+const pending=(kind="")=>["STATUS","123",repo,server].join(us)+"\r\n"+(kind?kind.split(",").map((k,i)=>[k,join(cwd,`fixture-${i}.txt`),"False",k==="PR"||k==="AD"?"-1":"125","NO_MERGES"].join(us)+"\r\n").join(""):"");
 type Slot={out?:string|Buffer;err?:string;code?:number;noSpawn?:boolean;stall?:boolean;throws?:boolean;streamError?:boolean};
 async function invoke(args:Record<string,unknown>,slots:Slot[],core=false,registered=false){
  const calls:string[][]=[],children:any[]=[];const controller=new AbortController();
@@ -90,7 +91,7 @@ const tools=await loadRegisteredTools();assert.deepEqual(tools.get("plastic_swit
  const normalChildren=direct.children;for(const c of normalChildren){for(const emitter of [c,c.stdout,c.stderr])for(const event of ["spawn","close","error","data","end"])assert.equal(emitter.listenerCount(event),0,"Normal completion releases owned listeners");}
  const limited=await invoke({branch:"/main/target"},[...clean(),{stall:true}]);for(const c of limited.children){assert(c.listenerCount("error")<=1);assert.equal(c.listenerCount("close"),0);assert.equal(c.stdout.listenerCount("data"),0);}
 }
-assert.equal(parseSwitchPending(pending()+Array.from({length:20000},(_,i)=>["PR",cwd+`\\${i}.txt`,"False","-1","NO_MERGES"].join(us)+"\n").join(""),cwd).admitted,false);
+assert.equal(parseSwitchPending(pending()+Array.from({length:20000},(_,i)=>["PR",join(cwd,`${i}.txt`),"False","-1","NO_MERGES"].join(us)+"\n").join(""),cwd).admitted,false);
 assert.equal(parseSwitchLoadedBranch(header()+header()),null);
 assert.deepEqual(parseSwitchLoadedBranch(behind),{branch:"/main/evidence",repository:repo,server,basis:"standard-status",scope:"loaded-workspace"});
 // Synthetic adversarial derivatives; revision tokens never pass through JS numbers.
