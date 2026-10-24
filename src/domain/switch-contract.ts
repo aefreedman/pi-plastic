@@ -1,3 +1,4 @@
+import { receiptAbsolutePath, receiptPathKey } from "./receipt-paths";
 import { parseMachineReadablePendingItems, summarizePendingItems } from "./pending";
 import type { SwitchAttempt, SwitchCapture } from "../execution/switch-command";
 export type { SwitchAttempt, SwitchCapture } from "../execution/switch-command";
@@ -8,7 +9,7 @@ export type SwitchStepName = "branch-before" | "pending-before" | "shelve" | "pe
 export type SwitchStep = { name: SwitchStepName; argv: string[]; attempt: SwitchAttempt; capture: SwitchCapture; evidence: "unadmitted" | "admitted" | "terminal-only" | "eligible-no-changes"; effect: "read-observed" | "not-attempted" | "command-completed" | "uncertain"; branch: SwitchBranchObservation | null; summary: SwitchSummary | null; records: number };
 export type SwitchStrategy = "unresolved" | "already-on-target-branch" | "silent-noinput" | "direct-switch-private-only" | "blocked-bring-tracked-pending" | "cancel-with-pending" | "shelve-then-switch-noinput";
 export type SwitchData = { requestedTarget: string | null; workdir: string | null; pendingPolicy: "shelve" | "bring" | "cancel"; defaultedPolicy: boolean; preflight: boolean; strategy: SwitchStrategy; wouldRun: boolean; plannedMutations: Array<"shelve" | "switch">; unattemptedMutations: Array<"shelve" | "switch">; steps: SwitchStep[]; branchBefore: SwitchBranchObservation | null; branchAfter: SwitchBranchObservation | null; pendingBefore: SwitchSummary | null; pendingRecovery: SwitchSummary | null; observedShelveset: null; usedNoChangesShelveRecovery: boolean; targetVerification: "unverified" | "name-only" | "exact-qualifier-spelling"; serverAliasEquivalence: "unverified"; filePreservation: "unverified"; xlinkEffects: "unverified"; effect: "not-attempted" | "command-completed" | "uncertain" };
-type Base = { schemaVersion: 1; action: "switch-branch"; provenance: { source: "plastic"; producer: "@aefree/pi-plastic"; contentTrust: "external" }; sourceAdmission: "windows-cm11.0.16.10371-observed"; completeness: { read: "complete" | "incomplete" | "unknown"; capture: "complete" | "incomplete" | "unknown"; projection: true }; data: SwitchData };
+type Base = { schemaVersion: 1; action: "switch-branch"; provenance: { source: "plastic"; producer: "@aefree/pi-plastic"; contentTrust: "external" }; sourceAdmission: "validated-cm-output"; completeness: { read: "complete" | "incomplete" | "unknown"; capture: "complete" | "incomplete" | "unknown"; projection: true }; data: SwitchData };
 export type SwitchReceipt = Base & ({ ok: true; outcome: "preflight" | "already-loaded" | "switched" } | { ok: false; outcome: "canceled" | "blocked" | "failed" | "uncertain" | "command-completed-unverified"; error: { code: "invalid_request" | "unsupported_source" | "observation_failed" | "policy_canceled" | "policy_blocked" | "mutation_failed" | "target_unverified" | "producer_failed"; stage: "input" | SwitchStepName | "policy" | "producer"; message: string } });
 export const safeSwitchValue = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 4096 && value === value.trim() && !/[\u0000-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(value);
 const identity = (value: string) => safeSwitchValue(value) && !/[?\uFFFD]/u.test(value);
@@ -34,7 +35,7 @@ export function compareSwitchTarget(observed: SwitchBranchObservation, requested
     return target.repository === observed.repository && target.server === observed.server ? "exact-qualifier-spelling" : "unverified";
 }
 const decimal = /^(0|[1-9][0-9]{0,19})$/;
-const absolute = (value: string) => identity(value) && /^(?:[A-Za-z]:[\\/]|\\\\)/.test(value);
+const absolute = (value: string) => identity(value) && receiptAbsolutePath(value);
 export const switchPendingArgv = ["status", "--machinereadable", "--includeRevId", "--fieldseparator=\x1f"];
 /** Selected strict pending source; legacy selector and checkin's 500-record contract stay untouched. */
 export function parseSwitchPending(text: string, cwd: string) {
@@ -56,6 +57,6 @@ export function parseSwitchPending(text: string, cwd: string) {
 /** Genuine empty shelve source: exit1, empty stdout and exact workspace-specific error, never a loose substring. */
 export function admittedSwitchNoChanges(stdout: string, stderr: string, cwd: string): boolean {
     const m = /^Error: There are no changes in the workspace ([^\r\n]+)\r?\n?$/u.exec(stderr);
-    const key = (s: string) => s.replace(/\\/g, "/").replace(/\/$/, "").toLowerCase();
+    const key = (s: string) => receiptPathKey(s).replace(/\/$/, "");
     return stdout === "" && !!m && safeSwitchValue(m[1]) && key(m[1]) === key(cwd);
 }

@@ -1,11 +1,11 @@
-import { win32 } from "node:path";
+import { receiptAbsolutePath, receiptPathKey, receiptPathWithin, receiptRelativePath } from "./receipt-paths";
 import { parseSwitchLoadedBranch, parseSwitchTarget, safeSwitchValue } from "./switch-contract";
 
-/** Observed Windows CM copied-add profile only. No generic pending/parser migration. */
+/** Bounded CM copied-add profile. Unknown output still fails closed. */
 export const copiedPendingArgv = ["status", "--machinereadable", "--includeRevId", "--fieldseparator=\x1f"];
 const positive = /^[1-9][0-9]{0,19}$/;
-const qualifiedPath = (p: string) => /^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+[\\/])/.test(p);
-export const copiedPathKey = (path: string) => win32.normalize(path).toLowerCase();
+const qualifiedPath = receiptAbsolutePath;
+export const copiedPathKey = receiptPathKey;
 export type CopiedPending = { changeset: string; repository: string; server: string; mergeChangeset: string; paths: string[] };
 export function parseCopiedPending(text: string, cwd: string): CopiedPending | null {
     const lines = text.split(/\r?\n/); if (lines.at(-1) === "") lines.pop();
@@ -16,8 +16,7 @@ export function parseCopiedPending(text: string, cwd: string): CopiedPending | n
     for (const line of lines.slice(1)) {
         const f = line.split("\x1f"), m = /^Merge from ([1-9][0-9]{0,19})$/.exec(f[4] ?? "");
         if (f.length !== 5 || f[0] !== "CP" || !safeSwitchValue(f[1]) || /[?\uFFFD]/u.test(f[1]) || !qualifiedPath(f[1]) || f[2] !== "False" || !positive.test(f[3]) || !m) return null;
-        const relative = win32.relative(cwd, f[1]);
-        if (!relative || relative === ".." || relative.startsWith("..\\") || win32.isAbsolute(relative) || paths.some(p => copiedPathKey(p) === copiedPathKey(f[1]))) return null;
+        if (!receiptPathWithin(cwd, f[1]) || paths.some(p => copiedPathKey(p) === copiedPathKey(f[1]))) return null;
         if (mergeChangeset && mergeChangeset !== m[1]) return null;
         mergeChangeset = m[1]; paths.push(f[1]);
     }
@@ -32,7 +31,7 @@ export function admitCopiedStandardStatus(text: string, pending: CopiedPending, 
     if (!branch || !requested || branch.repository !== pending.repository || branch.server !== pending.server || !lines[0].endsWith(`(cs:${pending.changeset} - head)`) || lines.length !== pending.paths.length + 5 || lines[1] !== "Pending merge links" || lines[3] !== "Added" || !/^    Status +Size +Last Modified +Path *$/.test(lines[4])) return false;
     const link = /^    Merge from cs:([1-9][0-9]{0,19}) at (.+)$/.exec(lines[2]), linked = link && parseSwitchTarget(link[2]);
     if (!link || link[1] !== pending.mergeChangeset || !linked || linked.branch !== requested.branch || linked.repository !== pending.repository || linked.server !== pending.server || requested.repository !== null && (requested.repository !== linked.repository || requested.server !== linked.server)) return false;
-    const remaining = new Set(pending.paths.map(p => win32.relative(cwd, p)));
+    const remaining = new Set(pending.paths.map(p => receiptRelativePath(cwd, p)));
     for (const row of lines.slice(5)) {
         const candidates = [...remaining].filter(path => new RegExp(`^    Copied \\(new\\) \\(Merge from ${pending.mergeChangeset}\\) {2,}[0-9]{1,20}(?:\\.[0-9]{1,8})? (?:bytes|KB|MB) {2,}[^\\r\\n\\x00-\\x1f\\x7f]{1,128}? {2,}${escape(path)} *$`).test(row));
         if (candidates.length !== 1) return false;

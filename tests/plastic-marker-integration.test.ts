@@ -106,7 +106,7 @@ const dir=await mkdtemp(join(tmpdir(),"pi-marker-integration-"));try{
   commands.push([...a]);const c=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill(){return false;}});
   queueMicrotask(()=>{c.emit("spawn");c.stdout.end(pendingOutput);c.stderr.end();c.emit("close",1,null);});return c;
  })as any});
- assert.equal(pending.isError,process.platform!=="win32");assert(Check(list.outputSchema,pending.structuredContent));assert.equal(pending.structuredContent.outcome,process.platform==="win32"?"pending":"uncertain");assert.equal(pending.structuredContent.data.commandCompleted,false);assert.deepEqual(commands,[["merge","--list-conflict-markers"]]);commands=[];
+ assert.equal(pending.isError,false);assert(Check(list.outputSchema,pending.structuredContent));assert.equal(pending.structuredContent.outcome,"pending");assert.equal(pending.structuredContent.data.commandCompleted,false);assert.deepEqual(commands,[["merge","--list-conflict-markers"]]);commands=[];
  const result=await runWithAbortSignal(undefined,()=>mark.execute("fixture",{paths:["intentional.txt"],acknowledgeIntentionalMarkers:true,preflight:true,workdir:dir}),{spawn:((_:string,a:string[])=>{commands.push(a);throw Error("No SCM command permitted");})as any});assert(!result.isError);assert.equal(result.structuredContent.outcome,"preflight");assert.equal(commands.length,0);assert.equal(result.structuredContent.data.checkinReadiness,"unknown");
 }finally{await rm(dir,{recursive:true,force:true});}
 console.log("PASS: captured pending versus unknown marker failures/partial non-text effects stop merge/checkin/closeout without retries; compact completeness; intentional bypass registration and removed API");

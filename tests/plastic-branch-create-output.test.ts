@@ -52,7 +52,7 @@ async function invoke(s: Scenario = {}, args: unknown = input, core = false, reg
     assert.doesNotMatch(JSON.stringify(r.structuredContent), /private native|private stream/);
     return { calls, result: r, dto: r.structuredContent };
 }
-if (process.platform === "win32") {
+{
 let r = await invoke(); assert(r.dto.ok, JSON.stringify(r.dto)); assert.equal(r.dto.outcome, "command-completed"); assert.equal(r.dto.data.effect, "not-proven"); assert.equal(r.dto.data.observedCreatedIdentity, null); assert.deepEqual(r.calls, [["branch", "create", input.branch, `-c=${input.comment}`]]);
 for (const output of ["", "Unknown creation text", "Created branch 9007199254740993", "Created /different@repo@server\nError: contradictory", "é-é-日本-😀"]) { r = await invoke({ output }); assert(r.dto.ok); assert.equal(r.dto.data.observedCreatedIdentity, null); }
 for (const s of [{ code: 1 }, { code: null }, { signal: "SIGTERM" }, { stderr: "private native failure" }, { output: Buffer.from([255]) }, { output: "x".repeat(65537) }, { stderr: "x".repeat(16385) }, { decoded: true }, { missingSpawn: true }, { lateError: true }, { streamError: true }, { abort: true }, { timeout: true }, { timeout: true, ignoreTerm: true }] as Scenario[]) { r = await invoke(s); assert.equal(r.dto.outcome, "uncertain"); assert.equal(r.dto.data.effect, "uncertain"); assert.equal(r.calls.length, 1); }
@@ -85,18 +85,6 @@ const success = (await invoke()).dto;
 for (const mutate of [(d: any) => d.data.effect = "branch-created", (d: any) => d.data.observedCreatedIdentity = input.branch, (d: any) => d.data.attempt.exitCode = null, (d: any) => d.data.capture.stderrBytes = 1, (d: any) => d.data.resolvedTarget = "/different", (d: any) => d.data.command.push("--other"), (d: any) => d.data.rawResult = "opaque", (d: any) => d.completeness.capture = "unknown", (d: any) => d.data.parentResolution.basis = "status", (d: any) => d.data.capture.complete = false]) { const damaged = structuredClone(success); mutate(damaged); assert(!validateBranchCreateOutput(damaged)); }
 await invoke({}, input, true);
 await assert.rejects(() => invoke({}, { branch: "/root" }, true), /Refusing to create top-level branch/);
-} else {
-    for (const args of [input, { branch: "child" }, { branch: "child", parent: "/main" }]) {
-        const r = await invoke({}, args);
-        assert.equal(r.dto.ok, false);
-        assert.equal(r.dto.outcome, "unsupported");
-        assert.equal(r.dto.error.code, "unsupported_source");
-        assert.equal(r.dto.data.effect, "not-attempted");
-        assert.equal(r.calls.length, 0, "unsupported platforms must not dispatch Plastic");
-    }
-    const core = await invoke({}, input, true);
-    assert.match(core.result as string, /admitted only on Windows/);
-    assert.equal(core.calls.length, 0);
 }
 assert.equal(parseBranchCreateParent("/main@rep@server (cs:9007199254740993 - head)\r\n"), "/main");
 assert.equal(parseBranchCreateParent("/main@rep@server (cs:9007199254740993x - head)"), null);

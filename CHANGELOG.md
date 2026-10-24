@@ -7,6 +7,13 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.9.1] - 2026-10-24
+
+### Fixed
+
+- Remove unjustified Windows-only gates from checkin, branch creation, switch, workspace merge readiness, compound closeout and marker listing. Validate bounded CLI output on all hosts, accept POSIX paths and LF records, and preserve case-sensitive POSIX scope checks. Checkin/switch source-admission labels now describe output validation rather than a historical Windows client.
+- Replace non-Windows rejection expectations with deterministic execution coverage for Windows/macOS/Linux discriminators and POSIX merge/checkin path safety; retain unknown-output, capture and conflict barriers. Live macOS/Linux client validation remains pending.
+
 ## [0.9.0] - 2026-10-23
 
 ### Added

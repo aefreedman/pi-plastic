@@ -4,7 +4,7 @@ import { compactMarkerGate } from "../domain/marker-gate";
 import { parseCheckinPending } from "../domain/checkin-contract";
 import { parseMergedPending, correlateMergedApply, admitMergedStandardStatus } from "../domain/merged-workspace";
 import { randomBytes } from "node:crypto";
-import { win32 } from "node:path";
+import { receiptJoinPath } from "../domain/receipt-paths";
 import { parseCopiedPending, admitCopiedStandardStatus, copiedPendingArgv, copiedPathKey } from "../domain/copied-merge";
 import { captureWorkspaceMergeCommand, emptyWorkspaceMergeAttempt } from "../execution/workspace-merge-command";
 import { admitCleanStandardStatus, admitWorkspaceMergeOutput, buildWorkspaceMergeArgv, safeMergeText, type MergeAction, type MergeStage, type WorkspaceMergeData, type WorkspaceMergeReceipt, type MergeStrategy } from "../domain/workspace-merge-contract";
@@ -40,7 +40,6 @@ export async function assembleWorkspaceMergeReceipt(action:MergeAction,args:unkn
   if(!native&&parsed.protocol==="unsupported")return workspaceMergeFailure(action,data,"unsupported_readiness","Explicit contributor-policy apply output unadmitted; inspect without reapplying.");
   if(native){data.pendingReadMode="native-machine";data.protocol="native-completed";data.fileConflictCount=0;data.apply.admission="admitted";}
   let merged=!native&&parsed.protocol==="merged-candidate",copied=!native&&parsed.protocol==="apply-add-copied";
-  if((native||copied||merged)&&process.platform!=="win32")return workspaceMergeFailure(action,data,"unsupported_readiness","Pending readiness is admitted only on the observed Windows client.");
   if(merged&&(strategy!=="auto"||cherry||forced))return workspaceMergeFailure(action,data,"unsupported_readiness","Merged readiness requires normal auto mode; inspect without reapplying.");
   active="shortStatus";const short=await captureWorkspaceMergeCommand((native||copied||merged)?[...copiedPendingArgv]:["status","--short"],cwd);data.shortStatus={attempt:short.attempt,capture:short.capture,admission:"unsupported"};active=null;
   if(!short.capture.complete||short.failed||short.attempt.exitCode!==0)return workspaceMergeFailure(action,data,"unsupported_readiness","Merge completed; pending read failed/incomplete. No checkin.");
@@ -50,7 +49,7 @@ export async function assembleWorkspaceMergeReceipt(action:MergeAction,args:unkn
   if(merged&&(cherry||forced))return workspaceMergeFailure(action,data,"unsupported_readiness","Merged readiness requires non-forced, non-cherrypicked apply.");
   data.pendingReadMode=merged?"merged-machine":copied?"copied-machine":native?"native-machine":"short";
   const copiedKeys=pending?.paths.map(copiedPathKey)??[];
-  const coherent=!!pending&&parsed.copiedPaths.length===copiedKeys.length&&new Set(parsed.copiedPaths.map(copiedPathKey)).size===copiedKeys.length&&parsed.copiedPaths.every(p=>copiedKeys.includes(copiedPathKey(p)))&&new Set(parsed.addedPaths.map(p=>copiedPathKey(win32.join(cwd,p)))).size===copiedKeys.length&&parsed.addedPaths.every(p=>p.startsWith("/")&&!p.includes("\\")&&p.slice(1).split("/").every(v=>v!==""&&v!=="."&&v!==".."&&!/[?�]/u.test(v))&&copiedKeys.includes(copiedPathKey(win32.join(cwd,p))));
+  const coherent=!!pending&&parsed.copiedPaths.length===copiedKeys.length&&new Set(parsed.copiedPaths.map(copiedPathKey)).size===copiedKeys.length&&parsed.copiedPaths.every(p=>copiedKeys.includes(copiedPathKey(p)))&&new Set(parsed.addedPaths.map(p=>copiedPathKey(receiptJoinPath(cwd,p)))).size===copiedKeys.length&&parsed.addedPaths.every(p=>p.startsWith("/")&&!p.includes("\\")&&p.slice(1).split("/").every(v=>v!==""&&v!=="."&&v!==".."&&!/[?�]/u.test(v))&&copiedKeys.includes(copiedPathKey(receiptJoinPath(cwd,p))));
   const clean=native?parseCheckinPending(short.stdout!,cwd):null;
   data.shortStatus.admission=(merged?!!mergedPending&&(native||correlateMergedApply(parsed.declarations!,mergedPending,cwd)):copied?native||coherent:native?!!clean?.admitted&&clean.items.length===0:short.stdout==="")&&short.stderr===""?"admitted":"unsupported";
   active="fullStatus";const full=await captureWorkspaceMergeCommand(["status"],cwd);data.fullStatus={attempt:full.attempt,capture:full.capture,admission:"unsupported"};active=null;

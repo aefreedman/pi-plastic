@@ -27,7 +27,7 @@ async function invoke(args:Record<string,unknown>,slots:Slot[],core=false,regist
 const empty=await executeSwitchOutput({});assert(empty.isError);assert(validateSwitchOutput(empty.structuredContent));
 assert(!validateSwitchOutput({...empty.structuredContent,foreign:true}));
 const tools=await loadRegisteredTools();assert.deepEqual(tools.get("plastic_switchBranch")!.outputSchema,switchOutputSchema);
-if(process.platform==="win32"){
+{
  const clean=()=>[{out:header()},{out:pending()}];
  // Numeric head must not redirect loaded branch identity or imply latest content.
  for (const registered of [false,true]) {

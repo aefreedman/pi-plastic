@@ -8,7 +8,7 @@ import { admitWorkspaceMergeOutput, admitCleanStandardStatus } from "../src/doma
 import { loadRegisteredTools } from "./pi-tool-harness";
 const cwd="C:\\Example\\workspace",source="br:/main/café-é-日本-😀@Example Repository@example@unity";
 let calls:string[][]=[];
-const nativeReadinessSupported = process.platform === "win32";
+const nativeReadinessSupported = true; // Readiness depends on captured output, not host OS.
 function deps(mode="connected",mutate?:()=>void){return {spawn:((_:string,args:string[])=>{
  calls.push([...args]);mutate?.();const child=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill(){return false;}});
  queueMicrotask(()=>{child.emit("spawn");let out:string|Buffer="",err="",code=0;
@@ -30,19 +30,7 @@ function deps(mode="connected",mutate?:()=>void){return {spawn:((_:string,args:s
 for(const strategy of ["auto","source","destination"] as const)for(const format of ["text","json"] as const){
  calls=[];const r=await runWithAbortSignal(undefined,()=>executeWorkspaceMergeOutput("merge",{source,strategy,format,preflight:true,workdir:cwd}),deps());assert(validateWorkspaceMergeOutput(r.structuredContent));assert(r.structuredContent.ok);assert.equal(calls.length,0);assert.equal(r.structuredContent.data.checkinReadiness,"unknown");assert.equal(r.structuredContent.data.markers,null);
  calls=[];const a=await runWithAbortSignal(undefined,()=>executeWorkspaceMergeOutput("merge",{source,strategy,format,workdir:cwd}),deps());assert(validateWorkspaceMergeOutput(a.structuredContent));
- if(strategy === "auto" && !nativeReadinessSupported){
-  assert.equal(a.isError,true); assert.equal(a.structuredContent.ok,false);
-  assert.equal(a.structuredContent.data.commandCompleted,true);
-  assert.equal(a.structuredContent.data.markers?.state,"clear");
-  assert.equal(a.structuredContent.data.checkinReadiness,"unknown");
-  assert.equal(a.structuredContent.data.effect,"uncertain");
-  assert.equal(a.structuredContent.error!.code,"unsupported_readiness");
-  assert.equal(a.structuredContent.data.shortStatus.admission,"not-observed");
-  assert.equal(a.structuredContent.data.fullStatus.admission,"not-observed");
-  assert.equal(calls.filter(c=>c.includes("--merge")).length,1);
-  assert.deepEqual(calls.slice(1),[["merge","--list-conflict-markers"]]);
-  continue;
- }
+
  assert(a.structuredContent.ok);assert.equal(a.structuredContent.data.commandCompleted,true);assert.equal(a.structuredContent.data.markers?.state,"clear");assert.deepEqual(calls.slice(1),[["merge","--list-conflict-markers"],strategy==="auto"?["status","--machinereadable","--includeRevId","--fieldseparator=\x1f"]:["status","--short"],["status"]]);assert.equal(calls.filter(c=>c.includes("--merge")).length,1);assert.equal(calls[0].includes("--conflict-markers"),strategy==="auto");assert(calls[0].includes(strategy==="auto"?"--mergetype=try":strategy==="source"?"--keepsource":"--keepdestination"));
  for(const patch of [(d:any)=>d.data.commandCompleted=false,(d:any)=>d.data.intendedArgv.push("--to=br:/other"),(d:any)=>d.data.observedFinalizedMetadata=true,(d:any)=>d.data.markers=null,(d:any)=>d.data.markers.state="unknown",(d:any)=>d.data.fullStatus.admission="unsupported",(d:any)=>d.data.commandOutput=null]){const forged=structuredClone(a.structuredContent);patch(forged);assert.equal(validateWorkspaceMergeOutput(forged),false);}
 }

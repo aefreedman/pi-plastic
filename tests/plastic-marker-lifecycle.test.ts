@@ -46,7 +46,7 @@ try {
         const out = Buffer.from(fixture.stdoutBase64, "base64"), err = Buffer.from(fixture.stderrBase64, "base64").toString("utf8");
         calls = [];
         const r = await runWithAbortSignal(undefined, () => executeMarkerLifecycleOutput(list, { workdir: workspace, format: "json" }), deps(out, err, fixture.exitCode));
-        const dto = r.structuredContent, expected = !fixture.validUtf8 ? "unknown" : fixture.exitCode === 1 ? process.platform === "win32" ? "pending" : "unknown" : "clear";
+        const dto = r.structuredContent, expected = !fixture.validUtf8 ? "unknown" : fixture.exitCode === 1 ? "pending" : "clear";
         assert(validateMarkerLifecycleOutput(dto)); assert.equal(dto.data.inspection.state, expected, fixture.name);
         assert.equal(dto.data.inspection.capture!.validUtf8, fixture.validUtf8);
         assert.equal(dto.ok, expected !== "unknown"); assert.equal(r.isError, expected === "unknown");
@@ -73,7 +73,7 @@ try {
         assert.equal(core.outcome, "pending"); assert.equal(calls.length, 1);
     }
     const record = "CONFLICT_MARKERS /fixture/plain.txt\r\n";
-    const malformed = [record.replace(/\r/g, ""), record.slice(0, -2), record + "\r\n", record + "error\r\n", record + record, record + record.replace("plain", "PLAIN"), "\uFEFF" + record,
+    const malformed = [record.slice(0, -2), record + "\r\n", record + "error\r\n", record + record, record + record.replace("plain", "PLAIN"), "\uFEFF" + record,
         ...["plain.txt", "//plain.txt", "/../plain.txt", "/./plain.txt", "/a//plain.txt", "/a/", "/a\\plain.txt", "/C:/plain.txt", "/a?.txt", "/café.txt", "/ space.txt", "/space .txt ", "/a  b.txt", "/CON.txt", "/CON .txt", "/" + "x".repeat(256)].map(p => `CONFLICT_MARKERS ${p}\r\n`), record.repeat(257)];
     for (const [out, err, code] of [...malformed.map(out => [out, "", 1] as const), [record, "warning", 1], [record, "", 0], [record, "", 2]] as const) {
         calls = [];

@@ -19,7 +19,7 @@ export async function assembleSwitchReceipt(input: unknown): Promise<SwitchRecei
         data.effect = mutations.some(s => s.effect === "uncertain") ? "uncertain" : mutations.some(s => s.effect === "command-completed") ? "command-completed" : "not-attempted";
         data.unattemptedMutations = data.plannedMutations.filter(name => !mutations.some(s => s.name === name && s.attempt.state !== "not-attempted"));
         const reads = data.steps.filter(s => s.name !== "shelve" && s.name !== "switch");
-        return { schemaVersion: 1, action: "switch-branch", provenance: { source: "plastic", producer: "@aefree/pi-plastic", contentTrust: "external" }, sourceAdmission: "windows-cm11.0.16.10371-observed", completeness: { read: reads.length ? reads.every(s => s.evidence === "admitted") ? "complete" : "incomplete" : "unknown", capture: data.steps.length ? data.steps.every(s => s.capture.complete) ? "complete" : "incomplete" : "unknown", projection: true }, data, ok: ["preflight", "already-loaded", "switched"].includes(outcome), outcome, ...(["preflight", "already-loaded", "switched"].includes(outcome) ? {} : {error:{code,stage,message}}) } as SwitchReceipt;
+        return { schemaVersion: 1, action: "switch-branch", provenance: { source: "plastic", producer: "@aefree/pi-plastic", contentTrust: "external" }, sourceAdmission: "validated-cm-output", completeness: { read: reads.length ? reads.every(s => s.evidence === "admitted") ? "complete" : "incomplete" : "unknown", capture: data.steps.length ? data.steps.every(s => s.capture.complete) ? "complete" : "incomplete" : "unknown", projection: true }, data, ok: ["preflight", "already-loaded", "switched"].includes(outcome), outcome, ...(["preflight", "already-loaded", "switched"].includes(outcome) ? {} : {error:{code,stage,message}}) } as SwitchReceipt;
     };
     const normal = (o: SwitchCommandObservation) => !o.failed && o.capture.complete && o.attempt.state === "started" && o.attempt.terminal === "observed" && !o.attempt.aborted && !o.attempt.timedOut;
     const observe = async (name: SwitchStepName, argv: string[]) => {
@@ -44,7 +44,6 @@ export async function assembleSwitchReceipt(input: unknown): Promise<SwitchRecei
         const r=input;
         const cwd=resolve(r.workdir??process.cwd());if(!safeSwitchValue(cwd))return finish("failed","invalid_request","Resolved workdir exceeds the bound.");
         Object.assign(data,{requestedTarget:r.branch,workdir:cwd,pendingPolicy:r.pendingChanges??"cancel",defaultedPolicy:r.pendingChanges===undefined,preflight:r.preflight??false});
-        if(process.platform!=="win32")return finish("failed","unsupported_source","Switch source is admitted only on observed Windows/client configuration.");
         const before=await observe("branch-before",["status"]);data.branchBefore=before.s.branch;
         if(!data.branchBefore)return finish("failed");
         const pending=await observe("pending-before",switchPendingArgv);data.pendingBefore=pending.s.summary;

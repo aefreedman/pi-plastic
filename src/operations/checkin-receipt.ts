@@ -1,6 +1,6 @@
 import { inspectConflictMarkers } from "./marker-lifecycle";
 import { compactMarkerGate } from "../domain/marker-gate";
-import { win32 } from "node:path";
+import { receiptRelativePath } from "../domain/receipt-paths";
 import { admitMergedStandardStatus, correlateMergedCheckin } from "../domain/merged-workspace";
 import { parseSwitchLoadedBranch } from "../domain/switch-contract";
 import { randomBytes } from "node:crypto";
@@ -50,7 +50,7 @@ function validateRequest(input: unknown): asserts input is CheckinRequest {
     if (values.reduce((n, s) => n + s.length, 0) > 16384 || Buffer.byteLength(JSON.stringify(values), "utf8") > 32768) throw Error("Checkin input exceeds aggregate bound.");
 }
 export async function assembleCheckinReceipt(input: unknown): Promise<CheckinReceipt> {
-    const data: CheckinData = { markers: null, sourceAdmission: "windows-cm11.0.16.10371-observed", requestedPaths: [], includedPaths: [], fallbackPaths: [], excludedPaths: [], privateAddPaths: [], blockedPrivatePaths: [], itemEvents: [], observedChangesets: [], command: null, steps: [], autoEnabledApplyChanged: false, usedFallbackRetry: false, usedPrivateAutoAddRecovery: false, pendingBefore: null, pendingAfter: null, wouldRun: false, omittedReferences: 0, scopeExhaustion: "unverified", branchHead: "unverified", serverAliasEquivalence: "unverified", xlinkEffects: "unverified", mergeLinkIdentity: "unverified" };
+    const data: CheckinData = { markers: null, sourceAdmission: "validated-cm-output", requestedPaths: [], includedPaths: [], fallbackPaths: [], excludedPaths: [], privateAddPaths: [], blockedPrivatePaths: [], itemEvents: [], observedChangesets: [], command: null, steps: [], autoEnabledApplyChanged: false, usedFallbackRetry: false, usedPrivateAutoAddRecovery: false, pendingBefore: null, pendingAfter: null, wouldRun: false, omittedReferences: 0, scopeExhaustion: "unverified", branchHead: "unverified", serverAliasEquivalence: "unverified", xlinkEffects: "unverified", mergeLinkIdentity: "unverified" };
     let created: CheckinReceipt["data"]["createdChangeset"] = null;
     const finish = (outcome: CheckinReceipt["outcome"], code = "uncertain", stage: "input" | "pending" | "checkin" | "producer" = "checkin", message = "Checkin evidence is uncertain; inspect workspace/repository state before deciding whether to retry."): CheckinReceipt => {
         const effects = data.steps.filter(s => s.operation !== "status").map(s => s.effect);
@@ -76,7 +76,6 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         if (input.updateAfter) return finish("failed", "UNATTENDED_UPDATE_AFTER_BLOCKED", "input", "updateAfter is disabled for unattended safety. Run plastic_update() then plastic_merge(...) with an explicit conflict policy.");
         const cwd = input.workdir ?? process.cwd();
         if (!checkinSafeValue(cwd)) return finish("failed", "invalid_request", "input", "Invalid bounded workdir.");
-        if (process.platform !== "win32") return finish("unsupported", "source_platform_unadmitted", "pending", "Checkin sources are admitted only on the observed Windows client.");
         data.requestedPaths = input.paths ?? [];
         const record = async (name: CheckinStep["name"], argv: string[]) => {
             if (data.steps.length >= 8) throw Error("Step bound exceeded.");
@@ -130,7 +129,7 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
             if (merged.privateRows.length) {
                 // Do not rely on workspace-wide --all selection in the presence
                 // of private work. These directories are proven disjoint above.
-                data.includedPaths = merged.rows.map(r => win32.relative(cwd, r.path));
+                data.includedPaths = merged.rows.map(r => receiptRelativePath(cwd, r.path));
             }
             // All merged controlled rows must remain selected. Partial merge
             // checkins and directory scopes overlapping private rows are unproven.

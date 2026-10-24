@@ -2,7 +2,7 @@
 
 [Documentation index](README.md) · [Merging](2026-10-06-merging.md) · [Status](2026-10-06-status.md) · [Diffs and patches](2026-10-06-diffs-and-patches.md)
 
-These bounded profiles were independently observed on Windows English CM 11.0.16.10484. They are not a promise of client-family, localization, Xlink, directory-conflict or binary-conflict support. Existing sourceAdmission labels identify historical source contracts, not the client or package revision currently loaded.
+These bounded profiles were independently observed on Windows English CM 11.0.16.10484. They are not a promise of client-family, localization, Xlink, directory-conflict or binary-conflict support. Observation provenance is not an OS allowlist. Checkin, branch creation, switch, workspace merge readiness and compound closeout validate CLI evidence on Windows, macOS and Linux. POSIX absolute paths and LF records are accepted alongside Windows paths and CRLF; POSIX comparisons preserve case. Checkin/switch `sourceAdmission: "validated-cm-output"` describes the contract, not a detected client version. Live macOS/Linux client validation remains pending; malformed, unsupported or incomplete evidence still stops safely.
 
 ## Multi-file workspace merges and checkins
 

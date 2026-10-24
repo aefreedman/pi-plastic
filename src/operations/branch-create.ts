@@ -29,7 +29,6 @@ export async function assembleBranchCreateReceipt(input: unknown): Promise<Branc
         // These forms formerly discarded qualification. Never dispatch a different scope.
         if (relative && (r.branch.includes("@") || r.parent?.includes("@"))) return finish("unsupported", "ambiguous_qualifier", "Relative qualifier-bearing branch creation cannot resolve scope safely; provide a full hierarchical target.");
         stage = "source";
-        if (process.platform !== "win32") return finish("unsupported", "unsupported_source", "Branch creation source is admitted only on Windows.");
         let parent = r.parent;
         if (relative && parent === undefined) {
             stage = "parent"; data.parentResolution.basis = "unresolved";

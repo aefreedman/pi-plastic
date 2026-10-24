@@ -1,3 +1,4 @@
+import { receiptAbsolutePath } from "./receipt-paths";
 import type { MarkerGate } from "./marker-gate";
 import { parseMergedPending } from "./merged-workspace";
 import { parseMachineReadablePendingItems, type PendingItem } from "./pending";
@@ -10,7 +11,7 @@ export type CheckinSummary = { totalPending: number; tracked: number; private: n
 export type CheckinStep = { name: "pending-before" | "initial-checkin" | "private-add" | "private-retry" | "pending-recovery" | "fallback-checkin" | "pending-after" | "merge-diagnostic" | "merge-readiness"; operation: "status" | "checkin" | "add"; attempt: CheckinAttempt; capture: CheckinCapture; effect: "not-attempted" | "uncertain" | "command-completed" | "changeset-created" | "read-observed"; evidence: "unadmitted" | "admitted"; records: number; summary: CheckinSummary | null; changeset: CheckinChangeset | null };
 export type CheckinItemEvent = { operation: "CO" | "AD" | "DE" | "CP" | "RP"; path: string } | { operation: "MV"; sourcePath: string; path: string };
 export type CheckinData = {
-    markers: MarkerGate | null; sourceAdmission: "windows-cm11.0.16.10371-observed"; requestedPaths: string[]; includedPaths: string[]; fallbackPaths: string[]; excludedPaths: Array<{ path: string; reason: string }>; privateAddPaths: string[]; blockedPrivatePaths: Array<{ path: string; reason: string }>; itemEvents: CheckinItemEvent[]; observedChangesets: CheckinChangeset[]; command: string[] | null; steps: CheckinStep[]; autoEnabledApplyChanged: boolean; usedFallbackRetry: boolean; usedPrivateAutoAddRecovery: boolean; pendingBefore: CheckinSummary | null; pendingAfter: CheckinSummary | null; wouldRun: boolean; omittedReferences: number; scopeExhaustion: "unverified"; branchHead: "unverified"; serverAliasEquivalence: "unverified"; xlinkEffects: "unverified"; mergeLinkIdentity: "unverified" };
+    markers: MarkerGate | null; sourceAdmission: "validated-cm-output"; requestedPaths: string[]; includedPaths: string[]; fallbackPaths: string[]; excludedPaths: Array<{ path: string; reason: string }>; privateAddPaths: string[]; blockedPrivatePaths: Array<{ path: string; reason: string }>; itemEvents: CheckinItemEvent[]; observedChangesets: CheckinChangeset[]; command: string[] | null; steps: CheckinStep[]; autoEnabledApplyChanged: boolean; usedFallbackRetry: boolean; usedPrivateAutoAddRecovery: boolean; pendingBefore: CheckinSummary | null; pendingAfter: CheckinSummary | null; wouldRun: boolean; omittedReferences: number; scopeExhaustion: "unverified"; branchHead: "unverified"; serverAliasEquivalence: "unverified"; xlinkEffects: "unverified"; mergeLinkIdentity: "unverified" };
 type Base = { schemaVersion: 1; action: "checkin"; provenance: { source: "plastic"; producer: "@aefree/pi-plastic"; contentTrust: "external" }; completeness: { capture: "complete" | "incomplete" | "unknown"; projection: boolean } };
 export type CheckinReceipt = Base & (
     { ok: true; outcome: "completed"; data: CheckinData & { effect: "changeset-created"; createdChangeset: CheckinChangeset } } |
@@ -23,7 +24,7 @@ export const checkinSafeValue = (s: unknown): s is string => typeof s === "strin
 export const checkinSafeComment = (s: unknown): s is string => typeof s === "string" && s.length > 0 && s.length <= 4096 && !checkinUnsafeText.test(s.replace(/[\r\n]/g, " "));
 // Loss-marker rejection is a conservative admission policy, not proof of original Unicode fidelity.
 const identity = (s: string) => checkinSafeValue(s) && s === s.trim() && !/[?\uFFFD]/.test(s);
-const absolute = (s: string) => identity(s) && /^(?:[A-Za-z]:[\\/]|\\\\)/.test(s);
+const absolute = (s: string) => identity(s) && receiptAbsolutePath(s);
 export const checkinDecimal = /^(0|[1-9][0-9]{0,19})$/;
 export function parseCheckinChangeset(payload: string): CheckinChangeset | null {
     const m = /^cs:(0|[1-9][0-9]{0,19})@br:(\/[^@]+)@([^@]+)@([^@]+(?:@(cloud|unity))?) \(mount:'\/'\)$/.exec(payload);

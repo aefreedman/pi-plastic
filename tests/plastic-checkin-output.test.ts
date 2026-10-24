@@ -86,10 +86,7 @@ async function invoke(scenario: Scenario = {}, args: any = input, core = false, 
     for (const c of children) { for (const e of ["spawn", "close", "error"]) assert(c.listenerCount(e) === 0 || e === "error" && c.listeners(e).length === 1 && c.listeners(e)[0].name === "ignoreRetiredError"); for (const stream of [c.stdout, c.stderr]) for (const e of ["data", "end", "error", "close"]) assert(stream.listenerCount(e) === 0 || e === "error" && stream.listeners(e).length === 1 && stream.listeners(e)[0].name === "ignoreRetiredError"); }
     return { result, calls, dto };
 }
-if (process.platform !== "win32") {
-    const dto = await assembleCheckinReceipt(input); assert(!dto.ok && dto.outcome === "unsupported");
-    console.log("PASS: non-Windows source admission; Windows source suite not applicable");
-} else {
+{
 let r = await invoke(); assert(r.dto.ok); assert.equal(r.dto.data.createdChangeset.id, "9007199254740997"); assert.equal(r.dto.data.createdChangeset.branch, "/main/café-é-日本-😀"); assert.equal(r.dto.data.createdChangeset.server, "example@unity"); assert.equal(r.calls.length, 3);
 const registered = (await loadRegisteredTools()).get("plastic_checkin")!;
 for (const newline of ["\n", "\r\n", "\r"]) {

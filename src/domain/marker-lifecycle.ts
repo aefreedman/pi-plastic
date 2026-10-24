@@ -19,13 +19,13 @@ export function markerListingCaptureComplete(i: Pick<MarkerInspection, "attempt"
     const { attempt: a, capture: c } = i;
     return !!c && a.state === "started" && a.terminal === "observed" && !a.aborted && !a.timedOut && c.complete && c.validUtf8 && !c.truncated && c.stdoutBytes === c.stdoutRetainedBytes && c.stdoutBytes <= 65536 && c.stderrBytes === 0 && c.stderrRetainedBytes === 0;
 }
-/** Observed Windows CM 11.0.16.10512 ASCII listing profile only. Printed paths
+/** Bounded CM ASCII listing profile, with LF or CRLF records. Printed paths
  * are external evidence, never physical file identity or mutation operands. */
 export function classifyMarkerInspection(i: MarkerInspection): MarkerInspection["state"] {
     if (!markerListingCaptureComplete(i) || i.stderr !== "" || i.stdout === null || Buffer.byteLength(i.stdout, "utf8") !== i.capture!.stdoutBytes) return "unknown";
     if (i.attempt.exitCode === 0 && i.stdout === "") return "clear";
-    if (process.platform !== "win32" || i.attempt.exitCode !== 1 || !i.stdout.endsWith("\r\n")) return "unknown";
-    const records = i.stdout.slice(0, -2).split("\r\n"), seen = new Set<string>();
+    if (i.attempt.exitCode !== 1 || !i.stdout.endsWith("\n")) return "unknown";
+    const records = i.stdout.replace(/\r?\n$/, "").split(/\r?\n/), seen = new Set<string>();
     if (records.length > 256) return "unknown";
     for (const record of records) {
         if (!record.startsWith("CONFLICT_MARKERS /")) return "unknown";
