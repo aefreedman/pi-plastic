@@ -44,7 +44,9 @@ The three environment settings are deliberate separate choices: exact target, mu
 | `large-merge` | 130 source files: either complete verified integration, or an explicit bounded stop with all native pending paths retained—not silent prefix success |
 | `unicode-path` | Unicode filename/content: either verified integration or an observable capture/encoding stop, with original path retained in independent UTF-8 XML; no lossy decoding fallback |
 
-The default matrix runs the seven positive/real-conflict scenarios. Capacity, Unicode-path and `merged-unrelated` scope probes run **alone**, because a correctly bounded/encoding/policy stop deliberately retains a pending merge. For example:
+The default matrix runs the seven positive/real-conflict scenarios and can take several minutes. Give the outer command runner at least a 15-minute deadline, or select one scenario per invocation and inspect its completed result before starting the next. Individual CM calls remain bounded at 30 seconds. An outer timeout is an infrastructure failure, not a failed merge-normalization assertion: inspect the exact run's evidence and current sandbox state before any new attempt; do not replay an uncertain mutation.
+
+Capacity, Unicode-path and `merged-unrelated` scope probes run **alone**, because a correctly bounded/encoding/policy stop deliberately retains a pending merge. For example:
 
 ```bash
 PI_PLASTIC_LIVE_SCENARIOS=large-merge npm run test:live:merge

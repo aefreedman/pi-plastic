@@ -175,7 +175,7 @@ try {
     }
   });
   if (selected.has("text-conflict")) await live.scenario("text-conflict", async () => {
-    const { target, root } = setup("text-conflict");
+    const { target, root, baseline } = setup("text-conflict");
     const source = createSource(target);
     const conflictFile = join(root, "existing plain.txt");
     put(conflictFile, "source conflicts on first line\n" + baseText.slice(baseText.indexOf("\n") + 1));
@@ -213,7 +213,7 @@ try {
     assert.equal(markersAfterEdit.stdout, "");
     assert.equal(markersAfterEdit.stderr, "");
     const resolved = await live.tool("plastic_checkin", { message: "pi-plastic deliberate synthetic conflict reconciliation", includeAll: true });
-    live.verifyIntegration(resolved.data.createdChangeset.id, target, sourceId, targetId, [relative(workspace, conflictFile)]);
+    live.verifyIntegration(resolved.data.createdChangeset.id, target, sourceId, baseline, [relative(workspace, conflictFile)]);
   });
   if (selected.has("unicode-path")) await live.scenario("unicode-path", async () => {
     const { target, root, baseline } = setup("unicode-path");
