@@ -133,7 +133,7 @@ assert(mixedParsed.admitted);
 assert.equal(mixedParsed.items[1].kind, "changed");
 assert.equal(mixedParsed.items[1].revisionId, undefined);
 for (const tool of [undefined, registered]) {
-    r = await invoke({ pending: mixedPending }, input, false, tool);
+    r = await invoke({ pending: mixedPending, fullStatus: `/main/café-é-日本-😀@Example Repository@example@unity (cs:9007199254740993 - head)\r\nChanged\r\n    Status  Size  Last Modified  Path\r\n    Changed    opaque display    ${name}\r\n` }, input, false, tool);
     assert(r.dto.ok);
     assert.equal(r.dto.data.pendingBefore.changed, 2);
     assert.deepEqual(r.dto.data.includedPaths, [name]);

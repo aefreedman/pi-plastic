@@ -7,6 +7,12 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Fixed
+
+- Replace native workspace merge/checkin whole-profile admission with shared pending facts and operation-specific semantic safety assessments. Equivalent Windows/forward/relative workdirs no longer reject valid merged state; ordinary/merged/private compositions remain observable with explicit scope blockers.
+- Stop treating table size/age/column widths or section order as merge-readiness protocols while retaining identity, source-link, unknown-section, conflict, scope, capture and no-replay barriers. Independent pending observations no longer inherit the applying parser's 128-pair limit.
+- Preserve exact child blockers in default closeout text and add bounded assessment diagnostics. Explicit checkin path selections now suppress `--all` instead of risking unrelated inclusion; disjoint private exclusions retain exact controlled scope.
+
 ## [0.9.1] - 2026-10-24
 
 ### Fixed

@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { canonicalWorkspaceDirectory } from "../domain/workspace-observation";
 import { parseSwitchTarget, parseSwitchLoadedBranch, compareSwitchTarget, parseSwitchPending, switchPendingArgv, safeSwitchValue } from "../domain/switch-contract";
 import { checkinSafeComment, checkinSafeValue } from "../domain/checkin-contract";
 import { admitCleanStandardStatus } from "../domain/workspace-merge-contract";
@@ -23,6 +24,9 @@ function admitRequest(input:unknown):asserts input is CloseoutRequest { if(!inpu
 export async function assembleCloseoutReceipt(input:unknown):Promise<CloseoutReceipt> {
  const data=emptyCloseoutData();let stage:"input"|CloseoutStageName|"producer"="input";let childEntered=false;
  const finish=(outcome:CloseoutReceipt["outcome"],code:Extract<CloseoutReceipt,{ok:false}>["error"]["code"]="observation_failed",message="Closeout paused; inspect earlier effects before deciding whether to retry."):CloseoutReceipt=>{
+  // Bound the parent view without discarding the complete child receipt, and
+  // never split a surrogate pair while projecting a path-bearing diagnosis.
+  let bounded="";for(const point of message){if(bounded.length+point.length>256)break;bounded+=point;}message=bounded;
   const effects=data.stages.map(closeoutChildEffect);data.effect=data.createdChangeset?"changeset-created":effects.includes("uncertain")||childEntered?"uncertain":effects.includes("command-completed")?"command-completed":"not-attempted";
   const captures=closeoutCaptures(data.stages),projection=data.stages.every(s=>s.kind==="read"||s.result.completeness.projection);
   const ok=outcome==="completed"||outcome==="preflight";const actual=!ok&&data.effect!=="not-attempted"?"uncertain":outcome;
@@ -33,7 +37,7 @@ export async function assembleCloseoutReceipt(input:unknown):Promise<CloseoutRec
  const loaded=async(name:CloseoutStageName,verify=false,mergedPending?:MergedPending|null)=>{const {s,o,success}=await read(name,["status"]);if(success){s.branch=parseSwitchLoadedBranch(o.stdout!);if(s.branch&&(!mergedPending||admitMergedStandardStatus(o.stdout!,mergedPending,data.sourceBranch!,data.requested!.workdir)))s.admission="admitted";else s.branch=null;}if(!s.branch)return false;if(verify){data.targetVerification=compareSwitchTarget(s.branch,data.targetBranch!);if(data.targetVerification==="unverified")return false;}return true;};
  const pending=async(name:"pending-before"|"pending-final")=>{const {s,o,success}=await read(name,[...switchPendingArgv]);if(success){const p=parseSwitchPending(o.stdout!,data.requested!.workdir);if(p.summary){s.admission="admitted";s.summary=p.summary;}}return s.summary;};
  try{
-  const submitted=input&&typeof input==="object"&&!Array.isArray(input)?Object.freeze({...input}):input;admitRequest(submitted);const cwd=submitted.workdir??process.cwd();if(!safeSwitchValue(cwd)||!safeSwitchValue(resolve(cwd)))return finish("failed","invalid_request","Closeout needs a bounded workdir.");data.requested={source:submitted.source??null,target:submitted.target??null,message:submitted.message??null,cardRef:submitted.cardRef??null,strategy:submitted.strategy??"auto",updateTarget:submitted.updateTarget??true,includePrivate:submitted.includePrivate??false,preflight:submitted.preflight??false,outputFormat:submitted.format??"text",workdir:cwd};
+  const submitted=input&&typeof input==="object"&&!Array.isArray(input)?Object.freeze({...input}):input;admitRequest(submitted);const cwd=canonicalWorkspaceDirectory(submitted.workdir??process.cwd());if(!safeSwitchValue(cwd)||!safeSwitchValue(resolve(cwd)))return finish("failed","invalid_request","Closeout needs a bounded workdir.");data.requested={source:submitted.source??null,target:submitted.target??null,message:submitted.message??null,cardRef:submitted.cardRef??null,strategy:submitted.strategy??"auto",updateTarget:submitted.updateTarget??true,includePrivate:submitted.includePrivate??false,preflight:submitted.preflight??false,outputFormat:submitted.format??"text",workdir:cwd};
   if(!await loaded("loaded-before"))return finish("failed");const start=(data.stages[0] as Extract<CloseoutStage,{kind:"read"}>).result.branch!;data.sourceBranch=submitted.source??start.branch;
   const source=parseSwitchTarget(data.sourceBranch)!;const inScope=(spec:string)=>{const t=parseSwitchTarget(spec)!;return t.repository===null||t.repository===start.repository&&t.server===start.server;};
   if(!inScope(data.sourceBranch)||submitted.target!==undefined&&!inScope(submitted.target))return finish("failed","target_unverified","Qualified branch repository/server spelling differs from the observed workspace; alias equivalence is unverified. No target mutation permitted.");
@@ -59,7 +63,7 @@ export async function assembleCloseoutReceipt(input:unknown):Promise<CloseoutRec
   if(!await loaded("loaded-after-switch",true))return finish("failed","target_unverified");
   if(data.requested.updateTarget){stage="update";childEntered=true;const updated=await assembleUpdateReceipt({workdir:cwd});push({name:"update",kind:"update",result:updated});childEntered=false;if(!updated.ok)return finish("failed","child_failed");}
   if(!await loaded("loaded-before-merge",true))return finish("failed","target_unverified");
-  stage="merge";childEntered=true;const merged=await assembleWorkspaceMergeReceipt("merge",{source:data.sourceBranch!,strategy:data.requested.strategy,workdir:cwd});push({name:"merge",kind:"merge",result:merged});childEntered=false;if(!merged.ok)return finish("failed","child_failed");
+  stage="merge";childEntered=true;const merged=await assembleWorkspaceMergeReceipt("merge",{source:data.sourceBranch!,strategy:data.requested.strategy,workdir:cwd});push({name:"merge",kind:"merge",result:merged});childEntered=false;if(!merged.ok)return finish("failed","child_failed",`merge/${merged.error.code}: ${merged.error.message}`);
   const copiedReady=merged.data.protocol==="apply-add-copied",mergedReady=merged.data.protocol==="merged-candidate";
   const ready=await read("readiness",copiedReady||mergedReady?[...switchPendingArgv]:["status"]);
   const mergedPending=mergedReady&&ready.success?parseMergedPending(ready.o.stdout!,cwd):null;
@@ -68,8 +72,8 @@ export async function assembleCloseoutReceipt(input:unknown):Promise<CloseoutRec
   // full status must still correlate its source link, namespace and resolved rows.
   if(!await loaded("loaded-before-checkin",true,mergedPending))return finish("failed","target_unverified");
   const checkinArgs={message:data.checkinMessage,includeAll:true,includePrivate:data.requested.includePrivate,workdir:cwd};
-  stage="checkin-preflight";childEntered=true;const preview=await assembleCheckinReceipt({...checkinArgs,preflight:true});push({name:"checkin-preflight",kind:"checkin",result:preview});childEntered=false;if(!preview.ok)return finish("failed","child_failed");
-  stage="checkin";childEntered=true;const checked=await assembleCheckinReceipt(checkinArgs);push({name:"checkin",kind:"checkin",result:checked});childEntered=false;data.createdChangeset=checked.data.createdChangeset;if(!checked.ok)return finish("failed","child_failed");
+  stage="checkin-preflight";childEntered=true;const preview=await assembleCheckinReceipt({...checkinArgs,preflight:true});push({name:"checkin-preflight",kind:"checkin",result:preview});childEntered=false;if(!preview.ok)return finish("failed","child_failed",`checkin-preflight/${preview.error.code}: ${preview.error.message}`);
+  stage="checkin";childEntered=true;const checked=await assembleCheckinReceipt(checkinArgs);push({name:"checkin",kind:"checkin",result:checked});childEntered=false;data.createdChangeset=checked.data.createdChangeset;if(!checked.ok)return finish("failed","child_failed",`checkin/${checked.error.code}: ${checked.error.message}`);
   if(!await loaded("loaded-final",true))return finish("failed","target_unverified");
   const final=(data.stages.at(-1)! as Extract<CloseoutStage,{kind:"read"}>).result.branch!;
   if(!data.createdChangeset||data.createdChangeset.branch!==final.branch||data.createdChangeset.repository!==final.repository||data.createdChangeset.server!==final.server)return finish("failed","target_unverified","Observed changeset retained but its branch/repository/server spelling is not the final loaded target. No alias equivalence or target checkin proof inferred.");

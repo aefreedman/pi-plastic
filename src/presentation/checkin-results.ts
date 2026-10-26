@@ -8,7 +8,7 @@ export function presentCheckinReceipt(dto: CheckinReceipt, format: "text" | "jso
         `- Steps: ${dto.data.steps.map(s => `${s.name} (${s.effect})`).join(", ") || "none"}`,
         `- Pending after: ${dto.data.pendingAfter ? dto.data.pendingAfter.totalPending : "not verified"}`,
         "- Requested scope exhaustion, branch head, alias equivalence, merge links and Xlink effects: unverified",
-        ...(!dto.ok ? [dto.error.message] : []),
+        ...(!dto.ok ? [`- Blocker: ${dto.error.stage}/${dto.error.code}: ${dto.error.message}`] : []),
     ].join("\n");
     return Buffer.byteLength(text, "utf8") <= 24000 ? text : JSON.stringify({ action: dto.action, outcome: dto.outcome, ok: dto.ok, note: "Presentation omitted; inspect structuredContent for the bounded receipt." });
 }

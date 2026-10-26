@@ -1,3 +1,4 @@
+import type { WorkspaceAssessment } from "./workspace-observation";
 import type { MarkerGate } from "./marker-gate";
 import { parseMergedApply, type MergedDeclaration } from "./merged-workspace";
 import type { WorkspaceMergeAttempt, WorkspaceMergeCapture } from "../execution/workspace-merge-command";
@@ -8,6 +9,7 @@ export const safeMergeText = (v: unknown): v is string => typeof v === "string" 
 export type MergeStage = { attempt: WorkspaceMergeAttempt; capture: WorkspaceMergeCapture | null; admission: "not-observed" | "unsupported" | "admitted" };
 export type WorkspaceMergeData = {
  intendedArgv: readonly string[]; workingDirectory: string | null; requestedSource: string | null; strategy: MergeStrategy | null; cherrypicking: boolean | null; forced: boolean | null; previewRequested: boolean | null; outputFormatRequested: "text" | "json" | null;
+ assessment?: WorkspaceAssessment;
  markers: MarkerGate | null; apply: MergeStage; shortStatus: MergeStage; fullStatus: MergeStage; pendingReadMode: "short" | "native-machine" | "copied-machine" | "merged-machine";
  commandOutput: { stdout: string; stderr: string } | null;
  commandCompleted: boolean; observedWorkspaceIdentity: null; observedSourceIdentity: null; observedPendingItems: null;

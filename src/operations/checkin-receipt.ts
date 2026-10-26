@@ -1,7 +1,8 @@
+import { canonicalWorkspaceDirectory, observeWorkspaceStandard, assessWorkspaceState, workspaceBlockerMessage } from "../domain/workspace-observation";
 import { inspectConflictMarkers } from "./marker-lifecycle";
 import { compactMarkerGate } from "../domain/marker-gate";
 import { receiptRelativePath } from "../domain/receipt-paths";
-import { admitMergedStandardStatus, correlateMergedCheckin } from "../domain/merged-workspace";
+import { correlateMergedCheckin } from "../domain/merged-workspace";
 import { parseSwitchLoadedBranch } from "../domain/switch-contract";
 import { randomBytes } from "node:crypto";
 import { buildFallbackScopePaths } from "../domain/paths";
@@ -12,34 +13,6 @@ const pendingArgv = ["status", "--machinereadable", "--includeRevId", "--fieldse
 const summary = (items: PendingItem[], cwd: string): CheckinSummary => { const { privatePaths: _, ...s } = summarizePendingItems(items, cwd); return s; };
 const normal = (o: CheckinCommandObservation) => o.capture.complete && !o.failed && o.attempt.state === "started" && o.attempt.terminal === "observed" && o.attempt.exitCode !== null && !o.attempt.aborted && !o.attempt.timedOut;
 const success = (o: CheckinCommandObservation) => normal(o) && o.attempt.exitCode === 0 && o.capture.stderrBytes === 0;
-// Inspect section/row markers, never words embedded in a branch or filename.
-// Default status can omit unchanged checkouts, so a valid header-only body is
-// allowed; unfamiliar sections/metadata still cannot establish ordinary state.
-function ordinaryStatusBodyAdmitted(text: string): boolean {
-    const shapes = {
-        Changed: { header: /^    Status +Size +Last Modified +Path *$/, label: "(?:Changed|Checked-out \\((?:changed|unchanged)\\))" },
-        Added: { header: /^    Status +Size +Last Modified +Path *$/, label: "(?:Added|Private)" },
-        Deleted: { header: /^    Status +Size +Path *$/, label: "(?:Deleted|Locally deleted|Removed)" },
-        Moved: { header: /^    Status +Size +Similarity +Path *$/, label: "(?:Moved|Moved locally)" },
-    };
-    let section: keyof typeof shapes | null = null, needsHeader = false;
-    const seen = new Set<string>();
-    for (const line of text.split(/\r?\n/).slice(1)) {
-        if (!line.trim()) continue;
-        if (line.length > 4096 || /[\u0000-\u001f\u007f-\u009f]/.test(line)) return false;
-        if (Object.hasOwn(shapes, line)) {
-            if (needsHeader || seen.has(line)) return false;
-            seen.add(line); section = line as keyof typeof shapes; needsHeader = true; continue;
-        }
-        if (!section) return false;
-        const shape = shapes[section];
-        if (needsHeader) { if (!shape.header.test(line)) return false; needsHeader = false; continue; }
-        // A status-label annotation is metadata, unlike a parenthesis in the
-        // later path cell. Unknown annotations (including Merge from) fail.
-        if (new RegExp(`^    ${shape.label} +\\(`).test(line) || !new RegExp(`^    ${shape.label} {2,}.+$`).test(line)) return false;
-    }
-    return !needsHeader;
-}
 function validateRequest(input: unknown): asserts input is CheckinRequest {
     if (!input || typeof input !== "object" || Array.isArray(input)) throw Error("Invalid bounded checkin input.");
     const r = input as Record<string, unknown>;
@@ -74,7 +47,7 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
     try {
         validateRequest(input);
         if (input.updateAfter) return finish("failed", "UNATTENDED_UPDATE_AFTER_BLOCKED", "input", "updateAfter is disabled for unattended safety. Run plastic_update() then plastic_merge(...) with an explicit conflict policy.");
-        const cwd = input.workdir ?? process.cwd();
+        const cwd = canonicalWorkspaceDirectory(input.workdir ?? process.cwd());
         if (!checkinSafeValue(cwd)) return finish("failed", "invalid_request", "input", "Invalid bounded workdir.");
         data.requestedPaths = input.paths ?? [];
         const record = async (name: CheckinStep["name"], argv: string[]) => {
@@ -91,27 +64,26 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         const read = async (name: "pending-before" | "pending-recovery" | "pending-after") => {
             const { o, s } = await record(name, pendingArgv), p = parseCheckinPending(o.stdout ?? "", cwd);
             s.records = p.records;
+            if (p.observation.issues.length) data.assessment = { ready: false, complete: false, rowCount: p.observation.rows.length, mergeRowCount: p.observation.rows.filter(r => r.mergeChangeset !== null).length, ordinaryRowCount: p.observation.rows.filter(r => r.mergeChangeset === null && r.status !== "PR").length, linkCount: 0, blockers: p.observation.issues };
             if (success(o) && p.admitted) { s.evidence = "admitted"; s.effect = "read-observed"; s.summary = summary(p.items, cwd); return p; }
             return null;
         };
         stage = "pending";
         const before = await read("pending-before");
-        if (!before) return finish("unsupported", "pending_source_unadmitted", "pending", "Pending selection could not be admitted; no mutation was dispatched.");
+        if (!before) return finish("unsupported", "pending_source_unadmitted", "pending", data.assessment ? workspaceBlockerMessage(data.assessment) : "pending_observation_incomplete: no mutation was dispatched.");
         data.pendingBefore = summary(before.items, cwd);
         data.markers = compactMarkerGate(await inspectConflictMarkers(cwd));
         if (data.markers.state !== "clear") return finish("unsupported", "marker_readiness_unknown", "pending", "Native marker listing is unknown or pending; edit/validate and re-inspect. No mutation or automatic retry.");
         const merged = before.merged;
         let loaded: ReturnType<typeof parseSwitchLoadedBranch> = null;
-        // CO/-1/NO_MERGES also occurs during an unresolved merge. Read the
-        // native link state before any checkin, including standalone/preflight.
-        if (merged || before.items.some(i => i.statusCode === "CO")) {
+        // Full-state safety is shared with merge and closeout, not inferred from
+        // which captured copied/merged/ordinary profile happened to match.
+        if (merged || before.items.some(i => /^(CO|RP|CP|DE)$/.test(i.statusCode))) {
             const { o, s } = await record("merge-readiness", ["status"]);
-            loaded = success(o) ? parseSwitchLoadedBranch(o.stdout ?? "") : null;
-            const source = /^    Merge from cs:[1-9][0-9]{0,19} at (.+)\r?$/m.exec(o.stdout ?? "")?.[1];
-            const ready = loaded && loaded.repository === before.repository && loaded.server === before.server && (merged
-                ? !!source && admitMergedStandardStatus(o.stdout!, merged, source, cwd)
-                : ordinaryStatusBodyAdmitted(o.stdout ?? ""));
-            if (!ready) return finish("unsupported", "merge_readiness_unadmitted", "pending", "Merge source/resolution metadata could not be admitted; no checkin was dispatched.");
+            const standard = observeWorkspaceStandard(o.stdout ?? "", before.observation);
+            loaded = standard.branch;
+            data.assessment = assessWorkspaceState(before.observation, standard, { allowOrdinary: !merged });
+            if (!success(o) || !data.assessment.ready) return finish("unsupported", data.assessment.blockers.some(b => b.code === "unrelated_controlled_pending") ? "mixed_merge_scope" : "merge_readiness_unadmitted", "pending", !success(o) ? "standard_observation_incomplete: no checkin was dispatched." : workspaceBlockerMessage(data.assessment));
             s.evidence = "admitted";
         }
         if (merged && input.includePrivate) return finish("unsupported", "merged_private_scope", "pending", "Merged checkin does not admit private inclusion; leave unrelated private work excluded.");
@@ -136,7 +108,7 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
             if (scoped.length !== merged.rows.length) return finish("unsupported", "merged_partial_scope", "pending", "All correlated merged controlled paths must be selected.");
         }
         const nonce = randomBytes(16).toString("hex"), seps = { start: `__PI_CI_START_${nonce}__`, end: `__PI_CI_END_${nonce}__`, field: `__PI_CI_FIELD_${nonce}__` };
-        const command = (paths: string[], force: boolean) => ["checkin", `-c=${input.message}`, ...(input.includeAll ? ["--all"] : []), ...(force ? ["--applychanged"] : []), ...(input.includePrivate ? ["--private"] : []), ...paths, "--machinereadable", `--startlineseparator=${seps.start}`, `--endlineseparator=${seps.end}`, `--fieldseparator=${seps.field}`];
+        const command = (paths: string[], force: boolean) => ["checkin", `-c=${input.message}`, ...(input.includeAll && paths.length === 0 ? ["--all"] : []), ...(force ? ["--applychanged"] : []), ...(input.includePrivate ? ["--private"] : []), ...paths, "--machinereadable", `--startlineseparator=${seps.start}`, `--endlineseparator=${seps.end}`, `--fieldseparator=${seps.field}`];
         const initial = command(data.includedPaths, apply); data.command = ["cm", ...initial]; data.wouldRun = true;
         if (input.preflight) return finish("preflight");
         const attempt = async (name: "initial-checkin" | "private-retry" | "fallback-checkin", argv: string[]) => {

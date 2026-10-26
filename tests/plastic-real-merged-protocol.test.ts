@@ -37,7 +37,8 @@ for (const [applyLabel, pendingLabel, fullLabel, checkinLabel, sourceLeaf] of [
     const events = parseCheckinEvidence(native, separators).events;
     assert(parseCheckinEvidence(native, separators).admitted);
     assert(correlateMergedCheckin(events, pending, cwd));
-    for (const path of [cwd, cwd + "\\foreign", pending.rows[0].path.replace("\\fixtures", "\\..\\fixtures"), "C:\\Other\\parent"]) {
+    assert(correlateMergedCheckin([...events, { operation: "CO", path: cwd }], pending, cwd), "Native root-directory structural event is an ancestor, not extra selected content");
+    for (const path of [cwd + "\\foreign", pending.rows[0].path.replace("\\fixtures", "\\..\\fixtures"), "C:\\Other\\parent"]) {
         assert(!correlateMergedCheckin([...events, { operation: "CO", path }], pending, cwd));
     }
     assert(!correlateMergedCheckin(events.filter(e => e.path !== pending.rows[0].path), pending, cwd));
@@ -52,9 +53,9 @@ for (const [applyLabel, pendingLabel, fullLabel, checkinLabel, sourceLeaf] of [
     for (const bad of [apply + apply, "noise" + apply, apply.replace("DO_", "UNKNOWN_"), apply.replace("/fixtures/", "/../fixtures/"), apply.replace("C:\\Example", "C:\\Other"), apply.replace("__EV_F__43", "__EV_F__043"), apply.slice(0, -12)]) {
         if (bad !== apply) { const d = parseMergedApply(bad, token); assert(!d || !correlateMergedApply(d, pending, cwd)); }
     }
-    for (const bad of [machine + machine.split("\r\n")[1] + "\r\n", machine.replace("Merge from ", "Unknown "), machine.replace("C:\\Example", "C:\\Other"), machine.replace("\\fixtures\\", "\\..\\fixtures\\"), machine.replace("Merge from ", "Merge from 0"), machine + "CO\x1fC:\\Example\\workspace\\local.txt\x1fFalse\x1f-1\x1fNO_MERGES\r\n"]) assert.equal(parseMergedPending(bad, cwd), null);
+    for (const bad of [machine + machine.split("\r\n")[1] + "\r\n", machine.replace("Merge from ", "Unknown "), machine.replace("C:\\Example", "C:\\Other"), machine.replace("\\fixtures\\", "\\..\\fixtures\\"), machine.replace("Merge from ", "Merge from 0")]) assert.equal(parseMergedPending(bad, cwd), null);
     const wrongDirectory = parseMergedPending(machine.replace("False", "True"), cwd);
-    assert(!wrongDirectory || !admitMergedStandardStatus(full, wrongDirectory, source, cwd));
+    if (wrongDirectory) assert.equal(wrongDirectory.rows[0].isDirectory, true, "Machine directory identity is not inferred from volatile display size");
     for (const bad of [full + "Merge in progress\r\n", full + full, full.replace(" at /main/evidence/", " at /main/other/"), full.replace("example@unity", "example@cloud"), full.replace("Changed", "Unknown"), full.replace("Merge from cs:", "Merge from cs:0"), full.replace("(Merge from ", "(Merge from 0"), full.replace("fixtures\\evidence", "fixtures\\other"), full.replace("    Merge from cs:", "Pending merge links\r\n    Merge from cs:")]) assert(!admitMergedStandardStatus(bad, pending, source, cwd));
     assert(!admitMergedStandardStatus(full, pending, source.replace("@unity", "@cloud"), cwd));
     for (const bad of [native + native, native.replace("__EV_S__RP", "__EV_S__UNKNOWN"), native + "noise", native.replace("mount:'/'", "mount:'/xlink'")]) {
@@ -163,10 +164,12 @@ for (const bad of [
     privateMachine.replace("PR\x1f", "CH\x1f"),
     privateMachine.replace("True", "False"), // copied directory owning children
 ]) assert.equal(parseMergedPending(bad, cwd), null);
-for (const bad of [
+for (const display of [
     privateFull.replace("Status                     Size        Path", "Status                     Size        Last Modified    Path"),
-    privateFull.replace("1.54 MB", "1x54 MB"),
+    privateFull.replace("1.54 MB", "opaque display"),
     privateFull.replace("1.54 MB", "1.54 GB"),
+]) assert(admitMergedStandardStatus(display, privatePending, "/main/evidence/source", cwd));
+for (const bad of [
     privateFull.replace("Removed (Merge from 54)", "Removed"),
     privateFull.replace("Checked-out (changed) (Merge from 54)", "Checked-out (changed)"),
 ]) assert(!admitMergedStandardStatus(bad, privatePending, "/main/evidence/source", cwd));
@@ -179,7 +182,7 @@ for (const count of [128, 129]) {
     const rows = Array.from({ length: count }, (_, i) => derive(co, i));
     const machine = [fileMachine.split("\r\n")[0], ...rows, ""].join("\r\n");
     const apply = [...Array.from({ length: count }, (_, i) => derive(declaration, i)), ...Array.from({ length: count }, (_, i) => derive(action, i)), ""].join("\r\n");
-    assert.equal(!!parseMergedPending(machine, cwd), count === 128);
+    assert(parseMergedPending(machine, cwd), "Independent pending observations do not inherit the applying-frame pair limit");
     assert.equal(!!parseMergedApply(apply, token), count === 128);
 }
 console.log("PASS: actual cm10484 multi-file and directory/deletion profiles; native structural parent events; explicit private exclusion; unresolved stop; bounded structural derivatives");

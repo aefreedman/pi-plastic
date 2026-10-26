@@ -1,3 +1,4 @@
+import { canonicalWorkspaceDirectory, observeWorkspacePending, observeWorkspaceStandard, assessWorkspaceState, workspacePendingArgv, workspaceBlockerMessage } from "../domain/workspace-observation";
 import { parseSwitchLoadedBranch } from "../domain/switch-contract";
 import { inspectConflictMarkers } from "./marker-lifecycle";
 import { compactMarkerGate } from "../domain/marker-gate";
@@ -21,9 +22,9 @@ export async function assembleWorkspaceMergeReceipt(action:MergeAction,args:unkn
   const keys=["source","strategy","cherrypicking","forced","preflight","format","workdir"];
   if(action!=="merge")return workspaceMergeFailure(action,data,"invalid_request","Only merge is supported.");
   if(!args||typeof args!=="object"||Array.isArray(args)||Object.keys(args).some(k=>!keys.includes(k)))return workspaceMergeFailure(action,data,"invalid_request","Use only declared workspace merge controls.");
-  const i=args as Record<string,unknown>,source=i.source,cwd=i.workdir===undefined?process.cwd():i.workdir,strategy=i.strategy===undefined?"auto":i.strategy,cherry=i.cherrypicking===undefined?false:i.cherrypicking,forced=i.forced===undefined?false:i.forced,preview=i.preflight===undefined?false:i.preflight,format=i.format===undefined?"text":i.format;
-  if(!safeMergeText(source)||source.trimStart().startsWith("-")||!safeMergeText(cwd)||!["auto","source","destination"].includes(strategy as string)||[cherry,forced,preview].some(v=>typeof v!=="boolean")||!["text","json"].includes(format as string))return workspaceMergeFailure(action,data,"invalid_request","Use a bounded source operand, strict controls and text/json; source options/stdin are rejected.");
-  const token="__WM_"+randomBytes(12).toString("hex")+"__";data.intendedArgv=buildWorkspaceMergeArgv(source,strategy as MergeStrategy,cherry as boolean,forced as boolean,token);data.workingDirectory=cwd;data.requestedSource=source;data.strategy=strategy as MergeStrategy;data.cherrypicking=cherry as boolean;data.forced=forced as boolean;data.previewRequested=preview as boolean;data.outputFormatRequested=format as "text"|"json";
+  const i=args as Record<string,unknown>,source=i.source,cwdInput=i.workdir===undefined?process.cwd():i.workdir,cwd=typeof cwdInput==="string"?canonicalWorkspaceDirectory(cwdInput):cwdInput,strategy=i.strategy===undefined?"auto":i.strategy,cherry=i.cherrypicking===undefined?false:i.cherrypicking,forced=i.forced===undefined?false:i.forced,preview=i.preflight===undefined?false:i.preflight,format=i.format===undefined?"text":i.format;
+  if(!safeMergeText(source)||source.trimStart().startsWith("-")||!safeMergeText(cwdInput)||!safeMergeText(cwd)||!["auto","source","destination"].includes(strategy as string)||[cherry,forced,preview].some(v=>typeof v!=="boolean")||!["text","json"].includes(format as string))return workspaceMergeFailure(action,data,"invalid_request","Use a bounded source operand, strict controls and text/json; source options/stdin are rejected.");
+  const token="__WM_"+randomBytes(12).toString("hex")+"__";data.intendedArgv=buildWorkspaceMergeArgv(source,strategy as MergeStrategy,cherry as boolean,forced as boolean,token);data.workingDirectory=canonicalWorkspaceDirectory(cwd);data.requestedSource=source;data.strategy=strategy as MergeStrategy;data.cherrypicking=cherry as boolean;data.forced=forced as boolean;data.previewRequested=preview as boolean;data.outputFormatRequested=format as "text"|"json";
   if(preview)return {...header(action,data),ok:true,outcome:"preflight"};
   active="apply";const apply=await captureWorkspaceMergeCommand([...data.intendedArgv],cwd);data.apply={attempt:apply.attempt,capture:apply.capture,admission:"unsupported"};active=null;data.effect=["started","unknown"].includes(apply.attempt.state)?"uncertain":"not-attempted";
   if(!apply.capture.complete||apply.failed||apply.attempt.state!=="started")return workspaceMergeFailure(action,data,apply.attempt.aborted?"aborted":data.effect==="not-attempted"?"launch_failed":"uncertain","Merge capture/start/completion is not established; do not retry automatically.");
@@ -34,6 +35,23 @@ export async function assembleWorkspaceMergeReceipt(action:MergeAction,args:unkn
   data.markers=compactMarkerGate(await inspectConflictMarkers(cwd));
   if(data.markers.state!=="clear")return workspaceMergeFailure(action,data,"unsupported_readiness","Marker listing is unknown or pending; inspect/edit/validate and re-inspect. No checkin or automatic retry.");
   const native=strategy==="auto";
+  if(native) {
+   data.protocol="native-completed";data.pendingReadMode="native-machine";data.fileConflictCount=0;data.apply.admission="admitted";
+   const directory=data.workingDirectory!;
+   active="shortStatus";const pendingRead=await captureWorkspaceMergeCommand([...workspacePendingArgv],directory);data.shortStatus={attempt:pendingRead.attempt,capture:pendingRead.capture,admission:"unsupported"};active=null;
+   if(!pendingRead.capture.complete||pendingRead.failed||pendingRead.attempt.exitCode!==0||pendingRead.stderr!=="")return workspaceMergeFailure(action,data,"unsupported_readiness","pending_observation_incomplete: merge completed; inspect current state without replay.");
+   const observation=observeWorkspacePending(pendingRead.stdout!,directory);
+   data.shortStatus.admission=observation.issues.length?"unsupported":"admitted";
+   active="fullStatus";const stateRead=await captureWorkspaceMergeCommand(["status"],directory);data.fullStatus={attempt:stateRead.attempt,capture:stateRead.capture,admission:"unsupported"};active=null;
+   if(!stateRead.capture.complete||stateRead.failed||stateRead.attempt.exitCode!==0||stateRead.stderr!=="")return workspaceMergeFailure(action,data,"unsupported_readiness","standard_observation_incomplete: merge completed; inspect current state without replay.");
+   data.assessment=assessWorkspaceState(observation,observeWorkspaceStandard(stateRead.stdout!,observation),{source});
+   if(observation.rows.some(r=>r.mergeChangeset!==null)){data.protocol="merged-candidate";data.pendingReadMode="merged-machine";data.fileConflictCount=observation.rows.filter(r=>r.status==="CO"&&r.mergeChangeset!==null).length;}
+   data.fullStatus.admission=data.assessment.ready?"admitted":"unsupported";
+   if(cherry||forced)return workspaceMergeFailure(action,data,"unsupported_readiness","nonstandard_merge_policy: independent normal merge readiness is not authorization for forced/cherrypicked closeout.");
+   if(apply.stderr!=="")return workspaceMergeFailure(action,data,"unsupported_readiness","apply_warning_unknown: merge completed with stderr; inspect without replay.");
+   if(!data.assessment.ready)return workspaceMergeFailure(action,data,"unsupported_readiness",workspaceBlockerMessage(data.assessment));
+   data.effect="not-proven";data.checkinReadiness="supported-no-unresolved-signals";return {...header(action,data),ok:true,outcome:"command-completed"};
+  }
   const parsed:ReturnType<typeof admitWorkspaceMergeOutput>=native?{protocol:"native-completed",fileConflictCount:0,copiedPaths:[],addedPaths:[]}:admitWorkspaceMergeOutput(apply.stdout!,token);
   data.protocol=parsed.protocol;data.pendingReadMode=parsed.protocol==="merged-candidate"?"merged-machine":parsed.protocol==="apply-add-copied"?"copied-machine":"short";data.fileConflictCount=parsed.fileConflictCount;data.apply.admission=parsed.protocol==="unsupported"?"unsupported":"admitted";
   if(!native&&parsed.protocol==="file-conflict"){data.checkinReadiness="blocked";return workspaceMergeFailure(action,data,"conflict","Observed file conflicts; explicit contributor policy did not establish readiness.");}

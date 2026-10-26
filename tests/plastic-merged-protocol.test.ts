@@ -39,9 +39,9 @@ for (const [applyLabel, pendingLabel, fullLabel, checkinLabel, sourceLeaf] of [
     for (const bad of [apply + apply, "noise" + apply, apply.replace("DO_", "UNKNOWN_"), apply.replace("/fixtures/", "/../fixtures/"), apply.replace("C:\\Example", "C:\\Other"), apply.replace("__EV_F__43", "__EV_F__043"), apply.slice(0, -12)]) {
         if (bad !== apply) { const d = parseMergedApply(bad, token); assert(!d || !correlateMergedApply(d, pending, cwd)); }
     }
-    for (const bad of [machine + machine.split("\r\n")[1] + "\r\n", machine.replace("Merge from ", "Unknown "), machine.replace("C:\\Example", "C:\\Other"), machine.replace("\\fixtures\\", "\\..\\fixtures\\"), machine.replace("Merge from ", "Merge from 0"), machine + "CO\x1fC:\\Example\\workspace\\local.txt\x1fFalse\x1f-1\x1fNO_MERGES\r\n"]) assert.equal(parseMergedPending(bad, cwd), null);
+    for (const bad of [machine + machine.split("\r\n")[1] + "\r\n", machine.replace("Merge from ", "Unknown "), machine.replace("C:\\Example", "C:\\Other"), machine.replace("\\fixtures\\", "\\..\\fixtures\\"), machine.replace("Merge from ", "Merge from 0")]) assert.equal(parseMergedPending(bad, cwd), null);
     const wrongDirectory = parseMergedPending(machine.replace("False", "True"), cwd);
-    assert(!wrongDirectory || !admitMergedStandardStatus(full, wrongDirectory, source, cwd));
+    if (wrongDirectory) assert.equal(wrongDirectory.rows[0].isDirectory, true, "Machine directory identity is not inferred from volatile display size");
     for (const bad of [full + "Merge in progress\r\n", full + full, full.replace(" at /main/evidence/", " at /main/other/"), full.replace("example@unity", "example@cloud"), full.replace("Changed", "Unknown"), full.replace("Merge from cs:", "Merge from cs:0"), full.replace("(Merge from ", "(Merge from 0"), full.replace("fixtures\\evidence", "fixtures\\other"), full.replace("    Merge from cs:", "Pending merge links\r\n    Merge from cs:")]) assert(!admitMergedStandardStatus(bad, pending, source, cwd));
     assert(!admitMergedStandardStatus(full, pending, source.replace("@unity", "@cloud"), cwd));
     for (const bad of [native + native, native.replace("__EV_S__RP", "__EV_S__UNKNOWN"), native + "noise", native.replace("mount:'/'", "mount:'/xlink'")]) {

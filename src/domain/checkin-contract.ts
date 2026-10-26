@@ -2,7 +2,8 @@ import { receiptAbsolutePath } from "./receipt-paths";
 import type { MarkerGate } from "./marker-gate";
 import { parseMergedPending } from "./merged-workspace";
 import { parseMachineReadablePendingItems, type PendingItem } from "./pending";
-import { parseCopiedPending } from "./copied-merge";
+import type { WorkspaceAssessment } from "./workspace-observation";
+import { observeWorkspacePending } from "./workspace-observation";
 export type CheckinRequest = { message: string; paths?: string[]; applyChanged?: boolean; includePrivate?: boolean; includeAll?: boolean; updateAfter?: boolean; preflight?: boolean; format?: "text" | "json"; workdir?: string };
 import type { CheckinAttempt, CheckinCapture } from "../execution/checkin-command";
 export type { CheckinAttempt, CheckinCapture } from "../execution/checkin-command";
@@ -11,7 +12,7 @@ export type CheckinSummary = { totalPending: number; tracked: number; private: n
 export type CheckinStep = { name: "pending-before" | "initial-checkin" | "private-add" | "private-retry" | "pending-recovery" | "fallback-checkin" | "pending-after" | "merge-diagnostic" | "merge-readiness"; operation: "status" | "checkin" | "add"; attempt: CheckinAttempt; capture: CheckinCapture; effect: "not-attempted" | "uncertain" | "command-completed" | "changeset-created" | "read-observed"; evidence: "unadmitted" | "admitted"; records: number; summary: CheckinSummary | null; changeset: CheckinChangeset | null };
 export type CheckinItemEvent = { operation: "CO" | "AD" | "DE" | "CP" | "RP"; path: string } | { operation: "MV"; sourcePath: string; path: string };
 export type CheckinData = {
-    markers: MarkerGate | null; sourceAdmission: "validated-cm-output"; requestedPaths: string[]; includedPaths: string[]; fallbackPaths: string[]; excludedPaths: Array<{ path: string; reason: string }>; privateAddPaths: string[]; blockedPrivatePaths: Array<{ path: string; reason: string }>; itemEvents: CheckinItemEvent[]; observedChangesets: CheckinChangeset[]; command: string[] | null; steps: CheckinStep[]; autoEnabledApplyChanged: boolean; usedFallbackRetry: boolean; usedPrivateAutoAddRecovery: boolean; pendingBefore: CheckinSummary | null; pendingAfter: CheckinSummary | null; wouldRun: boolean; omittedReferences: number; scopeExhaustion: "unverified"; branchHead: "unverified"; serverAliasEquivalence: "unverified"; xlinkEffects: "unverified"; mergeLinkIdentity: "unverified" };
+    assessment?: WorkspaceAssessment; markers: MarkerGate | null; sourceAdmission: "validated-cm-output"; requestedPaths: string[]; includedPaths: string[]; fallbackPaths: string[]; excludedPaths: Array<{ path: string; reason: string }>; privateAddPaths: string[]; blockedPrivatePaths: Array<{ path: string; reason: string }>; itemEvents: CheckinItemEvent[]; observedChangesets: CheckinChangeset[]; command: string[] | null; steps: CheckinStep[]; autoEnabledApplyChanged: boolean; usedFallbackRetry: boolean; usedPrivateAutoAddRecovery: boolean; pendingBefore: CheckinSummary | null; pendingAfter: CheckinSummary | null; wouldRun: boolean; omittedReferences: number; scopeExhaustion: "unverified"; branchHead: "unverified"; serverAliasEquivalence: "unverified"; xlinkEffects: "unverified"; mergeLinkIdentity: "unverified" };
 type Base = { schemaVersion: 1; action: "checkin"; provenance: { source: "plastic"; producer: "@aefree/pi-plastic"; contentTrust: "external" }; completeness: { capture: "complete" | "incomplete" | "unknown"; projection: boolean } };
 export type CheckinReceipt = Base & (
     { ok: true; outcome: "completed"; data: CheckinData & { effect: "changeset-created"; createdChangeset: CheckinChangeset } } |
@@ -50,34 +51,9 @@ export function parseCheckinEvidence(text: string, s: CheckinSeparators) {
     return { admitted: !malformed, records: Math.min(lines.length, 501), changesets, events };
 }
 export function parseCheckinPending(text: string, cwd: string) {
-    // statusCode CP retained; added kind is local checkin selection, not legacy migration.
-    const candidate = parseMergedPending(text, cwd);
-    const copied = parseCopiedPending(text, cwd);
-    // Prefer the narrow copied-file profile when it represents the snapshot.
-    // All-copy directories/private exclusions still need merged scope/link/event
-    // correlation; do not discard that strict candidate merely for being CP-only.
-    const merged = candidate && (candidate.rows.some(r => r.status !== "CP") || !copied) ? candidate : null;
-    if (merged) {
-        const items = parseMachineReadablePendingItems(text, cwd).map(item => ({ ...item, kind: item.statusCode === "CP" ? "added" as const : item.kind }));
-        return { admitted: items.length === merged.rows.length + merged.privateRows.length, records: merged.rows.length + merged.privateRows.length + 1, items, repository: merged.repository, server: merged.server, merged };
-    }
-    if (copied) {
-        const items = parseMachineReadablePendingItems(text, cwd).map(item => ({ ...item, kind: "added" as const }));
-        return { admitted: items.length === copied.paths.length, records: copied.paths.length + 1, items, repository: copied.repository, server: copied.server };
-    }
-    const lines = text.split(/\r?\n/); if (lines.at(-1) === "") lines.pop();
-    let admitted = lines.length > 0 && lines.length <= 500;
-    const h = (lines[0] ?? "").split("\x1f");
-    if (h.length !== 4 || h[0] !== "STATUS" || !checkinDecimal.test(h[1]) || !identity(h[2] ?? "") || !identity(h[3] ?? "")) admitted = false;
-    for (const line of lines.slice(1)) {
-        const f = line.split("\x1f");
-        // Exact observed shapes only; unfamiliar status/metadata fails closed.
-        // CO uses -1 (no reusable revision identity), even for unselected paths.
-        if (f[0] === "MV") {
-            if (f.length !== 7 || f[1] !== "100%" || !absolute(f[2]) || !absolute(f[3]) || f[4] !== "False" || !checkinDecimal.test(f[5]) || f[5] === "0" || f[6] !== "NO_MERGES") admitted = false;
-        } else if (f.length !== 5 || !/^(PR|AD|CO|CH|LD)$/.test(f[0]) || !absolute(f[1]) || !/^(True|False)$/.test(f[2]) || !(/^(PR|AD|CO)$/.test(f[0]) ? f[3] === "-1" : checkinDecimal.test(f[3]) && f[3] !== "0") || f[4] !== "NO_MERGES") admitted = false;
-    }
-    const items: PendingItem[] = admitted ? parseMachineReadablePendingItems(text, cwd) : [];
-    if (admitted && items.length !== lines.length - 1) admitted = false;
-    return { admitted, records: Math.min(lines.length, 501), items, repository: admitted ? h[2] : null, server: admitted ? h[3] : null };
+    const observation = observeWorkspacePending(text, cwd);
+    const items = observation.issues.length ? [] : parseMachineReadablePendingItems(text, observation.cwd).map(item => ({ ...item, kind: item.statusCode === "CP" ? "added" as const : item.kind }));
+    const merged = parseMergedPending(text, observation.cwd) ?? undefined;
+    return { admitted: observation.issues.length === 0 && items.length === observation.rows.length, records: observation.records, items,
+        repository: observation.repository, server: observation.server, merged, observation };
 }
