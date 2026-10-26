@@ -165,11 +165,11 @@ for (const bad of [
     privateMachine.replace("True", "False"), // copied directory owning children
 ]) assert.equal(parseMergedPending(bad, cwd), null);
 for (const display of [
-    privateFull.replace("Status                     Size        Path", "Status                     Size        Last Modified    Path"),
     privateFull.replace("1.54 MB", "opaque display"),
     privateFull.replace("1.54 MB", "1.54 GB"),
 ]) assert(admitMergedStandardStatus(display, privatePending, "/main/evidence/source", cwd));
 for (const bad of [
+    privateFull.replace("Status                     Size        Path", "Status                     Size        Last Modified    Path"), // semantic cell count no longer matches rows
     privateFull.replace("Removed (Merge from 54)", "Removed"),
     privateFull.replace("Checked-out (changed) (Merge from 54)", "Checked-out (changed)"),
 ]) assert(!admitMergedStandardStatus(bad, privatePending, "/main/evidence/source", cwd));

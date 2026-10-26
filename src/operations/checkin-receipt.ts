@@ -64,7 +64,12 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         const read = async (name: "pending-before" | "pending-recovery" | "pending-after") => {
             const { o, s } = await record(name, pendingArgv), p = parseCheckinPending(o.stdout ?? "", cwd);
             s.records = p.records;
-            if (p.observation.issues.length) data.assessment = { ready: false, complete: false, rowCount: p.observation.rows.length, mergeRowCount: p.observation.rows.filter(r => r.mergeChangeset !== null).length, ordinaryRowCount: p.observation.rows.filter(r => r.mergeChangeset === null && r.status !== "PR").length, linkCount: 0, blockers: p.observation.issues };
+            if (p.observation.issues.length) {
+                // Authorization is a pre-effect decision, not a mutable view of
+                // the latest read. Later parse gaps cannot revoke an observed CI.
+                if (name === "pending-before") data.assessment = { ready: false, complete: false, rowCount: p.observation.rows.length, mergeRowCount: p.observation.rows.filter(r => r.mergeChangeset !== null).length, ordinaryRowCount: p.observation.rows.filter(r => r.mergeChangeset === null && r.status !== "PR").length, linkCount: 0, blockers: p.observation.issues };
+                else data.postObservationIssues = { stage: name, issues: p.observation.issues };
+            }
             if (success(o) && p.admitted) { s.evidence = "admitted"; s.effect = "read-observed"; s.summary = summary(p.items, cwd); return p; }
             return null;
         };

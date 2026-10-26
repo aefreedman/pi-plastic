@@ -7,6 +7,7 @@ export function presentCheckinReceipt(dto: CheckinReceipt, format: "text" | "jso
         ...(dto.data.createdChangeset ? [`- Observed root changeset: cs:${dto.data.createdChangeset.id}@br:${dto.data.createdChangeset.branch}@${dto.data.createdChangeset.repository}@${dto.data.createdChangeset.server}`] : []),
         `- Steps: ${dto.data.steps.map(s => `${s.name} (${s.effect})`).join(", ") || "none"}`,
         `- Pending after: ${dto.data.pendingAfter ? dto.data.pendingAfter.totalPending : "not verified"}`,
+        ...(dto.data.postObservationIssues ? [`- ${dto.data.postObservationIssues.stage} observation: ${dto.data.postObservationIssues.issues.map(i => i.code).join(", ")}${dto.data.createdChangeset ? "; created identity is retained" : ""}.`] : []),
         "- Requested scope exhaustion, branch head, alias equivalence, merge links and Xlink effects: unverified",
         ...(!dto.ok ? [`- Blocker: ${dto.error.stage}/${dto.error.code}: ${dto.error.message}`] : []),
     ].join("\n");

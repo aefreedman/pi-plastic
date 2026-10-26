@@ -41,6 +41,7 @@ if (process.platform === "win32") {
                             if (pending && mode === "extra-controlled") out += ["CO", cwd + String.fromCharCode(92) + "unrelated.txt", "False", "-1", "NO_MERGES"].join("\x1f") + "\r\n";
                             if (pending && mode === "standalone-race" && machineReads === 4) out = get("048-unresolved-machine");
                             if (pending && (mode === "unresolved" || mode === "readiness-changed" && machineReads === 2)) out = get("048-unresolved-machine");
+                            if (checked && mode === "post-malformed") out = "FUTURE_PENDING_HEADER\r\n";
                             if (checked && mode === "post-fail") { code = 1; err = "Synthetic final observation failure"; }
                         } else {
                             if (pending) fullReads++;
@@ -83,14 +84,21 @@ if (process.platform === "win32") {
         }
         const core = await invoke("success", "core", "json");
         assert.equal(JSON.parse(core.result).data.createdChangeset.id, id);
-        for (const mode of ["unresolved", "readiness-changed", "before-checkin-source", "warning", "checkin-unknown", "post-fail", "private", "extra-controlled", "standalone-race"]) {
+        for (const mode of ["unresolved", "readiness-changed", "before-checkin-source", "warning", "checkin-unknown", "post-fail", "post-malformed", "private", "extra-controlled", "standalone-race"]) {
             if (mode === "private" && leaf !== "source") continue;
             const { result, calls } = await invoke(mode);
             assert(validateCloseoutOutput(result.structuredContent), mode); assert.equal(!!result.isError, mode !== "private", mode);
             assert.equal(calls.filter(c => c[0] === "merge").length, 1, mode);
-            assert.equal(calls.filter(c => c[0] === "checkin").length, ["checkin-unknown", "post-fail", "private"].includes(mode) ? 1 : 0, mode);
+            assert.equal(calls.filter(c => c[0] === "checkin").length, ["checkin-unknown", "post-fail", "post-malformed", "private"].includes(mode) ? 1 : 0, mode);
             assert(!calls.some(c => ["undo", "shelve"].includes(c[0])), "no compensation/replay");
-            if (mode === "post-fail") assert.equal(result.structuredContent.data.createdChangeset?.id, id);
+            if (mode === "post-fail" || mode === "post-malformed") assert.equal(result.structuredContent.data.createdChangeset?.id, id);
+            if (mode === "post-malformed") {
+                assert.equal(result.structuredContent.data.effect, "changeset-created");
+                const checkin = result.structuredContent.data.stages.find((s: any) => s.name === "checkin").result;
+                assert(checkin.ok); assert.equal(checkin.data.assessment.ready, true);
+                assert.equal(checkin.data.postObservationIssues.stage, "pending-after");
+                assert.equal(checkin.data.pendingAfter, null);
+            }
         }
     }
 }

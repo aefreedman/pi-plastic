@@ -17,7 +17,7 @@ const row = (code = "CH", file = path) => [code, file, "False", code === "PR" ||
 const checkedOutRow = (file = path) => ["CO", file, "False", "-1", "NO_MERGES"].join(us) + "\r\n";
 const payload = "cs:9007199254740997@br:/main/café-é-日本-😀@Example Repository@example@unity (mount:'/')";
 const input = { message: "Fixture résumé é 日本語 😀", workdir: cwd, paths: [name] };
-type Scenario = { fullStatus?: string; mode?: string; native?: string; private?: boolean; recoveryFail?: boolean; afterFail?: boolean; addFail?: boolean; retryFail?: boolean; fallback?: boolean; pending?: string; preabort?: boolean; launch?: "sync" | "async"; lateError?: boolean; decoded?: boolean; abort?: boolean; timeout?: boolean; ignoreTerm?: boolean; code?: number | null; signal?: string; stderr?: string; scopeMany?: boolean; noSpawn?: boolean; streamError?: boolean; payload?: string };
+type Scenario = { fullStatus?: string; mode?: string; native?: string; private?: boolean; recoveryFail?: boolean; afterFail?: boolean; afterMalformed?: boolean; addFail?: boolean; retryFail?: boolean; fallback?: boolean; pending?: string; preabort?: boolean; launch?: "sync" | "async"; lateError?: boolean; decoded?: boolean; abort?: boolean; timeout?: boolean; ignoreTerm?: boolean; code?: number | null; signal?: string; stderr?: string; scopeMany?: boolean; noSpawn?: boolean; streamError?: boolean; payload?: string };
 async function invoke(scenario: Scenario = {}, args: any = input, core = false, registered?: any) {
     const calls: string[][] = [], children: any[] = [], timers = new Set<any>(), controller = new AbortController();
     let reads = 0, checkins = 0;
@@ -37,6 +37,7 @@ async function invoke(scenario: Scenario = {}, args: any = input, core = false, 
                 } else {
                 reads++; out = header;
                 if (reads === 1) out += scenario.pending ?? (scenario.private ? row("PR") : scenario.fallback ? row("LD") : row());
+                if (reads > 1 && scenario.afterMalformed) out = "FUTURE_PENDING_HEADER\r\n";
                 if (reads > 1 && (scenario.recoveryFail || scenario.afterFail)) { err = "PRIVATE_PATH read failure"; code = 1; }
                 }
             } else if (argv[0] === "add") { out = "PRIVATE_PATH native add output"; if (scenario.addFail) code = 1; }
@@ -133,7 +134,7 @@ assert(mixedParsed.admitted);
 assert.equal(mixedParsed.items[1].kind, "changed");
 assert.equal(mixedParsed.items[1].revisionId, undefined);
 for (const tool of [undefined, registered]) {
-    r = await invoke({ pending: mixedPending, fullStatus: `/main/café-é-日本-😀@Example Repository@example@unity (cs:9007199254740993 - head)\r\nChanged\r\n    Status  Size  Last Modified  Path\r\n    Changed    opaque display    ${name}\r\n` }, input, false, tool);
+    r = await invoke({ pending: mixedPending, fullStatus: `/main/café-é-日本-😀@Example Repository@example@unity (cs:9007199254740993 - head)\r\nChanged\r\n    Status  Size  Last Modified  Path\r\n    Changed    opaque size    opaque age    ${name}\r\n` }, input, false, tool);
     assert(r.dto.ok);
     assert.equal(r.dto.data.pendingBefore.changed, 2);
     assert.deepEqual(r.dto.data.includedPaths, [name]);
@@ -162,6 +163,16 @@ r = await invoke({ private: true, native: "No changes in the workspace", addFail
 r = await invoke({ private: true, pending: row("PR", cwd + "\\.env.local"), native: "No changes in the workspace" }, { ...input, paths: [".env.local"] }); assert.equal(r.dto.error.code, "sensitive_private_paths"); assert.equal(r.calls.length, 2);
 r = await invoke({ private: true, native: "No changes in the workspace" }, { message: input.message, workdir: cwd }); assert.equal(r.dto.error.code, "private_items_ineligible"); assert.equal(r.calls.length, 2);
 for (const recoveryFail of [false, true]) { r = await invoke({ native: "No changes in the workspace", recoveryFail }); assert.equal(r.dto.outcome, "uncertain"); assert.equal(r.calls.length, 3); assert.equal(r.dto.data.pendingAfter?.totalPending ?? null, recoveryFail ? null : 0); }
+for (const tool of [undefined, registered]) {
+    r = await invoke({ pending: checkedOutRow(), afterMalformed: true }, { ...input, includeAll: true }, false, tool);
+    assert(r.dto.ok); assert.equal(r.dto.data.createdChangeset.id, "9007199254740997");
+    assert.equal(r.dto.data.effect, "changeset-created"); assert.equal(r.dto.data.assessment.ready, true);
+    assert.equal(r.dto.data.pendingAfter, null); assert.equal(r.dto.data.postObservationIssues.stage, "pending-after");
+    assert(r.dto.data.postObservationIssues.issues.some((i: any) => i.code === "pending_header_invalid"));
+    assert.equal(r.dto.data.steps.at(-1).evidence, "unadmitted"); assert.equal(r.calls.filter(c => c[0] === "checkin").length, 1);
+}
+const malformedCore = await invoke({ pending: checkedOutRow(), afterMalformed: true }, { ...input, format: "json" }, true);
+assert.equal(JSON.parse(malformedCore.result as string).data.createdChangeset.id, "9007199254740997");
 r = await invoke({ afterFail: true }); assert(r.dto.ok); assert.equal(r.dto.data.pendingAfter, null); assert.equal(r.dto.completeness.capture, "complete");
 r = await invoke({ private: true, native: "No changes in the workspace", afterFail: true }); assert(r.dto.ok); assert.equal(r.dto.data.pendingAfter, null); assert.equal(r.dto.data.steps[2].effect, "command-completed"); assert.equal(r.dto.data.steps[3].effect, "changeset-created");
 for (const scenario of [{ mode: "unknown" }, { mode: "bom" }, { mode: "repository" }, { noSpawn: true }, { streamError: true }, { lateError: true }, { timeout: true }] as Scenario[]) {

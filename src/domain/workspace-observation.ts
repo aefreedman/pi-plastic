@@ -60,7 +60,7 @@ export function observeWorkspaceStandard(text: string, pending: WorkspacePending
     const issue = (code: string, path: string | null = null) => { if (result.issues.length < 8) result.issues.push({ code, path }); };
     if (!result.branch) issue("loaded_branch_unknown");
     if (Buffer.byteLength(text, "utf8") > 65536) { issue("standard_observation_limit"); return result; }
-    const remaining = new Set(pending.rows), sections = new Set<string>(); let section = "", linksSection = false, needsHeader = false;
+    const remaining = new Set(pending.rows), sections = new Set<string>(); let section = "", linksSection = false, needsHeader = false, displayColumns: string[] = [];
     const lines = text.split(/\r?\n/);
     const head = /\(cs:([0-9]+) - head(?::[0-9]+)?\)$/.exec(lines[0] ?? "");
     if (!head || head[1] !== pending.changeset) issue("loaded_changeset_mismatch");
@@ -72,17 +72,24 @@ export function observeWorkspaceStandard(text: string, pending: WorkspacePending
         const link = /^\s+Merge from cs:([1-9][0-9]{0,19}) at (.+?)\s*$/.exec(line);
         if (link && section === "links") { const target = parseSwitchTarget(link[2]); if (!target) issue("merge_link_invalid"); else result.links.push({ changeset: link[1], ...target }); continue; }
         if (["Changed", "Added", "Deleted", "Moved"].includes(line.trim())) { if (needsHeader) issue("status_header_missing"); section = line.trim(); if (sections.has(section)) issue("status_section_duplicate"); sections.add(section); needsHeader = true; continue; }
-        if (/^\s+Status\s+.*\bPath\s*$/.test(line) && ["Changed", "Added", "Deleted", "Moved"].includes(section)) { if (!needsHeader) issue("status_header_duplicate"); needsHeader = false; continue; }
+        const tableHeader = /^\s+Status\s+Size(?:\s+(Last Modified|Similarity))?\s+Path\s*$/.exec(line);
+        if (tableHeader && ["Changed", "Added", "Deleted", "Moved"].includes(section)) {
+            if (!needsHeader) issue("status_header_duplicate");
+            displayColumns = ["Size", ...(tableHeader[1] ? [tableHeader[1]] : [])]; needsHeader = false; continue;
+        }
         // Only path and operation metadata are semantic. Size, age, spacing and
         // table order are presentation and deliberately not a readiness protocol.
         const matches = [...remaining].filter(row => {
             const expectedSection = /^(CP|AD|PR)$/.test(row.status) ? "Added" : /^(DE|LD)$/.test(row.status) ? "Deleted" : row.status === "MV" ? "Moved" : "Changed";
             if (section !== expectedSection || needsHeader) return false;
-            const path = receiptRelativePath(pending.cwd, row.path);
-            if (!line.trimEnd().endsWith(path)) return false;
-            const prefix = line.trimEnd().slice(0, -path.length).trimStart();
+            const path = receiptRelativePath(pending.cwd, row.path), cells = line.trim().split(/\s{2,}/);
             const metadata = row.mergeChangeset ? ` (Merge from ${row.mergeChangeset})` : "";
-            return /\s{2,}$/.test(prefix) && (labels[row.status] ?? []).some(label => prefix.startsWith(label + metadata) && /^\s{2,}/.test(prefix.slice((label + metadata).length)) && !prefix.slice((label + metadata).length).trimStart().startsWith("("));
+            // The header defines semantic cells, not their widths or contents.
+            // Directories emit an empty Size cell, collapsed by whitespace split.
+            // Extra delimiters (including inside a filename) are ambiguous, never
+            // an excuse to consume arbitrary text before a matching path suffix.
+            const count = 2 + displayColumns.length - (row.isDirectory ? 1 : 0);
+            return cells.length === count && cells.at(-1) === path && (labels[row.status] ?? []).some(label => cells[0] === label + metadata);
         });
         if (matches.length !== 1 || !["Changed", "Added", "Deleted", "Moved"].includes(section)) issue("standard_row_unmatched"); else remaining.delete(matches[0]);
     }
@@ -110,4 +117,9 @@ export function assessWorkspaceState(pending: WorkspacePendingObservation, stand
     const unique = blockers.filter((b, i) => blockers.findIndex(a => a.code === b.code && a.path === b.path) === i);
     return { ready: unique.length === 0, complete: pending.issues.length === 0 && standard.issues.length === 0, rowCount: pending.rows.length, mergeRowCount: merged.length, ordinaryRowCount: ordinary.length, linkCount: standard.links.length, blockers: unique.slice(0, 8) };
 }
-export const workspaceBlockerMessage = (assessment: WorkspaceAssessment): string => assessment.blockers.map(b => b.code + (b.path ? `: ${b.path}` : "")).join("; ").slice(0, 200);
+export const workspaceBlockerMessage = (assessment: WorkspaceAssessment): string => {
+    const message = assessment.blockers.map(b => b.code + (b.path ? `: ${b.path}` : "")).join("; ");
+    let bounded = "";
+    for (const point of message) { if (bounded.length + point.length > 200) break; bounded += point; }
+    return bounded;
+};
