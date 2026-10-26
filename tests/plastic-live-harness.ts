@@ -3,7 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { DOMParser } from "@xmldom/xmldom";
+import { DOMParser, type Element } from "@xmldom/xmldom";
 import { Check } from "typebox/value";
 import { loadRegisteredTools } from "./pi-tool-harness.ts";
 import { runWithAbortSignal } from "../src/execution/context.ts";
@@ -22,8 +22,9 @@ export function configuredLiveWorkspace(mutation = false): string | null {
 }
 export function parseLiveXml(text: string) {
   const diagnostics: string[] = [];
+  assert(!/<!DOCTYPE|<!ENTITY/i.test(text), "Independent CLI XML must not declare entities or a document type.");
   const document = new DOMParser({ onError: (_level, message) => diagnostics.push(message) }).parseFromString(text, "application/xml");
-  assert(document && diagnostics.length === 0, "Independent CLI XML must be well formed.");
+  assert(document && !document.doctype && diagnostics.length === 0, "Independent CLI XML must be well formed.");
   return document;
 }
 export function xmlTexts(document: ReturnType<typeof parseLiveXml>, tag: string): string[] {
@@ -31,17 +32,45 @@ export function xmlTexts(document: ReturnType<typeof parseLiveXml>, tag: string)
 }
 export function nativeXmlPendingPaths(document: ReturnType<typeof parseLiveXml>): string[] {
   assert.equal(document.documentElement?.tagName, "StatusOutput", "Not a native workspace status XML document.");
-  const containers = Array.from(document.getElementsByTagName("Changes"));
-  assert(containers.length <= 1, "Ambiguous independent pending inventory.");
-  if (!containers.length) return [];
-  const changes = Array.from(containers[0].childNodes).filter(node => node.nodeType === 1);
-  return changes.map(node => {
+  // This independent guard validates the envelope before absence of Changes can
+  // mean empty. A renamed/nested future inventory must never authorize mutation.
+  const children = (element: Element, allowed: readonly string[]): Map<string, Element> => {
+    const entries = new Map<string, Element>();
+    for (const node of Array.from(element.childNodes)) {
+      if (node.nodeType === 1) {
+        const child = node as Element;
+        assert(allowed.includes(child.tagName) && !entries.has(child.tagName), "Unknown or duplicate independent XML element.");
+        entries.set(child.tagName, child);
+      } else assert(node.nodeType === 8 || !node.nodeValue?.trim(), "Unexpected independent XML text.");
+    }
+    return entries;
+  };
+  const leaf = (element: Element | undefined): string => {
+    assert(element && element.getElementsByTagName("*").length === 0, "Missing or nested independent XML scalar.");
+    return element.textContent ?? "";
+  };
+  const envelope = children(document.documentElement, ["WorkspaceStatus", "WkConfigType", "WkConfigName", "Changes"]);
+  const workspace = envelope.get("WorkspaceStatus");
+  assert(workspace, "Independent XML workspace identity is missing.");
+  const status = children(workspace, ["Status"]).get("Status");
+  assert(status, "Independent XML status identity is missing.");
+  const context = children(status, ["RepSpec", "Changeset"]), repository = context.get("RepSpec");
+  assert(repository && /^(0|[1-9][0-9]*)$/.test(leaf(context.get("Changeset"))), "Independent XML changeset identity is invalid.");
+  const spec = children(repository, ["Server", "Name"]);
+  assert(leaf(spec.get("Server")) && leaf(spec.get("Name")) && leaf(envelope.get("WkConfigType")) && leaf(envelope.get("WkConfigName")), "Independent XML workspace metadata is incomplete.");
+  const container = envelope.get("Changes");
+  if (!container) return [];
+  const paths: string[] = [];
+  for (const node of Array.from(container.childNodes)) {
+    if (node.nodeType !== 1) { assert(node.nodeType === 8 || !node.nodeValue?.trim(), "Unexpected independent pending text."); continue; }
     assert.equal(node.nodeName, "Change", "Unknown independent pending element must not imply clean state.");
-    const change = node as unknown as { getElementsByTagName(name: string): ArrayLike<{ textContent: string | null }> };
-    const paths = Array.from(change.getElementsByTagName("Path")), types = Array.from(change.getElementsByTagName("Type"));
-    assert(paths.length === 1 && types.length === 1 && paths[0].textContent && types[0].textContent, "Independent XML pending row is incomplete.");
-    return paths[0].textContent;
-  });
+    const fields = children(node as Element, ["Type", "TypeVerbose", "Path", "OldPath", "PrintableMovedPath", "MergesInfo", "SimilarityPerUnit", "Similarity", "Size", "PrintableSize", "PrintableLastModified", "RevisionType", "LastModified"]);
+    for (const field of fields.values()) leaf(field);
+    const path = leaf(fields.get("Path")), type = leaf(fields.get("Type"));
+    assert(path && type, "Independent XML pending row is incomplete.");
+    paths.push(path);
+  }
+  return paths;
 }
 export class PlasticLiveHarness {
   readonly runId = `${new Date().toISOString().replace(/[-:.TZ]/g, "")}-${process.pid}`;

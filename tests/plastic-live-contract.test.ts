@@ -21,13 +21,26 @@ try {
 } finally {
   for (const name of vars) { const value = previous[name]; if (value === undefined) delete process.env[name]; else process.env[name] = value; }
 }
-assert.deepEqual(nativeXmlPendingPaths(parseLiveXml("<StatusOutput><WorkspaceStatus /></StatusOutput>")), []);
-assert.deepEqual(nativeXmlPendingPaths(parseLiveXml("<StatusOutput><Changes><Change><Type>RP</Type><Path>C:\\example\\café.txt</Path></Change></Changes></StatusOutput>")), ["C:\\example\\café.txt"]);
+const context = "<WorkspaceStatus><Status><RepSpec><Server>example@unity</Server><Name>Example Repository</Name></RepSpec><Changeset>16</Changeset></Status></WorkspaceStatus><WkConfigType>Branch</WkConfigType><WkConfigName>/main</WkConfigName>";
+const status = (inventory = "") => `<StatusOutput>${context}${inventory}</StatusOutput>`;
+const change = "<Change><Type>RP</Type><Path>C:\\example\\café.txt</Path></Change>";
+assert.deepEqual(nativeXmlPendingPaths(parseLiveXml(status())), []);
+assert.deepEqual(nativeXmlPendingPaths(parseLiveXml(status("<Changes />"))), []);
+assert.deepEqual(nativeXmlPendingPaths(parseLiveXml(status(`<Changes>${change}</Changes>`))), ["C:\\example\\café.txt"]);
 for (const xml of [
   "<OtherOutput />",
-  "<StatusOutput><Changes><Unknown /></Changes></StatusOutput>",
-  "<StatusOutput><Changes><Change><Type>RP</Type></Change></Changes></StatusOutput>",
-  "<StatusOutput><Changes /><Changes /></StatusOutput>",
+  "<StatusOutput />",
+  "<StatusOutput><WorkspaceStatus /></StatusOutput>",
+  status("<Changes><Unknown /></Changes>"),
+  status("<Changes><Change><Type>RP</Type></Change></Changes>"),
+  status("<Changes /><Changes />"),
+  status(`<FutureChanges>${change}</FutureChanges>`),
+  status(`<Unknown><Changes>${change}</Changes></Unknown>`),
+  status(`<Changes><Change><Type>RP</Type><Path><FuturePath>C:\\example\\pending.txt</FuturePath></Path></Change></Changes>`),
+  status().replace("</WorkspaceStatus>", `<FutureChanges>${change}</FutureChanges></WorkspaceStatus>`),
+  status().replace("<WkConfigName>/main</WkConfigName>", `<WkConfigName><Changes>${change}</Changes></WkConfigName>`),
+  status().replace("<Changeset>16</Changeset>", "<Changeset>16</Changeset><Changeset>17</Changeset>"),
 ]) assert.throws(() => nativeXmlPendingPaths(parseLiveXml(xml)));
+assert.throws(() => parseLiveXml('<!DOCTYPE StatusOutput [<!ENTITY x "pending">]><StatusOutput />'));
 assert.throws(() => parseLiveXml("<StatusOutput>"));
 console.log("PASS: live harness mutation attestation, absolute scope and independent pending completeness controls (no CM commands)");

@@ -86,7 +86,7 @@ try {
     put(selectedFile, "selected standalone edit\n");
     put(unrelated, "unrelated controlled edit\n");
     put(privateFile, "private work must remain untouched\n");
-    const receipt = await live.tool("plastic_checkin", { message: "pi-plastic selected scope", paths: [selectedFile], format: "text" });
+    const receipt = await live.tool("plastic_checkin", { message: "pi-plastic selected scope", paths: [selectedFile], includeAll: true, format: "text" });
     assert(receipt.data.createdChangeset?.id);
     const state = live.state();
     assert.equal(state.branch, target);
