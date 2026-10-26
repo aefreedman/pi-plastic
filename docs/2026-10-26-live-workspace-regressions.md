@@ -73,3 +73,15 @@ The process trace wraps the real execution seam and launches the actual executab
 For a redesign/regression investigation, run the same scenario against the baseline and candidate source. Record both revisions and exact scenario selections. Keep failures, partial effects and infrastructure errors distinct. Live execution is bounded per CLI process, with no timeout retry or fallback. A client/platform observation is not universal support or an atomic repository snapshot.
 
 `npm run test:live:contract` is credential-free and runs no CM commands. It validates opt-in/attestation behavior and ensures unknown/malformed independent pending XML cannot be interpreted as a clean workspace. Default `npm test` includes these harness controls. The ordinary deterministic suites still own malformed transport, cancellation, synthetic warning, and schema-semantic adversarial coverage.
+
+## Observed validation checkpoint — 2026-10-26
+
+The Windows CM sandbox reproduced the original mixed-forward failure against the baseline. Against redesign implementation `ec2db35` and harness revisions `9bbe754`/`8551177`, serial live runs established:
+
+- All seven default scenarios passed, including native/forward/relative workdirs, selected scope with `includeAll=true`, private exclusion, no-op and a real text conflict followed by deliberate reconciliation.
+- The 130-file scenario completed integration with independent content/history/ancestry checks; it did not silently accept a truncated path prefix.
+- Unrelated controlled work produced the expected explicit scope blocker and launched no checkin process.
+- The Unicode-filename probe stopped on uncertain client output capture; independent UTF-8 XML retained the original path, and no checkin process launched. This is safe failure evidence, **not Unicode-filename support**.
+- A final independent read-only smoke verified the original branch/changeset restored, no pending paths, no merge links and clear markers. Owned synthetic history remains available; separately authorized negative-fixture recovery was not counted as successful tool integration.
+
+An earlier multi-scenario invocation hit its outer host deadline, and an initial conflict run exposed an incorrect ancestry cutoff in the harness. Both remain recorded as failed/incomplete runs. New serial runs used longer deadlines and the corrected common-baseline ancestry assertion; neither failure was relabeled or used to justify replaying an uncertain merge. Raw evidence stays in private external run directories.
