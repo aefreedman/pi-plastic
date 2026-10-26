@@ -1,37 +1,32 @@
 import assert from "node:assert/strict";
-import { resolve } from "node:path";
-import { invokeRegisteredTool } from "./pi-tool-harness.ts";
+import { configuredLiveWorkspace, PlasticLiveHarness } from "./plastic-live-harness.ts";
 
-type ToolEnvelope = {
-  ok?: boolean;
-  data?: Record<string, unknown>;
-};
-
-const parseToolEnvelope = (text: string): ToolEnvelope => {
-  const fencedJson = text.match(/```json\s*([\s\S]*?)\s*```/);
-  assert(fencedJson, "Expected a structured JSON tool result.");
-  return JSON.parse(fencedJson[1]) as ToolEnvelope;
-};
-
-const configuredWorkspace = process.env.PI_PLASTIC_TEST_WORKSPACE?.trim();
-
-if (!configuredWorkspace) {
+const workspace = configuredLiveWorkspace();
+if (!workspace) {
   console.log("SKIP: set PI_PLASTIC_TEST_WORKSPACE to run opt-in Plastic live smoke tests");
   process.exit(0);
 }
-
-const workspace = resolve(configuredWorkspace);
-const status = parseToolEnvelope(await invokeRegisteredTool("plastic_status", { short: true, format: "json" }, workspace));
-assert.equal(status.ok, true, "Expected Plastic status to succeed.");
-const summary = status.data?.summary as Record<string, unknown> | undefined;
-const mergeState = status.data?.mergeState as Record<string, unknown> | undefined;
-assert.equal(summary?.totalPending, 0, "Live smoke tests require a clean workspace.");
-assert.equal(mergeState?.hasMergeInProgress, false, "Live smoke tests require no merge in progress.");
-
-const currentBranch = parseToolEnvelope(await invokeRegisteredTool("plastic_currentBranch", { format: "json" }, workspace));
-assert.equal(currentBranch.data?.branch, "/main", "Live sandbox must be on /main.");
-
-const mainExists = await invokeRegisteredTool("plastic_branchExists", { branch: "/main" }, workspace);
-assert.equal(mainExists.trim(), "true", "Expected plastic_branchExists to find the full /main path.");
-
-console.log("PASS: read-only Plastic live smoke tests passed for the configured sandbox");
+const live = await PlasticLiveHarness.create(workspace);
+try {
+  const initial = live.clean();
+  const status = await live.tool("plastic_status", { source: "xml", maxItems: 500, format: "text" });
+  assert.equal(status.completeness.read, "complete");
+  assert.equal(status.completeness.capture, "complete");
+  assert.equal(status.data.itemCount.parsed, 0);
+  assert.equal(status.data.itemCount.omitted, 0);
+  assert.equal(status.data.summary.totalPending, 0);
+  const branch = await live.tool("plastic_currentBranch", { format: "text" });
+  assert.equal(branch.data.branch, initial.branch, "Registered branch must agree with independent native observation.");
+  const exists = await live.tool("plastic_branchExists", { branch: initial.branch, format: "text" });
+  assert.equal(exists.data.exists, true);
+  const markers = await live.tool("plastic_mergeListConflictMarkers", { format: "text" });
+  assert.equal(markers.data.inspection.state, "clear");
+  const final = live.clean(initial.branch);
+  assert.equal(final.changeset, initial.changeset, "Read-only smoke must not create or load another changeset.");
+  live.saveSummary({ outcome: "passed", initial, final });
+  console.log(`PASS: registered structured outputs agree with independent native clean/branch/marker observations; private evidence: ${live.evidenceDirectory}`);
+} catch (error) {
+  live.saveSummary({ outcome: "failed", error: String(error) });
+  console.error(`Live smoke failed; private evidence: ${live.evidenceDirectory}`);
+  throw error;
+}
