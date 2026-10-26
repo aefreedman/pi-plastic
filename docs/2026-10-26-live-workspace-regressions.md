@@ -1,5 +1,7 @@
 # Live workspace merge regressions
 
+[Documentation index](README.md) · [Workspace observations](2026-10-26-workspace-observations.md)
+
 The opt-in live suites complement captured fixtures. They exercise the registered tools from the current source checkout against real CM processes, then independently inspect resulting bytes, native status XML, branch identity, changeset history and source ancestry. Schema validity alone is not acceptance.
 
 ## Choose the exact sandbox
