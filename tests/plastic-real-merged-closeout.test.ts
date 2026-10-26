@@ -60,10 +60,13 @@ if (process.platform === "win32") {
                 });
                 return child;
             }) as any };
+            // Exercise the exact production spelling regression through both
+            // registered and core closeout, not only the low-level parser.
+            const request = { ...args, workdir: format === "json" ? cwd.replaceAll("\\", "/") : cwd, format };
             const result = await runWithAbortSignal(undefined, () => route === "core"
-                ? mergeToBranch.execute({ ...args, format })
-                : route === "registered" ? tools.get("plastic_mergeToBranch")!.execute("synthetic", { ...args, format })
-                    : executeCloseoutOutput({ ...args, format }), deps);
+                ? mergeToBranch.execute(request)
+                : route === "registered" ? tools.get("plastic_mergeToBranch")!.execute("synthetic", request)
+                    : executeCloseoutOutput(request), deps);
             return { result: result as any, calls };
         }
         for (const format of ["text", "json"] as const) {
