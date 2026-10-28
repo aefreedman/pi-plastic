@@ -2,7 +2,7 @@
 
 [Documentation index](README.md) · [Tool-by-tool routing](README.md#look-up-a-tool)
 
-Pi Plastic registers **27 core tools** with output schemas, plus `plastic_tool_search`. The loader describes/activates capabilities and intentionally has no core receipt schema.
+Pi Plastic registers **41 core tools** with output schemas, plus `plastic_tool_search`. The loader describes/activates capabilities and intentionally has no core receipt schema.
 
 ## Capability loader
 
@@ -33,7 +33,7 @@ Set `PI_PLASTIC_TOOL_LOADING_MODE` before starting Pi:
 |---|---|---|
 | `balanced` | Loader, `plastic_status`, `plastic_currentBranch` | Default; inspect first and activate task capabilities as needed |
 | `loader-only` | Loader | Maximum initial schema reduction |
-| `all-active` | All 27 core tools; loader omitted from the active set | Controlled comparison or intentional full exposure |
+| `all-active` | All 41 core tools; loader omitted from the active set | Controlled comparison or intentional full exposure |
 
 Inactive tools remain registered. Prior loader additions on the active session branch are restored on startup, resume, fork, and reload.
 
@@ -55,9 +55,9 @@ On a sourceInfo-capable host, providers without native deferred definitions stil
 |---|---|
 | Status and discovery | Observe pending paths, branch paths/existence, workspace records, shelf IDs, review IDs |
 | Workspace operations | Add/undo/update/check in, create/delete/switch branches, request delete/change removal |
-| Merging | Workspace merge/finalization, server merge, staged branch closeout |
+| Merging | Workspace marker merges, server merges, staged branch closeout |
 | Diffs and patches | Compare explicitly scoped content or generate a review artifact—not patch application |
-| Shelvesets and reviews | Create/apply/delete shelvesets; create/update/delete code reviews |
+| Shelvesets and reviews | Create/apply/delete shelvesets; manage review metadata, discussions, reviewers and own status |
 
 Use status to list changed paths. Use diff when content evidence is needed, not as routine ceremony. Use preflight only when scope is broad/ambiguous, a compound operation needs inspection, or the user asks for it; its meaning varies by tool.
 

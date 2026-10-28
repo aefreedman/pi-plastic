@@ -17,7 +17,6 @@ This is the public manual shipped with the package. Start with a task, then read
 | Choose workspace merge versus server merge versus closeout | [Merging](2026-10-06-merging.md#choose-a-route) |
 | Understand shared workspace observations and safety blockers | [Workspace observations](2026-10-26-workspace-observations.md) |
 | Validate real merges in a disposable sandbox | [Live workspace regressions](2026-10-26-live-workspace-regressions.md) |
-| Understand observed multi-file, reviewed-server and inferred-move profiles | [Observed workflow profiles](2026-10-21-observed-workflow-profiles.md) |
 | Review local/historical changes or generate a patch | [Diffs and patches](2026-10-06-diffs-and-patches.md) |
 | Save/apply/delete a shelf or manage a review | [Shelvesets and reviews](2026-10-06-shelvesets-and-reviews.md) |
 | Understand display, footer, or ignore/cloak behavior | [Integrations](2026-10-06-integrations.md) |

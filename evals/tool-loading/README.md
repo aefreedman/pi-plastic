@@ -11,7 +11,7 @@ The runner pins the canonical local SDK package root for each subprocess and che
 - Tool errors, assistant errors, call/output/time bounds, maximum four activation results, and no destructive activation in negative or ambiguous discovery cases. An eval-only extension blocks every mutating Plastic call (including workspace update and server merge) unless that tool's registered schema supports `preflight` and the call supplies `preflight: true`. Persistent patch outputs are blocked; patch content returned through cleaned-up temporary files remains permitted.
 - JSONL events, assistant usage/cache totals, wall time, initial provider `tools` serialization size, and native `tool_search_call` / `tool_search_output` markers when Pi/provider payloads expose them.
 
-`baseline.json` preserves the legacy 29-tool measurement for comparison. The current all-active mode omits the loader and exposes `28 / 21071` after withholding workspace creation; balanced records `3 / 2133` (89.93% legacy reduction), and loader-only records `1 / 1121` (94.71%). The loader's prompt metadata is 278 characters; the untouched legacy baseline has none.
+`baseline.json` is a frozen comparison fixture consumed by the runner, not a current measurement or acceptance report. See [tools and loading](../../docs/2026-10-06-tools-and-loading.md) for the current catalog. Run fresh, authorized trials to measure current behavior and keep investigation notes and result reports outside this package.
 
 ## Run
 

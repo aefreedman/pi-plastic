@@ -40,8 +40,11 @@ export function observeWorkspacePending(text: string, workdir: string): Workspac
         if (seen.has(key)) issue("pending_path_duplicate", path); seen.add(key);
         const m = /^Merge from ([1-9][0-9]{0,19})$/.exec(metadata ?? "");
         if (metadata !== "NO_MERGES" && !m) issue("pending_merge_metadata_unknown", path);
-        if (!/^(PR|AD|CO|CH|LD|RP|CP|DE|MV)$/.test(f[0])) issue("pending_status_unknown", path);
+        if (!/^(PR|AD|CO|CH|LD|RP|CP|DE|MV|CO\+RP)$/.test(f[0])) issue("pending_status_unknown", path);
         const validRevision = /^(PR|AD|CO)$/.test(f[0]) ? revision === "-1" : positive.test(revision ?? "");
+        // Observed CO+RP is a replaced checkout with a positive revision,
+        // not ordinary CO/-1. Only its non-merge, file profile is admitted.
+        if (f[0] === "CO+RP" && (directory !== "False" || metadata !== "NO_MERGES")) issue("pending_compound_state_unknown", path);
         if (!validRevision || move && (f[1] !== "100%" || directory !== "False" || !!m)) issue("pending_revision_or_move_unknown", path);
         if (m && (!/^(CO|RP|CP|DE)$/.test(f[0]) || directory === "True" && !/^(CP|DE)$/.test(f[0]))) issue("pending_merge_kind_unknown", path);
         result.rows.push({ status: f[0], path, isDirectory: directory === "True", revision, mergeChangeset: m?.[1] ?? null, ...(sourcePath ? { sourcePath } : {}) });
@@ -53,7 +56,7 @@ export function observeWorkspacePending(text: string, workdir: string): Workspac
     }
     return result;
 }
-const labels: Record<string, readonly string[]> = { RP: ["Replaced"], CP: ["Copied (new)"], CO: ["Checked-out (changed)", "Checked-out (unchanged)"], CH: ["Changed"], AD: ["Added"], PR: ["Private"], DE: ["Removed", "Deleted"], LD: ["Locally deleted", "Deleted"], MV: ["Moved"] };
+const labels: Record<string, readonly string[]> = { "CO+RP": ["Replaced / Checked-out (unchanged)"], RP: ["Replaced"], CP: ["Copied (new)"], CO: ["Checked-out (changed)", "Checked-out (unchanged)"], CH: ["Changed"], AD: ["Added"], PR: ["Private"], DE: ["Removed", "Deleted"], LD: ["Locally deleted", "Deleted"], MV: ["Moved"] };
 export type WorkspaceStandardObservation = { branch: SwitchBranchObservation | null; links: Array<{ changeset: string; branch: string; repository: string | null; server: string | null }>; issues: WorkspaceIssue[] };
 export function observeWorkspaceStandard(text: string, pending: WorkspacePendingObservation): WorkspaceStandardObservation {
     const result: WorkspaceStandardObservation = { branch: parseSwitchLoadedBranch(text), links: [], issues: [] };

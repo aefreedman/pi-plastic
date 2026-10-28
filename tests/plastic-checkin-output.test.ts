@@ -125,6 +125,33 @@ for(const preflight of [false,true]){
 for(const suffix of ["Pending merge links\r\n    Merge from cs:43 at /main/source@Example Repository@example@unity\r\n","Merge in progress\r\n","Unresolved conflicts\r\n","Unexpected metadata\r\n"]){
     r=await invoke({pending:checkedOutRow(),fullStatus:ordinaryHeader+suffix},{message:"Unknown checkout state",workdir:cwd,includeAll:true});assert.equal(r.dto.outcome,"unsupported");assert.equal(r.calls.filter(c=>c[0]==="checkin").length,0);
 }
+// Sanitized regression for the observed CO+RP/positive-revision/NO_MERGES
+// profile. Full status must corroborate it; no invented merge admission.
+const replacedCheckout = row("CO+RP");
+const replacedFull = `/main/café-é-日本-😀@Example Repository@example@unity (cs:9007199254740993 - head)\r\nChanged\r\n    Status  Size  Last Modified  Path\r\n    Replaced / Checked-out (unchanged)    70 KB    opaque age    ${name}\r\n`;
+const replacedParsed = parseCheckinPending(header + replacedCheckout, cwd);
+assert(replacedParsed.admitted);
+assert.equal(replacedParsed.items[0].statusCode, "CO+RP");
+assert.equal(replacedParsed.items[0].kind, "changed");
+assert.equal(replacedParsed.items[0].revisionId, "9007199254740995");
+for (const tool of [undefined, registered]) for (const preflight of [false, true]) {
+    r = await invoke({ pending: replacedCheckout, fullStatus: replacedFull }, { ...input, preflight }, false, tool);
+    assert(r.dto.ok, JSON.stringify(r.dto));
+    assert.equal(r.dto.outcome, preflight ? "preflight" : "completed");
+    assert.equal(r.dto.data.assessment.ready, true);
+    assert.deepEqual(r.dto.data.includedPaths, [name]);
+    assert.equal(r.calls.filter(c => c[0] === "checkin").length, preflight ? 0 : 1);
+}
+for (const pending of [replacedCheckout.replace("9007199254740995", "-1"), replacedCheckout.replace("False", "True"), replacedCheckout.replace("NO_MERGES", "Merge from 43"), replacedCheckout.replace("CO+RP", "CO+RP+UNKNOWN"), replacedCheckout.replace("CO+RP", "CO+CP")]) {
+    r = await invoke({ pending, fullStatus: replacedFull });
+    assert.equal(r.dto.outcome, "unsupported");
+    assert(!r.calls.some(c => c[0] === "checkin"));
+}
+for (const fullStatus of [replacedFull + "Merge in progress\r\n", replacedFull + "Unresolved conflicts\r\n", replacedFull + "Pending merge links\r\n    Merge from cs:43 at /main/source@Example Repository@example@unity\r\n", replacedFull.replace("Replaced / Checked-out (unchanged)", "Replaced"), replacedFull.replace(name, "other.txt"), replacedFull.split("Changed")[0]]) {
+    r = await invoke({ pending: replacedCheckout, fullStatus });
+    assert.equal(r.dto.outcome, "unsupported");
+    assert(!r.calls.some(c => c[0] === "checkin"));
+}
 // General CO admission: unrelated checkouts must not block a selected CH path,
 // and selected checkouts must retain their requested scope without invented bases.
 const unrelatedCheckout = cwd + "\\unrelated-checked-out.txt";

@@ -83,7 +83,7 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         let loaded: ReturnType<typeof parseSwitchLoadedBranch> = null;
         // Full-state safety is shared with merge and closeout, not inferred from
         // which captured copied/merged/ordinary profile happened to match.
-        if (merged || before.items.some(i => /^(CO|RP|CP|DE)$/.test(i.statusCode))) {
+        if (merged || before.items.some(i => /^(CO|RP|CP|DE|CO\+RP)$/.test(i.statusCode))) {
             const { o, s } = await record("merge-readiness", ["status"]);
             const standard = observeWorkspaceStandard(o.stdout ?? "", before.observation);
             loaded = standard.branch;

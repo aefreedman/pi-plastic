@@ -40,6 +40,8 @@ Directly invoked mutating `plastic_*` tools run without package-owned approval t
 
 Create normal work branches beneath an intended parent: use `<parent-branch>/<new-branch>`, not `/<new-branch>`. The parent does not need to be the branch loaded in the workspace. Prefer `plastic_branchCreate(branch="<new-branch>", parent="<parent-branch>")`; omitting `parent` requires directly observed standard-status loaded-branch identity, not a changeset owner. Qualifier-bearing relative names/parents are rejected: use a full qualified hierarchical target. Successful branch-create receipts prove command completion only, not created identity or repository effects; no automatic verification/switch follows. Rare top-level branch creation requires the explicit `allowRootBranch=true` override.
 
+`CO+RP` means checked-out/replaced, not inherently an unresolved conflict. Checkin supports the observed non-merge file profile with a positive revision, `NO_MERGES`, and corroborating full status. A `pending_status_unknown` rejection indicates a tool admission limitation, not proof that files need repair: report the unsupported profile rather than undoing/replacing work, forcing a merge, or repeatedly retrying preflight.
+
 Checkin receipts distinguish observed root changesets from unverified scope/head/alias/Xlink/link effects. Checkin preflight reads pending scope but does not mutate. Eligible complete admitted failures may trigger existing safe-private add/retry or path fallback; capture/timeout/abort uncertainty must not be retried automatically. Failed post/recovery reads stay unknown, and even an empty pending read after failed checkin is not completion proof. Earlier child effects remain recorded; inspect them before another attempt.
 
 ## External File Loading

@@ -22,7 +22,7 @@ Default tests are credential-free. They cover schemas/semantic guards, registrat
 
 ## Structured API and transport
 
-All 27 core tools have closed output schemas and direct native producer execution. The capability loader is deliberately schema-less. Core exports remain string-returning views; selected failures reject so compound callers cannot proceed on presentation text.
+All 41 core tools have closed output schemas and direct native producer execution. The capability loader is deliberately schema-less. Core exports remain string-returning views; selected failures reject so compound callers cannot proceed on presentation text.
 
 Producers own request snapshots, source admission, bounded projection and same-observation presentation. Native details vary by route: legacy read presentation can remain in rawResult, while mutation/diff receipts use empty details. Don't parse strings to reconstruct canonical facts.
 

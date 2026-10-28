@@ -14,7 +14,7 @@ No older-client fallback, automatic retry, installation or policy substitution e
 plastic_merge(source="br:/main/owned-feature", strategy="auto", format="json")
 ```
 
-Normal auto workspace merge emits `--merge --nointeractiveresolution --mergetype=try --conflict-markers` plus nonce-framed output controls. It never selects source/destination or launches an external merge GUI for text conflicts. Compound workspace closeout uses this same default. Explicit source/destination remain intentional discard policies, not preservation/finalization proof. Server merge is a separate workflow.
+Normal auto workspace merge emits `--merge --nointeractiveresolution --mergetype=try --conflict-markers` plus nonce-framed output controls. It never selects source/destination or launches an external merge GUI for text conflicts. Compound workspace closeout uses this same default. Explicit source/destination remain intentional discard policies, not preservation/finalization proof. Server merge is a separate workflow. There is no forced-finalization API.
 
 CM writes diff3 destination/base/source regions to files. Applying output can contain `CONFLICT_MARKERS` and `UNRESOLVED` records. Labels contain workspace paths, not independently verified revision identities. Binary, symlink, recursive-intermediate, directory and delete-change conflicts still require explicit decisions.
 
@@ -32,7 +32,7 @@ An informational pending listing returns `ok:true`, `outcome:"pending"`, `inspec
 
 Native Windows Unicode listing bytes were invalid UTF-8 and included irreversible `?` replacements. They remain unknown: no fallback decoding, byte replacement, settings changes or retries occur, and no unobserved Unicode encoding or platform profile is claimed.
 
-Nested merge/checkin/closeout receipts retain compact marker state/attempt/capture evidence, not repeated raw listings. Compact `pending` requires compatible exit-1 complete/capture metadata but cannot revalidate omitted text; state/counts are not file identity. Exit-1/nonempty metadata cannot be promoted to `clear`. Standalone listing retains bounded external output and reclassifies exact text/byte lengths. Printed paths never become automatic mutation operands; physical scope and exact-file acknowledgement remain independent. **An empty marker list NEVER establishes all-conflict readiness.** XML status merge fields are not a replacement conflict-readiness contract; combined CO+RP/CO+CP layouts remain unsupported.
+Nested merge/checkin/closeout receipts retain compact marker state/attempt/capture evidence, not repeated raw listings. Compact `pending` requires compatible exit-1 complete/capture metadata but cannot revalidate omitted text; state/counts are not file identity. Exit-1/nonempty metadata cannot be promoted to `clear`. Standalone listing retains bounded external output and reclassifies exact text/byte lengths. Printed paths never become automatic mutation operands; physical scope and exact-file acknowledgement remain independent. **An empty marker list NEVER establishes all-conflict readiness.** Unknown or mixed pending/full-status profiles remain unsupported; source-linked pending state and exit zero alone cannot authorize checkin. XML status merge fields are not a replacement conflict-readiness contract. The observed non-merge file profile `CO+RP` with a positive revision and `NO_MERGES` is supported when full status corroborates `Replaced / Checked-out (unchanged)`. Merge-associated `CO+RP`, directory variants and `CO+CP` remain unsupported.
 
 CM documents that already marked files are untouched on a repeated marker merge. This is not an automatic retry policy.
 
@@ -47,7 +47,3 @@ plastic_changesetEditComment(changeset="cs:42@Example Repository@example@unity",
 Supply exactly one of `comment` or `commentsFile`. Empty text clears; omission does not. Shell-free text preserves spaces, question marks, Unicode and bounded line breaks. Option-leading text requires explicit comment-file form. The file form emits `-commentsfile=<path>`, never guesses a filename. Selectors begin with `cs:` followed by a number or GUID; qualifiers are preserved.
 
 Preflight performs zero commands and does not verify existence, permission or contents. Completion proves one command returned, not independently observed stored text or repository identity. Failed/uncertain writes are never retried automatically.
-
-## Historical evidence boundary
-
-Historical session captures included exit-zero applications with unsupported pending/full-status profiles and checkin rejection despite source-linked pending state. They do not prove latest-client marker readiness. Keep producer output bounded and untrusted. Do not widen admission from marker words, source links, exit zero or an empty list alone. Unknown/mixed pending layouts stay unsupported. Forced-finalization/preservation workarounds are not a current API.

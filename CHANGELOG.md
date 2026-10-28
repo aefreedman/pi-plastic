@@ -7,6 +7,13 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.9.3] - 2026-10-28
+
+### Fixed
+
+- Admit the observed non-merge `CO+RP` file status for checkin/preflight with positive revision and corroborating full status, while retaining marker, conflict, merge-link and scope gates. Clarify that unsupported status admission is not evidence that workspace content needs repair.
+- Keep consumer documentation focused on current contracts and usage; remove historical investigation and benchmark reports and correct catalog counts.
+
 ## [0.9.2] - 2026-10-26
 
 ### Fixed

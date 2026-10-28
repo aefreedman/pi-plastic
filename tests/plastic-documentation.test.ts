@@ -68,6 +68,7 @@ const skillPath = resolve(root, "skills/using-plastic/SKILL.md");
 const publicDocs = [readmePath, ...paths, skillPath];
 for (const path of publicDocs) {
     const text = stripFences(read(path));
+    assert(!/^#{1,6}\s+(?:Observed validation checkpoint|Historical evidence boundary|Historical .*results|.*(?:investigation|work log))\b/im.test(text), `Keep work logs, investigations and result reports in coordination docs: ${relative(root, path)}`);
     assert(packed(path), `Every consumer document must ship: ${relative(root, path)}`);
     let tablePipes: number | null = null;
     for (const line of text.split("\n")) {
@@ -89,6 +90,11 @@ for (const path of publicDocs) {
 const names = getRegisteredPlasticExportNames(), tools = await loadRegisteredTools();
 assert.equal([...tools.values()].filter(tool => tool.outputSchema).length, names.length);
 assert(!tools.get("plastic_tool_search")!.outputSchema);
+for (const path of publicDocs) {
+    for (const match of stripFences(read(path)).matchAll(/\b(\d+) core tools\b/g)) {
+        assert.equal(Number(match[1]), names.length, `Stale core-tool count in ${relative(root, path)}`);
+    }
+}
 const routes = new Map<string, string>();
 for (const match of read(indexPath).matchAll(/\|\s*`(plastic_[A-Za-z_]+)`\s*\|\s*\[[^\]]+\]\(([^)]+)\)\s*\|/g)) {
     assert(!routes.has(match[1]), `Duplicate index route: ${match[1]}`);
