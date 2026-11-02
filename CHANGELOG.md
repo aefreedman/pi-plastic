@@ -7,6 +7,12 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Fixed
+
+- Validate against Pi 1.5.0; use host-injected keybinding hints, including explicitly unbound actions.
+- Bound branch-footer status confirmation output and reject truncated, killed or aborted results rather than displaying a partial branch.
+- Preserve dynamically activated tools across reload and resume using Pi's native loadout restoration, with inactive defaults for deferred tools.
+
 ## [0.9.3] - 2026-10-28
 
 ### Fixed

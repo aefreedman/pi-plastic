@@ -2,8 +2,7 @@ import { readFile } from 'node:fs/promises';
 import assert from "node:assert/strict";
 import { stripVTControlCharacters } from "node:util";
 import { resolve } from "node:path";
-import { createRequire } from "node:module";
-import { pathToFileURL, fileURLToPath } from "node:url";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext, Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Text, visibleWidth } from "@earendil-works/pi-tui";
 
@@ -18,11 +17,11 @@ assert.equal(resolve(config.getPackageDir()),resolve(fileURLToPath(new URL("../"
 const { default: registerPlastic } = await import("../index");
 const { renderPlasticCall, renderPlasticResult, renderPlasticSearchResult } = await import("../src/plastic-renderers");
 initTheme("dark");
-// The host's shrinkwrap may keep a separate TUI copy; keyHint reads that copy's registry.
-const hostRequire = createRequire(import.meta.resolve("@earendil-works/pi-coding-agent"));
-const { getKeybindings, setKeybindings, KeybindingsManager }: typeof import("@earendil-works/pi-tui") = await import(pathToFileURL(hostRequire.resolve("@earendil-works/pi-tui")).href);
-const previousBindings = getKeybindings();
-setKeybindings(new KeybindingsManager({ "app.tools.expand": { defaultKeys: "ctrl+o" } }, { "app.tools.expand": "ctrl+e" }));
+// Inject host-owned hints: no process-global keybinding registry in renderer tests.
+const hints = {
+  keyText: (_id: string) => "ctrl+e",
+  keyHint: (_id: string, description: string) => `ctrl+e ${description}`,
+};
 const colors: Array<{ color: string; text: string }> = [];
 const theme: Pick<Theme, "fg" | "bold"> = { fg: (color, text) => { colors.push({ color, text }); return text; }, bold: text => text };
 const plain = (component: { render(width: number): string[] }, width = 100) => component.render(width).map(line => stripVTControlCharacters(line).trimEnd()).join("\n");
@@ -33,7 +32,7 @@ const structured = (action: string, data: Record<string, unknown>, extra: Record
 };
 const components: Text[] = [];
 const render = (name: string, result: Parameters<typeof renderPlasticResult>[1], expanded = false, context?: Parameters<typeof renderPlasticResult>[4]) => {
-  const component = renderPlasticResult(name, result, { expanded }, theme, context);
+  const component = renderPlasticResult(name, result, { expanded }, theme, { ...hints, ...context });
   components.push(component);
   return plain(component);
 };
@@ -119,6 +118,9 @@ try {
   assert.match(collapsedStatus, /Assets\/Old.cs -> Assets\/New.cs/);
   assert.match(collapsedStatus, /ctrl\+e details/);
   assert(!collapsedStatus.includes("ctrl+o"));
+  const unbound = { keyText: (_id: string) => "", keyHint: (_id: string, _description: string) => { throw Error("unbound hint must not be requested"); } };
+  assert.doesNotMatch(render("status", status, false, unbound), /ctrl\+|details/);
+  assert.match(render("branchDelete", textResult("- branch: missing"), false, { args: {}, isError: true }), /Failed[\s\S]*branch: missing/);
   assert(!collapsedStatus.includes('"ok"'));
   const expandedStatus = render("status", status, true);
   assert.match(expandedStatus, /Workspace\nC:\/Projects\/MyGame/);
@@ -211,6 +213,8 @@ try {
   const searched = renderPlasticSearchResult(search, {}, theme);
   assert.match(plain(searched), /1 activated.*0 already active[\s\S]*Unavailable: plastic_missing/);
   assert.match(plain(renderPlasticSearchResult(search, { expanded: true }, theme)), /Guidance:[ ]select exact paths/);
+  assert.match(plain(renderPlasticSearchResult(search, {}, theme, hints)), /ctrl\+e guidance/);
+  assert.doesNotMatch(plain(renderPlasticSearchResult(search, {}, theme, unbound)), /ctrl\+|guidance/);
   components.push(searched);
   const unicode = renderPlasticCall("diff", { mode:"file", path: "Assets/\u4e2d\u6587/\ud83d\ude80-e\u0301.cs", workdir: "C:/\u4e2d\u6587" }, theme);
   components.push(unicode);
@@ -265,6 +269,5 @@ try {
     console.log("\nExpanded file diff\n" + render("diff", structured("diff", { status: "changed", diff, truncated: false }), true));
   }
 } finally {
-  setKeybindings(previousBindings);
   if (previousPackageDir === undefined) delete process.env.PI_PACKAGE_DIR; else process.env.PI_PACKAGE_DIR = previousPackageDir;
 }

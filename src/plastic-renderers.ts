@@ -1,10 +1,10 @@
 import { stripVTControlCharacters } from "node:util";
-import { keyHint, type Theme } from "@earendil-works/pi-coding-agent";
+import type { Theme, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 
 type Args = Record<string, unknown>;
 type RenderTheme = Pick<Theme, "fg" | "bold">;
-type Context = { args?: unknown; cwd?: string; isError?: boolean; lastComponent?: unknown };
+type Context = { args?: unknown; cwd?: string; isError?: boolean; lastComponent?: unknown } & Partial<Pick<Parameters<NonNullable<ToolDefinition["renderResult"]>>[3], "keyHint" | "keyText">>;
 type Result = { content?: Array<{ type: string; text?: string }>; details?: unknown };
 type Options = { expanded?: boolean; isPartial?: boolean };
 type Tone = "success" | "warning" | "error" | "toolOutput";
@@ -323,7 +323,7 @@ export function renderPlasticResult(name: string, result: Result, options: Optio
     if (notices.length > 2) text += `\n${theme.fg("dim", `${notices.length - 2} more notices`)}`;
     for (const row of summary.rows.slice(0, 2)) text += `\n${theme.fg(summary.tone === "error" ? "error" : "muted", compact(row))}`;
     if (summary.rows.length > 2) text += `\n${theme.fg("dim", `${summary.rows.length - 2} more rows`)}`;
-    if (raw) text += `\n${theme.fg("dim", keyHint("app.tools.expand", "details"))}`;
+    if (raw && context?.keyText?.("app.tools.expand")) text += `\n${theme.fg("dim", context.keyHint?.("app.tools.expand", "details") ?? "")}`;
   } else {
     const section = (title: string, value: string) => { if (value) text += `\n\n${theme.fg("toolTitle", theme.bold(title))}\n${value}`; };
     const args = record(context?.args);
@@ -359,6 +359,6 @@ export function renderPlasticSearchResult(result: Result, options: Options, them
   if (unavailable.length) text += `\n${theme.fg("warning", compact(`Unavailable: ${unavailable.join(", ")}`))}`;
   for (const name of matches) text += `\n${theme.fg("accent", compact(name))}`;
   if (options.expanded) text += `\n\n${theme.fg("toolTitle", theme.bold("Guidance"))}\n${evidence(body(result), theme)}`;
-  else text += `\n${theme.fg("dim", keyHint("app.tools.expand", "guidance"))}`;
+  else if (context?.keyText?.("app.tools.expand")) text += `\n${theme.fg("dim", context.keyHint?.("app.tools.expand", "guidance") ?? "")}`;
   return reuse(context, text);
 }

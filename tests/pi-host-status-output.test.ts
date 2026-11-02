@@ -53,7 +53,7 @@ const previous = { executable: process.env.PI_PLASTIC_CM_EXECUTABLE, mode: proce
 process.env.PI_PLASTIC_CM_EXECUTABLE = process.execPath;
 process.env.PI_PLASTIC_TOOL_LOADING_MODE = "all-active";
 process.chdir(fixture); // Workspace-free commands inherit process cwd; fake executable scripts are owned here.
-const state = { scenario: "", nested: undefined as any };
+const state = { scenario: "", nested: undefined as any, validated: [] as Array<{ name: string; input: any }> };
 (globalThis as any).__plasticHostFixture = state;
 const commandFixture = `const fs = require("node:fs");
 fs.appendFileSync("calls.jsonl", JSON.stringify(process.argv.slice(1)) + "\\n");
@@ -235,6 +235,7 @@ await writeFile(join(fixture, "scenario.json"), "{}", { flag: "wx" });
 await writeFile(join(fixture, "calls.jsonl"), "", { flag: "wx" });
 await writeFile(join(fixture, "version"), `require("node:fs").appendFileSync("calls.jsonl", "version\\n"); console.log("fixture-version");`, { flag: "wx" });
 await writeFile(modifierPath, `export default function(pi) {
+  pi.on("tool_call", e => { if (e.toolName.startsWith("plastic_") && globalThis.__plasticHostFixture.scenario.startsWith("schema-")) globalThis.__plasticHostFixture.validated.push({ name: e.toolName, input: structuredClone(e.input) }); });
   pi.on("tool_call", e => { if (["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo","plastic_resolveDeleteChangeConflict","plastic_merge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate","plastic_branchEditComment","plastic_codeReviewCommentFind","plastic_codeReviewCommentAdd","plastic_codeReviewReviewerList","plastic_codeReviewSetStatus"].includes(e.toolName) && globalThis.__plasticHostFixture.scenario === "blocked") return { block: true, reason: "fixture policy block" }; });
   pi.on("tool_result", e => {
     if (!["plastic_status", "plastic_branchList", "plastic_workspaceList", "plastic_shelvesetList", "plastic_codeReviewFind", "plastic_diff", "plastic_mergeBranches", "plastic_checkin", "plastic_branchCreate","plastic_switchBranch","plastic_update","plastic_add","plastic_undo","plastic_resolveDeleteChangeConflict","plastic_merge","plastic_mergeToBranch","plastic_branchDelete","plastic_shelvesetDelete","plastic_codeReviewDelete","plastic_patch","plastic_shelvesetCreate","plastic_shelvesetApply","plastic_codeReviewCreate","plastic_codeReviewUpdate","plastic_branchEditComment","plastic_codeReviewCommentFind","plastic_codeReviewCommentAdd","plastic_codeReviewReviewerList","plastic_codeReviewSetStatus"].includes(e.toolName)) return;
@@ -289,6 +290,46 @@ await writeFile(modifierPath, `export default function(pi) {
   };
   const script = (args: object) => ({ code: `const dto = await tools.plastic_status(${JSON.stringify(args)}); if (typeof dto !== "object") throw Error("unexpected fallback"); text(dto);` });
   const text = (result: any) => result.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
+  // Actual host validation (both model calls and nested calls), not execute stubs.
+  for (const nested of [false, true]) {
+    const invokeSchema = (name: string, args: Record<string, unknown>) => run("schema-boundary", nested ? "codemode" : name, nested ? { code: `text(await tools.${name}(${JSON.stringify(args)}));` } : args);
+    for (const [name, args] of [
+      ["plastic_branchDelete", {}], // missing required mutation operand
+      ["plastic_add", { paths: [{}] }],
+      ["plastic_branchDelete", { branch: "br:/main/fixture", preflight: "not-a-boolean" }],
+      ["plastic_status", { maxItems: "0" }],
+      ["plastic_status", { maxItems: "501" }],
+      ["plastic_status", { source: "not-an-enum" }],
+    ] as Array<[string, Record<string, unknown>]>) {
+      state.validated.length = 0;
+      const rejected = await invokeSchema(name, args);
+      assert.equal(rejected.calls.length, 0, `${name}: invalid arguments must not launch a process`);
+      assert.equal(rejected.children[0].isError, true);
+      assert.equal(state.validated.length, 0, `${name} ${JSON.stringify(args)}: invalid arguments must not reach tool_call or execute; observed ${JSON.stringify(state.validated)}`);
+    }
+    state.validated.length = 0;
+    const coerced = await invokeSchema("plastic_status", { machineReadable: "true", maxItems: "1", format: null });
+    assert.equal(coerced.children[0].isError, false);
+    assert.deepEqual(state.validated[0].input, { machineReadable: true, maxItems: 1 });
+    assert.equal(coerced.calls.length, 1);
+    state.validated.length = 0;
+    const preview = await invokeSchema("plastic_resolveDeleteChangeConflict", { paths: "fixture.txt", preflight: "true", workdir: null });
+    assert.equal(preview.children[0].isError, false);
+    assert.deepEqual(state.validated[0].input, { paths: ["fixture.txt"], preflight: true });
+    assert.equal(preview.children[0].result.structuredContent.outcome, "preflight");
+    assert.equal(preview.calls.length, 0, "coerced preview remains command-only");
+    state.validated.length = 0;
+    const booleanPreview = await invokeSchema("plastic_branchDelete", { branch: "br:/main/fixture", preflight: "true" });
+    assert.equal(booleanPreview.children[0].isError, false);
+    assert.equal(state.validated[0].input.preflight, true);
+    assert.equal(booleanPreview.calls.length, 0);
+    state.validated.length = 0;
+    const guarded = await invokeSchema("plastic_resolveDeleteChangeConflict", { paths: ["--all"], preflight: true });
+    assert.equal(guarded.children[0].isError, true);
+    assert.equal(state.validated.length, 1, "semantic guard runs after schema validation");
+    assert.equal(guarded.calls.length, 0);
+  }
+  console.log("PASS: real-host direct/nested required, enum, range, numeric/boolean, singleton-array, optional-null validation and zero invalid mutation dispatch");
   const direct = await run("direct", "plastic_status", { machineReadable: true });
   const dto = direct.children[0].result.structuredContent;
   assert.match(text(direct.parent), /space ü.txt/);

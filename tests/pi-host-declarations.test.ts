@@ -35,7 +35,7 @@ try {
   for (const command of ["help", "version"]) await writeFile(join(fixture, command), 'require("node:fs").appendFileSync("calls.jsonl",JSON.stringify(process.argv.slice(1))+"\\n"); console.log("fixture");', { flag: "wx" });
   await writeFile(join(fixture, "calls.jsonl"), "", { flag: "wx" });
   const names = ["plastic_status", "plastic_branchList", "plastic_branchCreate", "plastic_codeReviewDelete", "plastic_diff", "plastic_codeReviewCommentFind", "plastic_codeReviewCommentAdd", "plastic_codeReviewSetStatus", "plastic_codeReviewReviewerAdd", "plastic_branchEditComment"];
-  const code = `const declarations = {}; for (const name of ${JSON.stringify(names)}) { const sample = await describeTool(name); if (typeof sample !== "string") throw Error("Missing declaration: " + name); declarations[name] = sample.split("codemode tool declaration:")[1].split("): Promise<")[0]; } text(JSON.stringify(declarations));`;
+  let code = `const declarations = {}; for (const name of ${JSON.stringify(names)}) { const sample = await describeTool(name); if (typeof sample !== "string") throw Error("Missing declaration: " + name); declarations[name] = sample.split("codemode tool declaration:")[1].split("): Promise<")[0]; } text(JSON.stringify(declarations));`;
   let turns = 0;
   const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
   const modelRuntime = await ModelRuntime.create({ authPath: join(fixture, "agent/auth.json"), modelsPath: null, refreshOnCreate: false });
@@ -60,14 +60,15 @@ try {
       return stream;
     },
   });
-  const services = await createAgentSessionServices({ cwd: fixture, agentDir: join(fixture, "agent"), modelRuntime,
+  const createServices = () => createAgentSessionServices({ cwd: fixture, agentDir: join(fixture, "agent"), modelRuntime,
     settingsManager: SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } }),
     resourceLoaderOptions: { additionalExtensionPaths: [extensionPath], extensionFactories: [createCodemodeExtension({ mode: "on", models: false })], noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true, systemPrompt: "Run only the local declaration action." },
   });
+  const services = await createServices();
   assert.deepEqual(services.diagnostics.filter(d => d.type === "error"), []);
   assert.deepEqual(services.resourceLoader.getExtensions().errors, []);
-  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: [...getRegisteredPlasticExportNames().map(toToolName), "codemode"] }));
-  await session.bindExtensions({});
+  ({ session } = await createAgentSessionFromServices({ services, sessionManager: SessionManager.create(fixture, join(fixture, "sessions")), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: [...getRegisteredPlasticExportNames().map(toToolName), "codemode"] }));
+  await session.bindExtensions({ onError: (error: unknown) => { throw error; } });
   for (const name of names) assert.equal(resolve(session.getAllTools().find((t: any) => t.name === name).sourceInfo.path), resolve(extensionPath));
   const coreTools = session.getAllTools().filter((t: any) => t.name.startsWith("plastic_") && t.name !== "plastic_tool_search");
   assert.equal(coreTools.length, getRegisteredPlasticExportNames().length);
@@ -130,6 +131,43 @@ try {
   assert.deepEqual(events.map(e => e.toolName), ["codemode"]);
   assert.equal(await readFile(join(fixture, "calls.jsonl"), "utf8"), "", "describeTool must not execute SCM commands");
   console.log(`PASS: real Pi ${config.VERSION} file-loaded declarations; integer/numeric, string length and array bounds; no input patterns/defaults, zero SCM calls/network`);
+
+  // Dynamic loader behavior through actual host reload/tree/persisted resume.
+  process.env.PI_PLASTIC_TOOL_LOADING_MODE = "loader-only";
+  session.dispose();
+  const loaderServices = await createServices();
+  ({ session } = await createAgentSessionFromServices({ services: loaderServices, sessionManager: SessionManager.create(fixture, join(fixture, "loader-sessions")), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off" }));
+  await session.bindExtensions({ onError: (error: unknown) => { throw error; } });
+  // Establish an initial persisted branch before activation, with codemode active.
+  session.setActiveToolsByName([...session.getActiveToolNames(), "codemode"]);
+  code = 'text("loader baseline");';
+  await session.prompt("Record the loader-only baseline");
+  const plasticActive = () => session.getActiveToolNames().filter((name: string) => name.startsWith("plastic_")).sort();
+  assert.deepEqual(plasticActive(), ["plastic_tool_search"]);
+  const beforeActivation = session.sessionManager.getLeafId();
+  code = 'text(await tools.plastic_tool_search({toolNames:["plastic_branchDelete"]}));';
+  await session.prompt("Activate a synthetic capability, without executing it");
+  assert.deepEqual(plasticActive(), ["plastic_branchDelete", "plastic_tool_search"]);
+  const afterActivation = session.sessionManager.getLeafId();
+  await session.reload();
+  assert.deepEqual(plasticActive(), ["plastic_branchDelete", "plastic_tool_search"]);
+  await session.navigateTree(beforeActivation, { summarize: false });
+  assert.deepEqual(plasticActive(), ["plastic_tool_search"]);
+  await session.navigateTree(afterActivation, { summarize: false });
+  assert.deepEqual(plasticActive(), ["plastic_branchDelete", "plastic_tool_search"]);
+  const savedFile = session.sessionFile;
+  assert(savedFile);
+  session.dispose();
+  for (const reason of ["resume", "startup"] as const) {
+    const resumedServices = await createServices();
+    assert.deepEqual(resumedServices.resourceLoader.getExtensions().errors, []);
+    ({ session } = await createAgentSessionFromServices({ services: resumedServices, sessionManager: SessionManager.open(savedFile), sessionStartEvent: { type: "session_start", reason }, model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off" }));
+    await session.bindExtensions({});
+    assert.deepEqual(plasticActive(), ["plastic_branchDelete", "plastic_tool_search"], `persisted resume via ${reason}`);
+    session.dispose();
+  }
+  assert.equal(await readFile(join(fixture, "calls.jsonl"), "utf8"), "", "reload/tree/resume/activation never executes SCM");
+  console.log("PASS: actual host loader-only initial exposure, activation, reload, tree rollback/forward and persisted session resume; zero SCM/network");
 } finally {
   session?.dispose();
   process.chdir(previous.cwd); globalThis.fetch = previous.fetch;

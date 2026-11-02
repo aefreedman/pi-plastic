@@ -51,6 +51,7 @@ const reviewWorkflowActions = {"codeReviewReviewerAdd": "reviewer-add", "codeRev
 
 export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: string) {
   const exportNames = getRegisteredPlasticExportNames();
+  const initiallyInactive = getInitiallyInactivePlasticTools(getPlasticToolLoadingMode());
   const coreDescriptions = new Map<string, string>();
   for (const exportName of exportNames) {
     const coreTool = getCoreTool(exportName);
@@ -62,6 +63,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
     const config = TOOL_CONFIG[exportName] ?? {};
     pi.registerTool({
       name: toToolName(exportName),
+      defaultActive: !initiallyInactive.has(toToolName(exportName)),
       label: toToolName(exportName),
       description: coreTool.description ?? toToolName(exportName),
       parameters: exportName === "diff" ? diffInputSchema : buildParameters(coreTool.args),
@@ -111,6 +113,7 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
 
   pi.registerTool({
     name: PLASTIC_TOOL_SEARCH_NAME,
+    defaultActive: getPlasticToolLoadingMode() !== "all-active",
     label: "Plastic Tool Search",
     description: "Search and enable Plastic SCM / Unity Version Control tools for workspace status and sync, changes and checkins, text-only diffs and patches, branches and merges, shelvesets, code reviews, and workspaces.",
     promptSnippet: "Use plastic_tool_search to find and enable Plastic SCM capabilities that are not active.",
@@ -177,8 +180,11 @@ export function registerPlasticTools(pi: ExtensionAPI, extensionSourcePath: stri
     },
   });
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", async (event, ctx) => {
     await notifyPatchCapabilityWarning(ctx as CapabilityDiagnosticContext);
+    // Pi restores native loadout deltas, including nested loader activations.
+    // Reapplying fresh-session filtering here loses those tools on reload/resume.
+    if (event.reason && (event.reason !== "startup" || ctx.sessionManager.getBranch().length > 0)) return;
     const ownership = getEffectivePlasticToolOwnership(pi.getAllTools(), extensionSourcePath);
     const active = pi.getActiveTools();
     const mode = getPlasticToolLoadingMode();

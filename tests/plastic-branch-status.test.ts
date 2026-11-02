@@ -240,4 +240,49 @@ const runTimers = async (delay: number): Promise<void> => {
   assert.doesNotMatch(source, /\.setFooter\s*\(/, "additive branch extension must never replace Pi's footer");
 }
 
-console.log("PASS: Plastic branch footer lifecycle and composition tests passed");
+// Exercise the default confirmation adapter with Pi's actual process runner, never cm.
+{
+  const sdkUrl = import.meta.resolve("@earendil-works/pi-coding-agent");
+  const { execCommand } = await import(new URL("./core/exec.js", sdkUrl).href);
+  const previousExecutable = process.env.PI_PLASTIC_CM_EXECUTABLE;
+  process.env.PI_PLASTIC_CM_EXECUTABLE = process.execPath;
+  try {
+    for (const mode of ["unicode", "overflow", "missing", "timeout", "abort", "inconsistent-truncated", "inconsistent-killed"]) {
+      const harness = new FooterHarness();
+      let observed: any;
+      (harness.api as any).exec = async (command: string, args: string[], options: any) => {
+        assert.equal(command, process.execPath); assert.deepEqual(args, ["status"]);
+        assert.equal(options.maxBuffer, 1024 * 1024); assert.equal(options.timeout, 5000);
+        if (mode.startsWith("inconsistent")) return { stdout: "/main/partial@repo@server\n", stderr: "", code: 0, killed: mode.endsWith("killed"), truncated: mode.endsWith("truncated") };
+        const code = mode === "unicode"
+          ? 'const b=Buffer.from("/main/résumé-日本-😀@repo@server\\n");let i=0;const t=setInterval(()=>{process.stdout.write(b.subarray(i,i+1));if(++i===b.length)clearInterval(t)},1)'
+          : mode === "overflow" ? 'process.stdout.write("/main/partial@repo@server\\n"+"x".repeat(2*1024*1024))'
+          : 'setInterval(()=>{},1000)';
+        const controller = new AbortController();
+        if (mode === "abort") setTimeout(() => controller.abort(), 50);
+        observed = await execCommand(mode === "missing" ? "pi-plastic-nonexistent-executable-fixture" : command, ["-e", code], process.cwd(), { ...options, signal: mode === "abort" ? controller.signal : options.signal, timeout: mode === "timeout" ? 50 : options.timeout });
+        return observed;
+      };
+      createPlasticBranchStatusExtension({
+        discoverWorkspace: async () => workspace(process.cwd()), readSelector: async () => undefined,
+        watchDirectory: () => ({ close() {} }),
+      })(harness.api as any);
+      await harness.emit("session_start", { reason: "startup" });
+      const status = harness.statuses.get("plastic-branch") ?? "";
+      if (mode === "unicode") {
+        assert.match(status, /résumé-日本-😀/); assert.doesNotMatch(status, /�/);
+      } else {
+        assert.match(status, /branch unavailable/); assert.doesNotMatch(status, /partial|ENOENT/);
+        if (mode === "missing") assert.match(observed.stderr, /pi-plastic-nonexistent-executable-fixture/, "Pi preserves useful spawn diagnostics without displaying them in the footer");
+        if (mode === "overflow") { assert.equal(observed.truncated, true); assert.equal(observed.killed, true); }
+        if (mode === "timeout" || mode === "abort") assert.equal(observed.killed, true);
+      }
+      await harness.emit("session_shutdown");
+      assert.equal(harness.statuses.size, 0);
+    }
+  } finally {
+    if (previousExecutable === undefined) delete process.env.PI_PLASTIC_CM_EXECUTABLE;
+    else process.env.PI_PLASTIC_CM_EXECUTABLE = previousExecutable;
+  }
+}
+console.log("PASS: Plastic branch footer lifecycle, bounded Pi exec, split UTF-8 and fail-closed confirmation tests passed");

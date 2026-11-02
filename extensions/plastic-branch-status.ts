@@ -13,6 +13,8 @@ import {
 const STATUS_KEY = "plastic-branch";
 const DEBOUNCE_MS = 150;
 const CM_TIMEOUT_MS = 5_000;
+// Status is only used to confirm a branch, never parse a partial workspace listing.
+const CM_MAX_BUFFER = 1024 * 1024;
 
 type Timer = ReturnType<typeof setTimeout>;
 type WatchHandle = { close(): void };
@@ -44,8 +46,11 @@ const createDefaultDependencies = (pi: ExtensionAPI): BranchStatusDependencies =
   },
   async confirmBranch(cwd, signal) {
     const executable = process.env.PI_PLASTIC_CM_EXECUTABLE?.trim() || "cm";
-    const result = await pi.exec(executable, ["status"], { cwd, signal, timeout: CM_TIMEOUT_MS });
-    if (result.code !== 0) throw new Error(result.stderr.trim() || `cm status failed with exit code ${result.code}`);
+    const result = await pi.exec(executable, ["status"], { cwd, signal, timeout: CM_TIMEOUT_MS, maxBuffer: CM_MAX_BUFFER });
+    if (result.truncated || result.killed || result.code !== 0 || signal.aborted) {
+      // Native diagnostics can contain private repository paths; the footer only reports unavailable.
+      throw new Error("cm status confirmation incomplete");
+    }
     return result.stdout;
   },
   setTimeout,
@@ -280,6 +285,7 @@ export const __plasticBranchStatusInternals = {
   STATUS_KEY,
   DEBOUNCE_MS,
   CM_TIMEOUT_MS,
+  CM_MAX_BUFFER,
   pathKey,
 };
 

@@ -168,11 +168,14 @@ async function main(): Promise<void> {
     assert.deepEqual(collision.details.unavailableToolNames, ["plastic_branchCreate"], "foreign collisions should be reported as unavailable from this extension");
     assert.equal(harness.setActiveToolsCalls.length, callsBefore + 1);
 
-    const restoredHarness = await loadHarness(["read"], [
+    // The real host restores its native loadout before session_start; a stale
+    // addedToolNames field must not override that authoritative active set.
+    const restoredHarness = await loadHarness(["read", "plastic_branchList"], [
       { type: "message", message: { role: "toolResult", addedToolNames: ["plastic_branchCreate", "plastic_branchList"] } },
     ], { sourceInfoAvailable: true, foreignTools: [foreignBranchCreate] });
     assert(!restoredHarness.getActiveTools().includes("plastic_branchCreate"), "foreign same-name tools must not be restored from this loader's history");
-    assert(restoredHarness.getActiveTools().includes("plastic_branchList"), "same-source historical loader additions should still restore");
+    assert(restoredHarness.getActiveTools().includes("plastic_branchList"), "native restored tools must survive session startup");
+    assert.equal(restoredHarness.setActiveToolsCalls.length, 0, "resumed native loadout must not be rebuilt from legacy results");
   });
 
   await withMode("loader-only", async () => {
