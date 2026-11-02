@@ -166,8 +166,43 @@ try {
     assert.deepEqual(plasticActive(), ["plastic_branchDelete", "plastic_tool_search"], `persisted resume via ${reason}`);
     session.dispose();
   }
+  // A user-selected inactive mutation tool must remain selected, and excluding
+  // the loader must not be overridden by package startup policy.
+  for (const mode of ["balanced", "loader-only", "all-active"]) {
+    process.env.PI_PLASTIC_TOOL_LOADING_MODE = mode;
+    const explicitServices = await createServices();
+    ({ session } = await createAgentSessionFromServices({ services: explicitServices, sessionManager: SessionManager.inMemory(fixture), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off", tools: ["plastic_branchDelete"] }));
+    await session.bindExtensions({ onError: (error: unknown) => { throw error; } });
+    assert.deepEqual(session.getActiveToolNames(), ["plastic_branchDelete"], `${mode}: respect explicit selection, including excluded loader`);
+    await session.reload();
+    assert.deepEqual(session.getActiveToolNames(), ["plastic_branchDelete"], `${mode}: reload respects explicit selection`);
+    session.dispose();
+  }
+  process.env.PI_PLASTIC_TOOL_LOADING_MODE = "loader-only";
+  const removalServices = await createServices();
+  ({ session } = await createAgentSessionFromServices({ services: removalServices, sessionManager: SessionManager.open(savedFile), model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off" }));
+  await session.bindExtensions({ onError: (error: unknown) => { throw error; } });
+  session.setActiveToolsByName(session.getActiveToolNames().filter((name: string) => name !== "plastic_branchDelete"));
+  code = 'text("native removal recorded");';
+  await session.prompt("Record deliberate capability removal");
+  const removedLeaf = session.sessionManager.getLeafId();
+  assert.deepEqual(plasticActive(), ["plastic_tool_search"]);
+  await session.reload();
+  assert.deepEqual(plasticActive(), ["plastic_tool_search"]);
+  await session.navigateTree(afterActivation, { summarize: false });
+  assert.deepEqual(plasticActive(), ["plastic_branchDelete", "plastic_tool_search"]);
+  await session.navigateTree(removedLeaf, { summarize: false });
+  assert.deepEqual(plasticActive(), ["plastic_tool_search"]);
+  session.dispose();
+  for (const reason of ["resume", "startup"] as const) {
+    const removedServices = await createServices();
+    ({ session } = await createAgentSessionFromServices({ services: removedServices, sessionManager: SessionManager.open(savedFile), sessionStartEvent: { type: "session_start", reason }, model: modelRuntime.getModel("plastic-local", "fixture")!, thinkingLevel: "off" }));
+    await session.bindExtensions({});
+    assert.deepEqual(plasticActive(), ["plastic_tool_search"], `native removal survives ${reason}; historical activation must not resurrect it`);
+    session.dispose();
+  }
   assert.equal(await readFile(join(fixture, "calls.jsonl"), "utf8"), "", "reload/tree/resume/activation never executes SCM");
-  console.log("PASS: actual host loader-only initial exposure, activation, reload, tree rollback/forward and persisted session resume; zero SCM/network");
+  console.log("PASS: actual host loader-only initial exposure, activation, explicit selection in all modes, deliberate removal, reload, tree rollback/forward and persisted startup/resume; zero SCM/network");
 } finally {
   session?.dispose();
   process.chdir(previous.cwd); globalThis.fetch = previous.fetch;
