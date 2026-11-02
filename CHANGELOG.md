@@ -7,6 +7,8 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.9.4] - 2026-11-02
+
 ### Fixed
 
 - Validate against Pi 1.5.0; use host-injected keybinding hints, including explicitly unbound actions.
