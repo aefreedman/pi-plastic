@@ -12,6 +12,11 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
   codeReviewCommentReply: { prepareArguments: prepareCommentArguments },
   codeReviewCommentEdit: { prepareArguments: prepareCommentArguments },
   codeReviewCommentDelete: { prepareArguments: prepareCommentArguments },
+  codeReviewCommentApply: { prepareArguments: prepareCommentArguments },
+  codeReviewCommentUnapply: { prepareArguments: prepareCommentArguments },
+  codeReviewSubscribe: { prepareArguments: prepareCommentArguments },
+  codeReviewUnsubscribe: { prepareArguments: prepareCommentArguments },
+  codeReviewSubscription: { prepareArguments: prepareCommentArguments },
   codeReviewReviewerAdd: { prepareArguments: prepareCommentArguments },
   codeReviewReviewerRemove: { prepareArguments: prepareCommentArguments },
   codeReviewReviewerList: { prepareArguments: prepareCommentArguments },
@@ -92,8 +97,7 @@ export const TOOL_CONFIG: Partial<Record<PlasticExportName, ToolConfig>> = {
       const input = normalizeOutputFormatAlias(normalizeArgs(args));
       normalizeWorkdirAliases(input);
       assignAlias(input, "output", ["output_file", "outputFile"]);
-      assignAlias(input, "toolPath", ["tool_path", "tool"]);
-      for (const key of ["cwd", "workingDirectory", "working_directory", "output_file", "outputFile", "tool_path", "tool"]) delete input[key];
+      for (const key of ["cwd", "workingDirectory", "working_directory", "output_file", "outputFile"]) delete input[key];
       return input;
     },
   },

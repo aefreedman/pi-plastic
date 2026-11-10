@@ -58,7 +58,7 @@ Preflight is **not routine confirmation** and does not mean the same thing every
 | Operation | Preflight behavior |
 |---|---|
 | Branch/object deletion, object writes, workspace merge/finalization, server merge | Command-only plan; zero CLI, no existence/conflict/permission proof |
-| Patch | Command-only plan; may read local selector metadata; no staging, backend probe, or generation |
+| Patch | Command-only plan; may read local selector metadata; no staging or generation |
 | Checkin | Reads pending scope once; no mutation |
 | Switch | Two sequential local reads; not server switchability/conflict proof |
 | Closeout | Read-only discovery/pending preview; not zero CLI or applying-readiness proof |

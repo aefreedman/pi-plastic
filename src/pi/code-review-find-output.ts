@@ -1,3 +1,4 @@
+import { reviewXmlDate, validReviewXmlText } from "../operations/code-review-find";
 import { Type, type Static, type TSchema } from "typebox";
 import { Check } from "typebox/value";
 import { assembleCodeReviewFindObservation, presentCodeReviewFindObservation, codeReviewFindPayload, CodeReviewFindError, validCodeReviewId, validCodeReviewQueryString, CODE_REVIEW_FIND_MAX_BYTES, type CodeReviewFindArgs } from "../operations/code-review-find";
@@ -11,8 +12,10 @@ const query = object({ status: queryString, assignee: queryString, owner: queryS
 const common = { schemaVersion: Type.Literal(1), action: Type.Literal("code-review-find"), provenance: object({ source: Type.Literal("plastic"), producer: Type.Literal("@aefree/pi-plastic"), contentTrust: Type.Literal("external") }) };
 const dataCommon = { scope: Type.Literal("workspace_repository"), qualifierVerified: Type.Literal(false), query, limits: object({ maxItems: Type.Integer({ minimum: 1, maximum: 500 }), idDigits: Type.Literal(20), queryCodeUnits: Type.Literal(4096), compactUtf8Bytes: Type.Literal(131072) }) };
 const errorCode = Type.Union([Type.Literal("command_failed"), Type.Literal("aborted"), Type.Literal("capture_incomplete"), Type.Literal("malformed_output"), Type.Literal("invalid_identity"), Type.Literal("unsupported_query"), Type.Literal("invalid_producer_data"), Type.Literal("output_overflow")]);
+const reviewRow = object({ id: Type.String({pattern:"^[1-9][0-9]{0,19}$"}), guid:Type.String({pattern:"^[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$"}), owner:Type.String(), date:Type.String(), title:Type.String(), assignee:Type.String(), targetType:Type.Union([Type.Literal("Branch"),Type.Literal("Changeset")]), target:Type.String(), destination:Type.String(), reviewersRaw:Type.String(), modifiedDate:Type.String(), comments:integer(Number.MAX_SAFE_INTEGER), unresolvedIssues:integer(Number.MAX_SAFE_INTEGER), unresolvedChanges:integer(Number.MAX_SAFE_INTEGER), unansweredQuestions:integer(Number.MAX_SAFE_INTEGER), codeReviewStatusName:Type.Union(["Under review","Reviewed","Rework required"].map(x=>Type.Literal(x))), mergeRequestStatusName:Type.Union(["None","Draft","Closed","Open","Merged"].map(x=>Type.Literal(x))) });
 export const codeReviewFindOutputSchema = Type.Union([
     object({ ...common, ok: Type.Literal(true), completeness: object({ read: Type.Literal("complete"), capture: Type.Literal("complete"), projection: Type.Boolean() }), data: object({ ...dataCommon, mode: Type.Literal("ids"), basis: Type.Literal("find_review_id_utf8"), diagnostics: object({ duplicateRecords: integer(19999) }), rows: Type.Array(object({ id: Type.String({ minLength: 1, maxLength: 20, pattern: "^(?:0|[1-9][0-9]*)$" }) }), { maxItems: 500 }), countBasis: Type.Literal("observed_query_rows"), counts: object({ observed: integer(20000), returned: integer(500), omitted: integer(20000), excluded: Type.Literal(0) }) }) }),
+    object({ ...common, ok: Type.Literal(true), completeness: object({ read: Type.Literal("complete"), capture: Type.Literal("complete"), projection: Type.Boolean() }), data: object({ ...dataCommon, mode: Type.Literal("xml"), basis: Type.Literal("find_review_xml_utf8"), rows: Type.Array(reviewRow, {maxItems:500}), countBasis:Type.Literal("observed_query_rows"), counts:object({observed:integer(20000),returned:integer(500),omitted:integer(20000),excluded:Type.Literal(0)}) }) }),
     object({ ...common, ok: Type.Literal(true), completeness: object({ read: Type.Literal("unknown"), capture: Type.Literal("unknown"), projection: Type.Literal(false) }), data: object({ ...dataCommon, mode: Type.Literal("native"), basis: Type.Literal("find_review_native"), rows: Type.Null(), counts: Type.Null(), countBasis: Type.Literal("unavailable") }) }),
     object({ ...common, ok: Type.Literal(false), completeness: object({ read: Type.Literal("incomplete"), capture: Type.Literal("unknown"), projection: Type.Literal(false) }), error: object({ code: errorCode, message: Type.String({ minLength: 1, maxLength: 256 }) }) }),
 ]);
@@ -24,6 +27,10 @@ export function validateCodeReviewFindOutput(value: unknown): CodeReviewFindOutp
     const dto = value as CodeReviewFindOutput;
     if (dto.ok) {
         if ([dto.data.query.status, dto.data.query.assignee, dto.data.query.owner, dto.data.query.target, dto.data.query.titleLike].some(value => value !== null && !validCodeReviewQueryString(value))) return failure("invalid_producer_data");
+        if(dto.data.mode==="xml") {
+            const {rows,counts,limits,query}=dto.data;
+            if(rows.some(r=>!reviewXmlDate(r.date)||!reviewXmlDate(r.modifiedDate)||Object.values(r).some(v=>typeof v==="string"&&!validReviewXmlText(v)))||new Set(rows.map(r=>r.id)).size!==rows.length||new Set(rows.map(r=>r.guid.toLowerCase())).size!==rows.length||counts.returned!==rows.length||counts.observed!==counts.returned+counts.omitted||counts.returned!==Math.min(counts.observed,limits.maxItems)||(query.limit!==null&&counts.observed>query.limit)||dto.completeness.projection!==(counts.omitted===0))return failure("invalid_producer_data");
+        }
         if (dto.data.mode === "ids") {
             const { rows, counts, diagnostics, limits, query } = dto.data;
             const repeats = rows.length - new Set(rows.map(row => row.id)).size;

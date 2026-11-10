@@ -8,8 +8,8 @@ export type ObjectWriteRequests = {
     "changeset-edit-comment": Common & { changeset: string; comment: string|null; commentsFile: string|null };
     "shelveset-create": Common & { paths: string[]|null; comment: string|null; commentsFile: string|null; all: boolean; dependencies: boolean; summaryFormat: boolean };
     "shelveset-apply": Common & { shelveset: string; changePaths: string[]|null; preview: boolean; dontCheckout: boolean; comparisonMethod: string|null };
-    "code-review-create": Common & { target: string; title: string; status: string|null; users: string[]|null; groups: string[]|null; repository: string|null; format: string|null };
-    "code-review-update": Common & { id: string; status: string|null; title: string|null; repository: string|null };
+    "code-review-create": Common & { target: string; title: string; status: string|null; users: string[]|null; groups: string[]|null; repository: string|null; format: string|null; description: string|null; descriptionFile: string|null };
+    "code-review-update": Common & { id: string; status: string|null; title: string|null; repository: string|null; description: string|null; descriptionFile: string|null };
 };
 export type ObjectWriteRequest = ObjectWriteRequests[ObjectWriteAction];
 export type EmittedObjectIdentity = { kind: "shelveset"|"code-review"; value: string; basis: "default-scalar"|"summary-scalar" };
@@ -32,8 +32,8 @@ const keys = {
     "changeset-edit-comment": ["changeset","comment","commentsFile"],
     "shelveset-create": ["paths","comment","commentsFile","all","dependencies","summaryFormat"],
     "shelveset-apply": ["shelveset","changePaths","preview","dontCheckout","comparisonMethod"],
-    "code-review-create": ["target","title","status","users","groups","repository","format"],
-    "code-review-update": ["id","status","title","repository"],
+    "code-review-create": ["target","title","status","users","groups","repository","format","description","descriptionFile"],
+    "code-review-update": ["id","status","title","repository","description","descriptionFile"],
 } as const;
 const comparisons=["ignoreeol","ignorewhitespaces","ignoreeolandwhitespaces","recognizeall"];
 export function validWriteText(v:unknown, multiline=false, empty=false):v is string {
@@ -48,7 +48,8 @@ export function validObjectWriteRequest(a:ObjectWriteAction,r:ObjectWriteRequest
     if(a==="shelveset-create")return (v.paths===null||validWritePaths(v.paths))&&(v.comment===null||validWriteText(v.comment,true))&&(v.commentsFile===null||validWriteText(v.commentsFile))&&!(v.comment!==null&&v.commentsFile!==null)&&[v.all,v.dependencies,v.summaryFormat].every(x=>typeof x==="boolean");
     if(a==="shelveset-apply")return validWriteOperand(v.shelveset)&&(v.changePaths===null||validWritePaths(v.changePaths))&&[v.preview,v.dontCheckout].every(x=>typeof x==="boolean")&&(v.comparisonMethod===null||comparisons.includes(v.comparisonMethod as string));
     if(v.status!==null&&!["Under review","Reviewed","Rework required"].includes(v.status as string)||v.repository!==null&&!validWriteOperand(v.repository))return false;
-    return a==="code-review-create"?validWriteOperand(v.target)&&validWriteOperand(v.title)&&[v.users,v.groups].every(x=>x===null||validReviewMembers(x))&&(v.format===null||validWriteText(v.format,true,true)):validReviewId(v.id)&&(v.title===null||validWriteText(v.title))&&(v.title!==null||v.status!==null);
+    if(v.description!==null&&v.descriptionFile!==null||v.description!==null&&!validWriteText(v.description,true,true)||v.descriptionFile!==null&&(!validWriteText(v.descriptionFile)||v.descriptionFile.trim()==="-"))return false;
+    return a==="code-review-create"?validWriteOperand(v.target)&&validWriteOperand(v.title)&&[v.users,v.groups].every(x=>x===null||validReviewMembers(x))&&(v.format===null||validWriteText(v.format,true,true)):validReviewId(v.id)&&(v.title===null||validWriteText(v.title))&&(v.title!==null||v.status!==null||v.description!==null||v.descriptionFile!==null);
 }
 export function objectWritePrefix(a:ObjectWriteAction) {return a==="changeset-edit-comment"?["changeset","editcomment"]:a==="shelveset-create"?["shelveset","create"]:a==="shelveset-apply"?["shelveset","apply"]:a==="code-review-create"?["codereview"]:["codereview","-e"];}
 export function objectWriteArgv(a:ObjectWriteAction,r:ObjectWriteRequest):string[] {
@@ -60,7 +61,7 @@ export function objectWriteArgv(a:ObjectWriteAction,r:ObjectWriteRequest):string
     } else if(a==="shelveset-apply") {
         argv.push(v.shelveset,...(v.changePaths??[]));if(v.preview)argv.push("--preview");if(v.dontCheckout)argv.push("--dontcheckout");if(v.comparisonMethod!==null)argv.push(`--comparisonmethod=${v.comparisonMethod}`);
     } else {
-        argv.push(...(a==="code-review-create"?[v.target,v.title]:[v.id]));if(v.status)argv.push(`--status=${v.status}`);if(a==="code-review-create") {if(v.users)argv.push(`--users=${v.users.join(",")}`);if(v.groups)argv.push(`--groups=${v.groups.join(",")}`);} else if(v.title!==null)argv.push(`--title=${v.title}`);if(v.repository)argv.push(`--repository=${v.repository}`);if(a==="code-review-create"&&v.format)argv.push(`--format=${v.format}`);
+        argv.push(...(a==="code-review-create"?[v.target,v.title]:[v.id]));if(v.status)argv.push(`--status=${v.status}`);if(a==="code-review-create") {if(v.users)argv.push(`--users=${v.users.join(",")}`);if(v.groups)argv.push(`--groups=${v.groups.join(",")}`);} else if(v.title!==null)argv.push(`--title=${v.title}`);if(v.description!==null)argv.push(`--description=${v.description}`);if(v.descriptionFile!==null)argv.push(`--descriptionfile=${v.descriptionFile}`);if(v.repository)argv.push(`--repository=${v.repository}`);if(a==="code-review-create"&&v.format)argv.push(`--format=${v.format}`);
     }
     return argv;
 }
@@ -89,10 +90,11 @@ export async function assembleObjectWriteReceipt(a:ObjectWriteAction,args:unknow
         if(a==="shelveset-create"&&r.comment===null&&r.commentsFile===null&&process.env.PLASTICEDITOR?.trim())return objectWriteFailure(a,d,"editor_configured","Comment-less creation with PLASTICEDITOR configured could launch an editor. Supply comment/commentsFile; no environment override or dispatch.");
         entered=true;const o=await captureWorkspaceMergeCommand([...d.intendedArgv],r.workdir);d.attempt=o.attempt;d.capture=o.capture;
         const completed=o.capture.complete&&!o.failed&&o.attempt.state==="started"&&o.attempt.exitCode===0;
-        if(completed) {
+        const partialCreate=a==="code-review-create"&&o.capture.complete&&!o.failed&&o.attempt.state==="started";
+        if(completed||partialCreate) {
             d.commandOutput={kind:"opaque-command-output",text:o.stdout!};d.observedCreatedIdentity=parseObjectWriteIdentity(a,r,o.stdout!);
             d.effect=d.observedCreatedIdentity?"identity-emitted":"not-proven";
-            if(o.capture.stderrBytes===0)return {...header(a,d),ok:true,outcome:"command-completed"} as ObjectWriteReceipt;
+            if(completed&&o.capture.stderrBytes===0)return {...header(a,d),ok:true,outcome:"command-completed"} as ObjectWriteReceipt;
             if(!d.observedCreatedIdentity)d.effect="uncertain";
         } else d.effect=["started","unknown"].includes(d.attempt.state)?"uncertain":"not-attempted";
         return objectWriteFailure(a,d,o.attempt.aborted?"aborted":["started","unknown"].includes(d.attempt.state)?"uncertain":"launch_failed","Object-write completion/state is not admitted. Earlier emitted identities remain recorded; no automatic retry, conflict choice or rollback.");

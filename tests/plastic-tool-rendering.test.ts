@@ -46,7 +46,7 @@ try {
   const {executePatchOutput}=await import("../src/pi/patch-output");
   const invalidPatch=await executePatchOutput({source:"--apply",preflight:true});
   assert.match(render("patch",invalidPatch,false,{args:{preflight:true},isError:true}),/Patch: failed/);
-  const patchPreview=await executePatchOutput({source:"cs:1",toolPath:"fictional-diff",preflight:true});
+  const patchPreview=await executePatchOutput({source:"cs:1",includeBinaries:true,preflight:true});
   assert.match(render("patch",patchPreview),/Patch: preflight/);
   const { executeUpdateOutput } = await import("../src/pi/update-output");
   const rejectedUpdatePreview = await executeUpdateOutput({preflight:true});
@@ -225,7 +225,7 @@ try {
   // Verify the registration boundary and a real command-only preflight without launching cm.
   const tools: ToolDefinition[] = [];
   registerPlastic({ registerTool: tool => tools.push(tool), on() {} } as ExtensionAPI);
-  assert.equal(tools.length, 42);
+  assert.equal(tools.length, 47);
   for (const tool of tools) assert(tool.renderCall && tool.renderResult, `${tool.name} needs both renderers`);
   const serverMerge = tools.find(tool => tool.name === "plastic_mergeBranches")!;
   const actual = await serverMerge.execute("preview", { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", message: "Review", preflight: true, format: "json" }, undefined, undefined, { cwd: "C:/Projects/MyGame" } as ExtensionContext);
@@ -248,6 +248,11 @@ try {
   for (const [exportName, request] of [
     ["branchEditComment", {branch:"br:/main/owned-feature",comment:"explicit"}],
     ["labelEditComment", {label:"lb:owned-label",comment:""}],
+    ["codeReviewCommentApply", {commentGuid:"00000000-0000-4000-8000-000000000001",changeset:"cs:16"}],
+    ["codeReviewCommentUnapply", {commentGuid:"00000000-0000-4000-8000-000000000001"}],
+    ["codeReviewSubscribe", {id:"1110",repository:"synthetic-repository@synthetic-org@unity"}],
+    ["codeReviewUnsubscribe", {id:"1110",repository:"synthetic-repository@synthetic-org@unity"}],
+    ["codeReviewSubscription", {id:"1110",repository:"synthetic-repository@synthetic-org@unity"}],
     ["codeReviewCommentFind", {review:"1114"}],
     ["codeReviewCommentAdd", {review:"1114",comment:"explicit"}],
     ["codeReviewReviewerList", {id:"1110",repository:"synthetic-repository@synthetic-org@unity"}],
@@ -261,6 +266,12 @@ try {
     assert.match(render(exportName,failed), /uncertain/);
     assert.match(render(exportName,failed), /stored state, repository identity, atomicity and rollback unverified/);
   }
+  const richReview={...textResult(""),structuredContent:{action:"code-review-find",ok:true,data:{mode:"xml",rows:[{id:"17",title:"Synthetic review",codeReviewStatusName:"Reviewed",unresolvedIssues:2}],counts:{observed:2,returned:1,omitted:1}}}};
+  assert.match(render("codeReviewFind",richReview),/Review query: 1 returned of 2 observed/);
+  assert.match(render("codeReviewFind",richReview),/Synthetic review.*Reviewed.*unresolved: 2/);
+  assert.match(render("codeReviewFind",richReview,true),/1 observed rows omitted/);
+  const subscription={...textResult(""),structuredContent:{action:"subscription",ok:true,outcome:"command-completed",data:{effect:"not-proven",observedSubscription:{subscribed:"yes",reason:"manual",emails:"disabled"}}}};
+  assert.match(render("codeReviewSubscription",subscription),/Own subscription: yes; reason: manual; repository emails: disabled/);
   console.log("PASS: Plastic renderer outcomes, previews, evidence, diffs, redaction, keybindings, registration and widths");
   if (process.argv.includes("--preview")) {
     console.log("\nStatus\n" + plain(renderPlasticCall("status", { workdir: "C:/Projects/MyGame" }, theme)) + "\n" + collapsedStatus);

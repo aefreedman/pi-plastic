@@ -108,7 +108,7 @@
   {
     "name": "plastic_codeReviewCommentFind",
     "label": "plastic_codeReviewCommentFind",
-    "description": "Read bounded comments for one exact numeric review ID using CM 11.0.16.10512 XML; no server-path evidence available.",
+    "description": "Read bounded comments for one exact numeric review ID using CM 11.0.16.10616 XML; lastRepositoryPath is NOT review/workspace identity.",
     "parameters": {
       "type": "object",
       "required": [
@@ -161,7 +161,12 @@
           "type": "string"
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "description": "Review server path; deleted files use base revision, shelve files must belong to the shelve."
+        },
+        "revision": {
+          "type": "string",
+          "description": "Exact genuine revid:N anchor from the review diff; exclusive with path. Deleted files use base revision. Never substitute a changeset ID."
         },
         "line": {
           "type": "integer",
@@ -370,6 +375,90 @@
     "hasOutputSchema": true
   },
   {
+    "name": "plastic_codeReviewCommentApply",
+    "label": "plastic_codeReviewCommentApply",
+    "description": "Mark exact Change comment GUID applied in explicit cs:N/GUID in the review repository; not discard. No retry or stored-state guarantee.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "commentGuid",
+        "changeset"
+      ],
+      "properties": {
+        "commentGuid": {
+          "type": "string"
+        },
+        "changeset": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "preflight": {
+          "type": "boolean"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string"
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewCommentUnapply",
+    "label": "plastic_codeReviewCommentUnapply",
+    "description": "Clear applied changeset of exact Change comment GUID; not discard. No retry or stored-state guarantee.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "commentGuid"
+      ],
+      "properties": {
+        "commentGuid": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "preflight": {
+          "type": "boolean"
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string"
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
     "name": "plastic_codeReviewReviewerAdd",
     "label": "plastic_codeReviewReviewerAdd",
     "description": "Add explicitly selected reviewers; existing reviewers are kept.",
@@ -502,7 +591,7 @@
   {
     "name": "plastic_codeReviewReviewerList",
     "label": "plastic_codeReviewReviewerList",
-    "description": "Read bounded opaque native reviewer evidence; no parsed membership or identity guarantee.",
+    "description": "Read bounded structured reviewer XML with exact names, fixed-English status and user/group type; no delimiter splitting or repository identity guarantee.",
     "parameters": {
       "type": "object",
       "required": [
@@ -681,6 +770,147 @@
         },
         "all": {
           "type": "boolean"
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewSubscribe",
+    "label": "plastic_codeReviewSubscribe",
+    "description": "Subscribe only the current user to review email. Completion does not prove email delivery/settings or stored state.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "id",
+        "repository"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Exact numeric review ID or GUID.",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string",
+          "description": "Explicit repository specification.",
+          "minimum": 1
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Zero-command preview only."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewUnsubscribe",
+    "label": "plastic_codeReviewUnsubscribe",
+    "description": "Unsubscribe only the current user from review email; later participation can resubscribe. No stored-state guarantee.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "id",
+        "repository"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Exact numeric review ID or GUID.",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string",
+          "description": "Explicit repository specification.",
+          "minimum": 1
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Zero-command preview only."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
+        }
+      }
+    },
+    "defaults": {},
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_codeReviewSubscription",
+    "label": "plastic_codeReviewSubscription",
+    "description": "Read current user review-email subscription using fixed-English structured format; disabled emails can also mean trigger visibility is denied. Group delivery and own notification settings are not established.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "id",
+        "repository"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Exact numeric review ID or GUID.",
+          "minimum": 1
+        },
+        "repository": {
+          "type": "string",
+          "description": "Explicit repository specification.",
+          "minimum": 1
+        },
+        "preflight": {
+          "type": "boolean",
+          "description": "Zero-command preview only."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "text"
+            },
+            {
+              "type": "string",
+              "const": "json"
+            }
+          ],
+          "description": "Output format. Defaults to text."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the workspace."
         }
       }
     },
@@ -1194,7 +1424,7 @@
   {
     "name": "plastic_patch",
     "label": "plastic_patch",
-    "description": "Generate a Plastic SCM review patch with a patch-specific non-GUI diff backend; branch selectors are qualified to the current workspace repository and requested outputs publish atomically without overwrite (cm patch).",
+    "description": "Generate a native git-diff-format Plastic SCM review patch (generation only); branch selectors are qualified to the current workspace repository and requested outputs publish atomically without overwrite (cm patch).",
     "parameters": {
       "type": "object",
       "required": [
@@ -1214,9 +1444,9 @@
           "type": "string",
           "description": "Optional new output file path. The package stages then atomically publishes it and refuses any existing path. If omitted, patch content is returned."
         },
-        "toolPath": {
-          "type": "string",
-          "description": "Optional patch-capable non-GUI diff executable for this call (highest priority). Otherwise use PI_PLASTIC_PATCH_EXECUTABLE; non-Windows falls back to PI_PLASTIC_DIFF_EXECUTABLE/diff, which must support the local Plastic patch argument contract."
+        "includeBinaries": {
+          "type": "boolean",
+          "description": "Include changed binary content as raw byte hunks. Default false lists changed binary files only; non-UTF8 artifacts return metadata rather than decoded content."
         },
         "clean": {
           "type": "boolean",
@@ -1228,7 +1458,7 @@
         },
         "preflight": {
           "type": "boolean",
-          "description": "Command-only preview; no staging, backend probe or generation."
+          "description": "Command-only preview; no staging or generation."
         },
         "format": {
           "anyOf": [
@@ -2150,9 +2380,19 @@
           "type": "string",
           "description": "Repository specification when no workspace is used."
         },
+        "description": {
+          "type": "string",
+          "description": "Explicit review description; empty clears. Exclusive with descriptionFile.",
+          "maximum": 4096
+        },
+        "descriptionFile": {
+          "type": "string",
+          "description": "Description file; exclusive with description. Standard input (-) rejected.",
+          "minimum": 1
+        },
         "format": {
           "type": "string",
-          "description": "Format string for creation output."
+          "description": "Format string for creation output; custom output has no parsed identity guarantee."
         },
         "preflight": {
           "type": "boolean",
@@ -2215,6 +2455,16 @@
         "title": {
           "type": "string",
           "description": "Updated review title.",
+          "minimum": 1
+        },
+        "description": {
+          "type": "string",
+          "description": "Replace/add review description; empty clears. Exclusive with descriptionFile.",
+          "maximum": 4096
+        },
+        "descriptionFile": {
+          "type": "string",
+          "description": "Description file; exclusive with description. Standard input (-) rejected.",
           "minimum": 1
         },
         "repository": {
@@ -2344,9 +2594,13 @@
             {
               "type": "string",
               "const": "ids"
+            },
+            {
+              "type": "string",
+              "const": "xml"
             }
           ],
-          "description": "Native output (default) or one canonical review-ID query."
+          "description": "Native output (default), canonical ID query, or rich current-profile XML. XML reviewersRaw is opaque; use reviewer-list for exact membership."
         },
         "maxItems": {
           "type": "integer",

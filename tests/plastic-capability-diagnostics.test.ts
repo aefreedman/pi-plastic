@@ -1,29 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { __plasticCapabilityDiagnosticInternals } from "../index.ts";
+import { existsSync, readFileSync } from "node:fs";
 
-async function main(): Promise<void> {
-  let checks = 0;
-  const notifications: Array<{ message: string; level: string }> = [];
-  const notify = __plasticCapabilityDiagnosticInternals.createPatchCapabilityWarningNotifier(async () => {
-    checks += 1;
-    return "Pi Plastic capability warning: configured patch backend unavailable.";
-  });
-
-  await notify({ hasUI: false, ui: { notify(message, level) { notifications.push({ message, level }); } } });
-  assert.equal(checks, 0, "Headless sessions must not run or emit UI diagnostics.");
-  assert.equal(notifications.length, 0, "Headless sessions must not receive a notification.");
-
-  await notify({ hasUI: true, ui: { notify(message, level) { notifications.push({ message, level }); } } });
-  await notify({ hasUI: true, ui: { notify(message, level) { notifications.push({ message, level }); } } });
-  assert.equal(checks, 1, "A package runtime must check and warn at most once.");
-  assert.deepEqual(notifications, [{ message: "Pi Plastic capability warning: configured patch backend unavailable.", level: "warning" }]);
-
-  const registrationText = readFileSync(new URL("../src/pi/register.ts", import.meta.url), "utf8");
-  assert.match(registrationText, /pi\.on\("session_start", async/, "Capability diagnostics must be evaluated at session startup.");
-  assert.match(registrationText, /await notifyPatchCapabilityWarning\(ctx as CapabilityDiagnosticContext\)/, "Session startup must use the UI-only capability notifier.");
-
-  console.log("PASS: plastic capability diagnostic tests succeeded");
+// Native patch generation has no external backend or startup capability probe.
+for (const path of ["../src/pi/register.ts", "../src/plastic-core.ts", "../index.ts"]) {
+  const source = readFileSync(new URL(path, import.meta.url), "utf8");
+  assert.doesNotMatch(source, /notifyPatchCapabilityWarning|getPatchBackendCapabilityWarning|capability-diagnostics/);
 }
-
-void main();
+assert.equal(existsSync(new URL("../src/pi/capability-diagnostics.ts", import.meta.url)), false);
+const support = readFileSync(new URL("../src/operations/patch-support.ts", import.meta.url), "utf8");
+assert.doesNotMatch(support, /PI_PLASTIC_PATCH_EXECUTABLE|probePatchExecutable|resolvePatchToolPath|withPatchBackendContractDiagnostic/);
+console.log("PASS: native patch generation has no obsolete backend diagnostics or startup probes");

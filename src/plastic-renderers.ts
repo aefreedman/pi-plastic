@@ -13,6 +13,7 @@ const separator = " \u00b7 ";
 
 const titles: Record<string, string> = {
   branchEditComment: "Edit branch comment", labelEditComment: "Edit label comment",
+  codeReviewCommentApply: "Apply review change", codeReviewCommentUnapply: "Unapply review change", codeReviewSubscribe: "Subscribe to review email", codeReviewUnsubscribe: "Unsubscribe from review email", codeReviewSubscription: "Review email subscription",
   codeReviewCommentFind: "Review comments", codeReviewCommentAdd: "Add review comment", codeReviewCommentReply: "Reply to review comment", codeReviewCommentEdit: "Edit review comment", codeReviewCommentDelete: "Delete review comments",
   codeReviewReviewerAdd: "Add reviewers", codeReviewReviewerRemove: "Remove reviewers", codeReviewReviewerList: "Reviewers", codeReviewSetStatus: "Set own review status", codeReviewRequestReview: "Re-request review",
   status: "Status", currentBranch: "Current branch", update: "Update", add: "Add", checkin: "Check in", undo: "Undo",
@@ -84,11 +85,12 @@ export function renderPlasticCall(name: string, input: unknown, theme: RenderThe
   return reuse(context, text);
 }
 
-const commentTools = new Set(["branchEditComment", "labelEditComment", "codeReviewCommentFind", "codeReviewCommentAdd", "codeReviewCommentReply", "codeReviewCommentEdit", "codeReviewCommentDelete", "codeReviewReviewerAdd", "codeReviewReviewerRemove", "codeReviewReviewerList", "codeReviewSetStatus", "codeReviewRequestReview"]);
-const commentActions = new Set(["branch-edit-comment", "label-edit-comment", "find", "add", "reply", "edit", "delete", "reviewer-add", "reviewer-remove", "reviewer-list", "set-status", "request-review"]);
+const commentTools = new Set(["branchEditComment", "labelEditComment", "codeReviewCommentFind", "codeReviewCommentAdd", "codeReviewCommentReply", "codeReviewCommentEdit", "codeReviewCommentDelete", "codeReviewReviewerAdd", "codeReviewReviewerRemove", "codeReviewReviewerList", "codeReviewSetStatus", "codeReviewRequestReview", "codeReviewCommentApply", "codeReviewCommentUnapply", "codeReviewSubscribe", "codeReviewUnsubscribe", "codeReviewSubscription"]);
+const commentActions = new Set(["branch-edit-comment", "label-edit-comment", "find", "add", "reply", "edit", "delete", "reviewer-add", "reviewer-remove", "reviewer-list", "set-status", "request-review", "apply", "unapply", "subscribe", "unsubscribe", "subscription"]);
 
 function payload(result: Result, raw: string): Record<string, unknown> {
   const structured = record((result as Result & {structuredContent?:unknown}).structuredContent);
+  if (structured.action === "code-review-find") return structured;
   if (commentActions.has(scalar(structured.action))) return structured;
   if (["merge-list-conflict-markers","merge-mark-resolved","shelveset-create","shelveset-apply","code-review-create","code-review-update","changeset-edit-comment"].includes(scalar(structured.action)) || structured.action === "patch" || structured.action === "diff" || structured.action === "merge-branches" || structured.action === "checkin" || structured.action === "branch-create" || structured.action === "switch-branch" || structured.action === "update" || structured.action === "add" || structured.action === "undo" || structured.action === "resolve-delete-change-conflict" || structured.action === "merge" || structured.action === "merge-to-branch" || structured.action === "branch-delete" || structured.action === "shelveset-delete" || structured.action === "code-review-delete") return structured;
   const rawResult = record(result.details).rawResult;
@@ -121,7 +123,11 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
   if (commentTools.has(name) && commentActions.has(action)) {
     summary.label = `${titles[name]}: ${scalar(envelope.outcome)}`;
     summary.tone = envelope.ok === false ? "error" : "warning";
-    summary.rows = [`Effect: ${scalar(data.effect)}`, `Emitted comment GUID: ${scalar(data.observedGuid) || "unobserved"}`];
+    summary.rows = [`Effect: ${scalar(data.effect)}`];
+    if (Object.hasOwn(data, "observedGuid")) summary.rows.push(`Emitted comment GUID: ${scalar(data.observedGuid) || "unobserved"}`);
+    if (Array.isArray(data.observedMembership)) summary.rows.push(`Observed reviewers: ${data.observedMembership.length}`);
+    const subscription = record(data.observedSubscription);
+    if (subscription.subscribed) summary.rows.push(`Own subscription: ${scalar(subscription.subscribed)}; reason: ${scalar(subscription.reason)}; repository emails: ${scalar(subscription.emails)}`);
     if (Array.isArray(data.rows)) summary.rows.push(`Observed comments: ${data.rows.length} of ${count(data.observedCount) ?? "unknown"}`);
     if (envelope.ok === false) notices.unshift(scalar(record(envelope.error).message));
     notices.push(envelope.outcome === "preflight" ? "Command-only preview; no SCM contacted." : "External evidence only; stored state, repository identity, atomicity and rollback unverified. Never retry automatically.");
@@ -233,6 +239,12 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
   } else if (envelope.ok === false && !(name === "diff" && Array.isArray(data.outcomes))) {
     summary.label = "Operation not successful";
     summary.tone = "error";
+  } else if (name === "codeReviewFind" && action === "code-review-find" && Array.isArray(data.rows)) {
+    const counts = record(data.counts);
+    summary.label = `Review query: ${count(counts.returned) ?? data.rows.length} returned of ${count(counts.observed) ?? "unknown"} observed`;
+    summary.rows = records(data.rows).map(row => data.mode === "xml" ? `${scalar(row.id)}: ${scalar(row.title)} - ${scalar(row.codeReviewStatusName)}; unresolved: ${count(row.unresolvedIssues) ?? "unknown"}` : scalar(row.id));
+    if (count(counts.omitted)) notices.push(`${count(counts.omitted)} observed rows omitted.`);
+    notices.push("Scoped external query evidence, not repository identity or totals. Reviewer text is never delimiter-parsed.");
   } else if (name === "status" && count(record(data.summary).totalPending) !== undefined) {
     summary.label = pending(record(data.summary));
     summary.rows = records(data.items).map(item => `${scalar(item.statusCode) || scalar(item.kind)}  ${scalar(item.sourcePath) ? `${scalar(item.sourcePath)} -> ` : ""}${scalar(item.path)}`);

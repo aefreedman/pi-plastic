@@ -85,32 +85,32 @@ Excerpts use surrogate-safe UTF-16 source/marker/omission counts and are not gua
 
 ## Patch generation
 
-`plastic_patch` uses `cm patch` for generation only. Defaults: JSON presentation, clean=false, integration=false; current backend precedence and local-selector qualification remain.
+`plastic_patch` uses `cm patch` for generation only. CM 11.0.16.10616 generates git diff natively, including rename support. Defaults: JSON presentation, clean=false, integration=false, includeBinaries=false. No external generation backend is configured or probed.
 
 ```text
 plastic_patch(source="br:/main/owned-feature", integration=true)
 plastic_patch(source="br:/main/owned-feature", clean=true, integration=true, output="new-review.patch")
 plastic_patch(source="<left spec>", destination="<right spec>")
-plastic_patch(source="<branch spec>", toolPath="<verified patch-capable executable>", format="text")
+plastic_patch(source="<branch spec>", includeBinaries=true, output="binary-review.patch", format="text")
 ```
 
-`output` is a new artifact path, not the text/JSON presentation selector. `format="text"` is additive presentation. `toolPath` is the highest-priority one-call backend override; consult [setup](2026-10-06-setup.md#diff-and-patch-backends) before selecting a backend.
+`output` is a new artifact path, not the text/JSON presentation selector. `format="text"` is additive presentation. `includeBinaries=true` adds `--include-binaries` to request raw byte hunks. Otherwise changed binaries are listed only, not included for restoration. CM `--tool` is application-only and is not accepted by this generation tool.
 
-Unqualified branch selectors are qualified only from the current workspace selector's exact repository/server. Otherwise supply a complete qualified branch. No alias equivalence, immutable/head selection, move encoding, workspace-effect, custom-backend-effect or rollback proof is invented.
+Unqualified branch selectors are qualified only from the current workspace selector's exact repository/server. Otherwise supply a complete qualified branch. No alias equivalence, immutable/head selection, move encoding, workspace-effect, binary-restoration or rollback proof is invented.
 
 The receipt separates:
 
-1. Requested/effective selectors and backend, with a redacted command projection.
+1. Requested/effective selectors and includeBinaries policy, with a redacted command projection.
 2. One generation attempt and capture.
 3. Bounded observed artifact bytes, SHA256, UTF-8/character/excerpt evidence where admitted.
 4. Atomic no-overwrite publication, separate from observation.
 5. Owned cleanup/retention and recovery directory information.
 
-No `--apply`, backend/strategy retry, probe fallback or workspace mutation follows. Server output may represent moves as moves or delete/add; don't assume representation without inspecting the generated artifact.
+No `--apply`, `--tool`, retry, backend probe/fallback or workspace mutation follows. Native rename support is not proof of rename records in an individual artifact; `moveRepresentation="unverified"` requires inspecting that artifact.
 
 ## Publication and cleanup
 
-With no output path, admitted patch content is returned and owned temp cleanup follows the supported route. An empty omitted-output artifact is legitimate.
+With no output path, admitted UTF-8 patch content is returned and owned temp cleanup follows the supported route. Non-UTF-8 output (including raw binary hunks) returns byte count/SHA256 and `utf8=false`, with content and character count null; it is never lossily decoded. Use an explicit output to preserve such bytes. `binaryLimited=true` records an observed binary-only listing in valid UTF-8 artifact text, not a complete binary inventory. `includeBinaries=true` alone does not prove any particular binary content was included. An empty omitted-output artifact is legitimate.
 
 Explicit output requires nonempty admitted bytes, then atomic exclusive hard-link publication from owned sibling staging. Existing destinations are never replaced. Failed/incomplete/warning captures cannot publish.
 
@@ -129,8 +129,8 @@ Already observed artifacts/publication remain recorded after later failure. Poss
 
 UTF-8 character/byte metrics are correlated, including truncated/opaque projections. Input/capture/observation/publication/outcome relationships are validated, not merely JSON shape.
 
-Preflight renders command intent; it may read local selector metadata, but does not stage, probe the backend, or generate a patch. It is not conflict analysis or artifact existence proof.
+Preflight renders command intent; it may read local selector metadata, but does not stage or generate a patch. It is not conflict analysis or artifact existence proof.
 
 ## Validation scope
 
-Comparison source evidence is bounded to Windows CM 11.0.16.10371 and the tested GNU diff backends; macOS text-only/backend incompatibility evidence is documented in setup. Other client/platform/backends, mixed-Xlink/nodata ownership, foreign post-hooks and RPC remain unverified. Those limits are not permission to silently switch routes.
+Patch generation targets native CM 11.0.16.10616; its help documents git-diff output and raw binary hunks. Receipt tests use synthetic artifacts, not proof of any individual live patch or binary restoration. Text comparison backend evidence remains separate. Mixed-Xlink/nodata ownership, foreign post-hooks and RPC remain unverified; no older-client compatibility route is provided.

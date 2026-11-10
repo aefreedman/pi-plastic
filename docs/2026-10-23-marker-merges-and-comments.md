@@ -4,7 +4,7 @@
 
 ## Client baseline
 
-These additions target Unity VCS **11.0.16.10512** (October 22, 2026). Installed `cm help merge` and `cm changeset editcomment --help` advertise these contracts. See [release notes](https://docs.unity.com/unity-version-control/release-notes/11) and [merge documentation](https://docs.unity.com/unity-version-control/uvcs-cli/merge).
+The package targets Unity VCS **11.0.16.10616 or newer**. Native marker merges and changeset comment editing were introduced in 11.0.16.10512. Installed `cm help merge` and `cm changeset editcomment --help` advertise these contracts. See [release notes](https://docs.unity.com/unity-version-control/release-notes/11) and [merge documentation](https://docs.unity.com/unity-version-control/uvcs-cli/merge).
 
 No older-client fallback, automatic retry, installation or policy substitution exists. Unsupported flags mean failure/uncertainty, not permission to run another merge. The CLI client version and Pi validation baseline are independent; the package manifest declares the Pi validation dependencies.
 
@@ -34,7 +34,7 @@ Native Windows Unicode listing bytes were invalid UTF-8 and included irreversibl
 
 Nested merge/checkin/closeout receipts retain compact marker state/attempt/capture evidence, not repeated raw listings. Compact `pending` requires compatible exit-1 complete/capture metadata but cannot revalidate omitted text; state/counts are not file identity. Exit-1/nonempty metadata cannot be promoted to `clear`. Standalone listing retains bounded external output and reclassifies exact text/byte lengths. Printed paths never become automatic mutation operands; physical scope and exact-file acknowledgement remain independent. **An empty marker list NEVER establishes all-conflict readiness.** Unknown or mixed pending/full-status profiles remain unsupported; source-linked pending state and exit zero alone cannot authorize checkin. XML status merge fields are not a replacement conflict-readiness contract. The observed non-merge file profile `CO+RP` with a positive revision and `NO_MERGES` is supported when full status corroborates `Replaced / Checked-out (unchanged)`. Merge-associated `CO+RP`, directory variants and `CO+CP` remain unsupported.
 
-CM documents that already marked files are untouched on a repeated marker merge. This is not an automatic retry policy.
+CM 11.0.16.10616 lists existing unresolved markers and exits 1 on a repeated `merge --merge --conflict-markers`, rather than printing "No merges detected" with exit zero. The package returns uncertain completion and never replays or checks in that merge automatically. CM documents that already marked files are untouched; this is not an automatic retry policy.
 
 ## Changeset comments
 

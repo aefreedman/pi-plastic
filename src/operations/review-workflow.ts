@@ -1,3 +1,5 @@
+import { parseReviewersXml, type ReviewMembership } from "../domain/review-xml";
+export { parseReviewersXml } from "../domain/review-xml";
 import { tool } from "../tool-definition";
 import { workdirArg } from "./arguments";
 import { outputFormatArg } from "../presentation/results";
@@ -6,12 +8,22 @@ import { validWriteOperand, validWriteText } from "./object-write-receipt";
 import { OWN_REVIEW_STATUSES, REVIEW_WORKFLOW_ACTIONS, validReviewId, validReviewMembers, type ReviewWorkflowAction } from "../domain/review-workflow";
 export { REVIEW_WORKFLOW_ACTIONS, type ReviewWorkflowAction } from "../domain/review-workflow";
 
+export type ReviewSubscription = { subscribed: "yes" | "no"; reason: "owner" | "reviewer" | "commented" | "mentioned" | "manual" | "unsubscribed" | "none" | "other"; emails: "enabled" | "disabled" };
+export function parseReviewSubscription(stdout: string): ReviewSubscription {
+    const m = /^(yes|no)\t(owner|reviewer|commented|mentioned|manual|unsubscribed|none|other)\t(enabled|disabled)(?:\r?\n)?$/.exec(stdout);
+    if (!m) throw Error("unsupported_profile");
+    return { subscribed: m[1] as ReviewSubscription["subscribed"], reason: m[2] as ReviewSubscription["reason"], emails: m[3] as ReviewSubscription["emails"] };
+}
+
 type Common = {id:string;repository:string;workdir:string;preflight:boolean;output:"text"|"json"};
 type Members = {users:string[]|null;groups:string[]|null};
 export type ReviewWorkflowRequests = {
     "reviewer-add": Common & Members;
     "reviewer-remove": Common & Members;
     "reviewer-list": Common;
+    subscribe: Common;
+    unsubscribe: Common;
+    subscription: Common;
     "set-status": Common & {status:typeof OWN_REVIEW_STATUSES[number];comment:string|null;commentsFile:string|null};
     "request-review": Common & Members & {all:boolean};
 };
@@ -20,18 +32,18 @@ export type ReviewWorkflowData = {
     attempt:ReturnType<typeof emptyWorkspaceMergeAttempt>;
     capture:Awaited<ReturnType<typeof captureWorkspaceMergeCommand>>["capture"]|null;
     commandOutput:{kind:"opaque-command-output";text:string}|null;
-    observedMembership:null;observedOwnStatus:null;observedRepositoryIdentity:null;
+    observedMembership:ReviewMembership[]|null;observedSubscription:ReviewSubscription|null;observedOwnStatus:null;observedRepositoryIdentity:null;
     scope:"requested-only";rollback:"not-proven";effect:"not-attempted"|"not-proven"|"uncertain";
 };
 export type ReviewWorkflowReceipt<A extends ReviewWorkflowAction=ReviewWorkflowAction> = {
     schemaVersion:1;action:A;provenance:{source:"plastic";producer:"@aefree/pi-plastic";contentTrust:"external"};
     completeness:{capture:"complete"|"incomplete"|"unknown";projection:true};
     data:ReviewWorkflowData & {requested:ReviewWorkflowRequests[A]|null};
-} & ({ok:true;outcome:"preflight"|"command-completed"}|{ok:false;outcome:"failed"|"uncertain";error:{code:"invalid_request"|"launch_failed"|"aborted"|"uncertain"|"producer_failed";message:string}});
-const keys={"reviewer-add":["users","groups"],"reviewer-remove":["users","groups"],"reviewer-list":[],"set-status":["status","comment","commentsFile"],"request-review":["all","users","groups"]} as const;
+} & ({ok:true;outcome:"preflight"|"command-completed"}|{ok:false;outcome:"failed"|"uncertain";error:{code:"invalid_request"|"launch_failed"|"aborted"|"uncertain"|"producer_failed"|"unsupported_profile";message:string}});
+const keys={"reviewer-add":["users","groups"],"reviewer-remove":["users","groups"],"reviewer-list":[],subscribe:[],unsubscribe:[],subscription:[],"set-status":["status","comment","commentsFile"],"request-review":["all","users","groups"]} as const;
 export function validReviewWorkflowRequest(a:ReviewWorkflowAction,r:ReviewWorkflowData["requested"]):boolean {
     if(!r||!validReviewId(r.id)||!validWriteOperand(r.repository)||!validWriteText(r.workdir)||typeof r.preflight!=="boolean"||!["text","json"].includes(r.output)||Buffer.byteLength(JSON.stringify(r),"utf8")>32768)return false;
-    if(a==="reviewer-list")return true;
+    if(["reviewer-list","subscribe","unsubscribe","subscription"].includes(a))return true;
     if(a==="set-status") {
         const v=r as ReviewWorkflowRequests["set-status"];
         return OWN_REVIEW_STATUSES.includes(v.status)&&!(v.comment!==null&&v.commentsFile!==null)&&(v.comment===null||validWriteText(v.comment,true))&&(v.commentsFile===null||validWriteText(v.commentsFile)&&v.commentsFile!=="-");
@@ -41,14 +53,16 @@ export function validReviewWorkflowRequest(a:ReviewWorkflowAction,r:ReviewWorkfl
     const selected=v.users!==null||v.groups!==null;
     return a==="request-review"?typeof v.all==="boolean"&&(v.all?!selected:selected):selected;
 }
-export function reviewWorkflowPrefix(a:ReviewWorkflowAction):string[] {return a.startsWith("reviewer-")?["codereview","reviewer",a.slice(9)]:["codereview","review"];}
+export function reviewWorkflowPrefix(a:ReviewWorkflowAction):string[] {return a.startsWith("reviewer-")?["codereview","reviewer",a.slice(9)]:["codereview",["subscribe","unsubscribe","subscription"].includes(a)?a:"review"];}
 export function reviewWorkflowArgv(a:ReviewWorkflowAction,r:NonNullable<ReviewWorkflowData["requested"]>):string[] {
     const argv=[...reviewWorkflowPrefix(a),r.id],v=r as ReviewWorkflowRequests["request-review"] & ReviewWorkflowRequests["set-status"];
     if(a==="set-status") {argv.push(`--${v.status}`);if(v.comment!==null)argv.push(`-c=${v.comment}`);if(v.commentsFile!==null)argv.push(`-commentsfile=${v.commentsFile}`);}
-    else if(a!=="reviewer-list") {if(a==="request-review")argv.push("--re-request");if(v.all)argv.push("--all");if(v.users)argv.push(`--users=${v.users.join(",")}`);if(v.groups)argv.push(`--groups=${v.groups.join(",")}`);}
+    else if(["reviewer-add","reviewer-remove","request-review"].includes(a)) {if(a==="request-review")argv.push("--re-request");if(v.all)argv.push("--all");if(v.users)argv.push(`--users=${v.users.join(",")}`);if(v.groups)argv.push(`--groups=${v.groups.join(",")}`);}
+    if(a==="reviewer-list")argv.push("--xml","--encoding=utf-8");
+    if(a==="subscription")argv.push("--format={subscribed}{tab}{reason}{tab}{emails}");
     argv.push(`--repository=${r.repository}`);return argv;
 }
-export function emptyReviewWorkflowData(a:ReviewWorkflowAction):ReviewWorkflowData {return {requested:null,intendedArgv:reviewWorkflowPrefix(a),attempt:emptyWorkspaceMergeAttempt(),capture:null,commandOutput:null,observedMembership:null,observedOwnStatus:null,observedRepositoryIdentity:null,scope:"requested-only",rollback:"not-proven",effect:"not-attempted"};}
+export function emptyReviewWorkflowData(a:ReviewWorkflowAction):ReviewWorkflowData {return {requested:null,intendedArgv:reviewWorkflowPrefix(a),attempt:emptyWorkspaceMergeAttempt(),capture:null,commandOutput:null,observedMembership:null,observedSubscription:null,observedOwnStatus:null,observedRepositoryIdentity:null,scope:"requested-only",rollback:"not-proven",effect:"not-attempted"};}
 function header(a:ReviewWorkflowAction,d:ReviewWorkflowData) {return {schemaVersion:1 as const,action:a,provenance:{source:"plastic" as const,producer:"@aefree/pi-plastic" as const,contentTrust:"external" as const},completeness:{capture:d.capture?d.capture.complete?"complete" as const:"incomplete" as const:"unknown" as const,projection:true as const},data:d};}
 export function reviewWorkflowFailure(a:ReviewWorkflowAction,d:ReviewWorkflowData,code:Extract<ReviewWorkflowReceipt,{ok:false}>["error"]["code"],message:string):ReviewWorkflowReceipt {return {...header(a,d),ok:false,outcome:["started","unknown"].includes(d.attempt.state)?"uncertain":"failed",error:{code,message}} as ReviewWorkflowReceipt;}
 export async function assembleReviewWorkflowReceipt(a:ReviewWorkflowAction,args:unknown):Promise<ReviewWorkflowReceipt> {
@@ -66,7 +80,13 @@ export async function assembleReviewWorkflowReceipt(a:ReviewWorkflowAction,args:
         // Native own-status permits no comment without opening an editor. No add-comment command is inferred.
         entered=true;const o=await captureWorkspaceMergeCommand([...d.intendedArgv],r.workdir);d.attempt=o.attempt;d.capture=o.capture;
         const completed=o.capture.complete&&!o.failed&&o.attempt.state==="started"&&o.attempt.exitCode===0;
-        if(completed) {d.commandOutput={kind:"opaque-command-output",text:o.stdout!};d.effect="not-proven";if(o.capture.stderrBytes===0)return {...header(a,d),ok:true,outcome:"command-completed"} as ReviewWorkflowReceipt;}
+        if(completed) {d.commandOutput={kind:"opaque-command-output",text:o.stdout!};d.effect="not-proven";if(o.capture.stderrBytes===0) {
+            try {
+                if(a==="reviewer-list")d.observedMembership=parseReviewersXml(o.stdout!);
+                if(a==="subscription")d.observedSubscription=parseReviewSubscription(o.stdout!);
+            } catch {d.effect="uncertain";return reviewWorkflowFailure(a,d,"unsupported_profile","Unsupported review read profile; no structured membership/subscription is admitted.");}
+            return {...header(a,d),ok:true,outcome:"command-completed"} as ReviewWorkflowReceipt;
+        }}
         d.effect=["started","unknown"].includes(d.attempt.state)?"uncertain":"not-attempted";
         return reviewWorkflowFailure(a,d,o.attempt.aborted?"aborted":["started","unknown"].includes(d.attempt.state)?"uncertain":"launch_failed","Review command completion not admitted; partial effects may exist. No automatic retry or rollback.");
     } catch {
@@ -85,6 +105,9 @@ const members=()=>({users:tool.schema.array(tool.schema.string()).min(1).max(100
 function execute(a:ReviewWorkflowAction) {return async(args:unknown)=>{const dto=await assembleReviewWorkflowReceipt(a,args);const text=presentReviewWorkflowReceipt(dto);if(!dto.ok)throw Error(text);return text;};}
 export const codeReviewReviewerAdd=tool({description:"Add explicitly selected reviewers; existing reviewers are kept.",args:{...common,...members()},execute:execute("reviewer-add")});
 export const codeReviewReviewerRemove=tool({description:"Remove only explicitly selected reviewers.",args:{...common,...members()},execute:execute("reviewer-remove")});
-export const codeReviewReviewerList=tool({description:"Read bounded opaque native reviewer evidence; no parsed membership or identity guarantee.",args:{...common},execute:execute("reviewer-list")});
+export const codeReviewReviewerList=tool({description:"Read bounded structured reviewer XML with exact names, fixed-English status and user/group type; no delimiter splitting or repository identity guarantee.",args:{...common},execute:execute("reviewer-list")});
 export const codeReviewSetStatus=tool({description:"Set caller own review status, not assignee status. Optional explicit status comment only.",args:{...common,status:tool.schema.enum(OWN_REVIEW_STATUSES),comment:tool.schema.string().min(1).optional(),commentsFile:tool.schema.string().min(1).optional()},execute:execute("set-status")});
+export const codeReviewSubscribe=tool({description:"Subscribe only the current user to review email. Completion does not prove email delivery/settings or stored state.",args:{...common},execute:execute("subscribe")});
+export const codeReviewUnsubscribe=tool({description:"Unsubscribe only the current user from review email; later participation can resubscribe. No stored-state guarantee.",args:{...common},execute:execute("unsubscribe")});
+export const codeReviewSubscription=tool({description:"Read current user review-email subscription using fixed-English structured format; disabled emails can also mean trigger visibility is denied. Group delivery and own notification settings are not established.",args:{...common},execute:execute("subscription")});
 export const codeReviewRequestReview=tool({description:"Explicitly re-request all OR selected users/groups. Never attaches a comment.",args:{...common,...members(),all:tool.schema.boolean().optional()},execute:execute("request-review")});

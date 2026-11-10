@@ -42,7 +42,7 @@ plastic_patch(source="<branch-spec>", integration=true)
 plastic_patch(source="<branch-spec>", clean=true, integration=true, output="<new-patch-file>")
 ```
 
-  On Windows configure `PI_PLASTIC_PATCH_EXECUTABLE` (or one-call `toolPath`) to a verified patch-capable non-GUI executable; do not rely on the text-diff/GnuWin32 setting. Use a repository-qualified `br:/...@<repository>@<server>` selector when the current workspace selector cannot supply the exact repository. Requested output is staged and atomically published only when successful.
+  Native CM patch generation needs no external backend. Set `includeBinaries=true` to request changed binary contents as raw byte hunks (default: binary names only). Use a repository-qualified `br:/...@<repository>@<server>` selector when the current workspace selector cannot supply the exact repository. Requested output is staged and atomically published only when successful, without overwrite.
 
 - When change-boundary evidence is needed, inspect specific files first and opt into multi-file output explicitly:
 

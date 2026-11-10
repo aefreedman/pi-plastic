@@ -10,7 +10,7 @@ const removeAction:"reviewer-remove"=remove.action;
 const listAction:"reviewer-list"=list.action;
 const statusAction:"set-status"=status.action;
 const requestAction:"request-review"=request.action;
-const observed:null=list.data.observedMembership;
+const observed:import("../../src/domain/review-xml").ReviewMembership[]|null=list.data.observedMembership;
 if(status.data.requested) {const own:"reviewed"|"rework-required"|"under-review"=status.data.requested.status;void own;}
 if(request.data.requested) {
     const explicitAll:boolean=request.data.requested.all;

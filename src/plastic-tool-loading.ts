@@ -57,6 +57,11 @@ export const PLASTIC_SEARCH_CATALOG: readonly PlasticSearchCatalogEntry[] = [
   { name: "plastic_codeReviewReviewerList", aliases: ["list reviewers"], tags: ["review", "inspect"], guidance: ["Read scoped external evidence; do not infer stored identity from completion."] },
   { name: "plastic_codeReviewSetStatus", aliases: ["set own review status"], tags: ["review", "mutation"], guidance: ["Require explicit targets and intent; command completion is not stored-state verification. Never retry automatically."] },
   { name: "plastic_codeReviewRequestReview", aliases: ["request review again"], tags: ["review", "mutation"], guidance: ["Require explicit targets and intent; command completion is not stored-state verification. Never retry automatically."] },
+  { name: "plastic_codeReviewCommentApply", aliases: ["apply review change","mark change applied"], tags: ["review","mutation"], guidance: ["Requires exact comment GUID and explicit applying changeset. Not discard; no retry or stored-state guarantee."] },
+  { name: "plastic_codeReviewCommentUnapply", aliases: ["unapply review change","mark change not applied"], tags: ["review","mutation"], guidance: ["Clear applied changeset for exact Change comment GUID; not discard."] },
+  { name: "plastic_codeReviewSubscribe", aliases: ["subscribe review email"], tags: ["review","mutation"], guidance: ["Current user only; no email delivery guarantee."] },
+  { name: "plastic_codeReviewUnsubscribe", aliases: ["unsubscribe review email"], tags: ["review","mutation"], guidance: ["Current user only; later participation may resubscribe."] },
+  { name: "plastic_codeReviewSubscription", aliases: ["review email subscription"], tags: ["review","inspect"], guidance: ["Read fixed-English current-user subscription; not group-delivery or notification-settings evidence."] },
 ] as const;
 
 export const PLASTIC_SEARCHABLE_TOOL_NAMES = new Set(PLASTIC_SEARCH_CATALOG.map((entry) => entry.name));
@@ -135,7 +140,7 @@ export type PlasticToolSearchMatch = PlasticSearchCatalogEntry & { description?:
 
 const SEARCH_STOP_WORDS = new Set(["a", "an", "available", "existing", "for", "my", "of", "the", "this", "to"]);
 const SEARCH_DOMAIN_TERMS = new Set(["branch", "changeset", "diff", "merge", "patch", "review", "shelveset", "workspace"]);
-const MUTATION_INTENT_TERMS = new Set(["add", "apply", "checkin", "create", "delete", "discard", "edit", "finalize", "merge", "remove", "resolve", "switch", "undo", "update"]);
+const MUTATION_INTENT_TERMS = new Set(["add", "apply", "checkin", "create", "delete", "discard", "edit", "finalize", "merge", "remove", "resolve", "switch", "undo", "update", "unapply", "subscribe", "unsubscribe"]);
 
 function normalizeSearchToken(token: string): string {
   if (token.length > 4 && /(?:ch|sh|x|z)es$/.test(token)) return token.slice(0, -2);

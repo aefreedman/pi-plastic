@@ -53,6 +53,14 @@ function typedRows(dto: CodeReviewFindOutput): string[] {
     if (dto.data.mode === "native") { const rows: null = dto.data.rows; return rows === null ? [] : []; }
     return dto.data.rows.map(row => row.id);
 }
+// Synthetic 10616 current-profile XML; not a captured native fixture.
+const reviewXml="<PLASTICQUERY><REVIEW><ID>17</ID><OWNER>owner@example.invalid</OWNER><DATE>2026-10-23T10:00:00Z</DATE><TITLE>Rich &amp; safe</TITLE><MERGEREQUESTSTATUS>localized</MERGEREQUESTSTATUS><STATUS>localized</STATUS><CODEREVIEWSTATUS>localized</CODEREVIEWSTATUS><ASSIGNEE></ASSIGNEE><TARGETTYPE>Changeset</TARGETTYPE><TARGET>16</TARGET><DESTINATION></DESTINATION><GUID>00000000-0000-4000-8000-000000000017</GUID><REVIEWERS>Doe, Example:Reviewed,QA:Under review</REVIEWERS><MODIFIEDDATE>2026-10-23T11:00:00Z</MODIFIEDDATE><COMMENTS>7</COMMENTS><UNRESOLVEDISSUES>3</UNRESOLVEDISSUES><UNRESOLVEDCHANGES>2</UNRESOLVEDCHANGES><UNANSWEREDQUESTIONS>1</UNANSWEREDQUESTIONS><CODEREVIEWSTATUSNAME>Reviewed</CODEREVIEWSTATUSNAME><MERGEREQUESTSTATUSNAME>None</MERGEREQUESTSTATUSNAME></REVIEW></PLASTICQUERY>";
+const rich=await invoke(reviewXml,{source:"xml"});assert(!rich.isError);assert.equal(rich.structuredContent.data.mode,"xml");assert.equal(rich.structuredContent.data.rows[0].guid,"00000000-0000-4000-8000-000000000017");assert.equal(rich.structuredContent.data.rows[0].reviewersRaw,"Doe, Example:Reviewed,QA:Under review");assert.equal(rich.structuredContent.data.rows[0].unresolvedIssues,3);assert.equal(rich.structuredContent.data.rows[0].codeReviewStatusName,"Reviewed");assert.deepEqual(calls,[["find","review","--nototal","--xml","--encoding=utf-8"]]);
+assert.deepEqual((await invoke("<PLASTICQUERY/>",{source:"xml"})).structuredContent.data.rows,[]);
+for(const bad of [reviewXml.replace("</GUID>","</GUID><EXTRA/>"),reviewXml.replace("<COMMENTS>7</COMMENTS>","<COMMENTS>-1</COMMENTS>"),reviewXml.replace("<CODEREVIEWSTATUSNAME>Reviewed</CODEREVIEWSTATUSNAME>","<CODEREVIEWSTATUSNAME>localized</CODEREVIEWSTATUSNAME>"),reviewXml.replace("<REVIEW>","<REVIEW attr=\"bad\">"),reviewXml.replace("<PLASTICQUERY>","<!DOCTYPE PLASTICQUERY><PLASTICQUERY>"),reviewXml.replace("</REVIEW>","</REVIEW><REVIEW/>"),Buffer.from([255])]) assert((await invoke(bad,{source:"xml"})).isError);
+for(const args of [{format:""},{dateFormat:"yyyy"}]) {assert((await invoke(reviewXml,{source:"xml",...args})).isError);assert.equal(calls.length,0);}
+for(const options of [{stderr:"warning"},{code:1},{decoded:true},{timeout:true},{abortDuring:new AbortController()}])assert((await invoke(reviewXml,{source:"xml"},options)).isError);
+for(const mutate of [(d:any)=>d.data.rows[0].guid="bad",(d:any)=>d.data.rows[0].modifiedDate="bad",(d:any)=>d.data.rows[0].comments=-1,(d:any)=>d.data.rows[0].title="bad\u0000",(d:any)=>d.data.rows[0].reviewersRaw="bad\ud800",(d:any)=>d.data.counts.observed++]){const d=structuredClone(rich.structuredContent);mutate(d);assert(!validateCodeReviewFindOutput(d).ok);}
 const direct = await invoke();
 const dto = direct.structuredContent;
 assert(dto.ok); assert.equal(dto.data.mode, "ids"); assert.deepEqual(typedRows(dto), ["17"]);
@@ -103,7 +111,7 @@ assert.equal(calls.length,1);assert.equal(cachedNativeJson.content[0].text,nativ
 for (const bad of ["\n", "17\n\n", "17\r", " 17", "17 ", "01", "-1", "1.0", "sh:1", "1e3", "header", "17\t3", "17\nTotal: 1", "9".repeat(21), "日本", "\ufeff17", Buffer.from([0xff]), full + "\nforeign"]) {
     const r = await invoke(bad, {maxItems: 1}); assert(r.isError, String(bad)); assert.equal(r.structuredContent.data, undefined);
 }
-for (const args of [{maxItems: 0}, {maxItems: 501}, {maxItems: 1.5}, {limit: 0}, {limit: Number.MAX_SAFE_INTEGER + 1}, {source: "xml"}, {output: "yaml"}, {owner: "\ud800"}, {owner: "x".repeat(4097)}, {target: "x\n"}, {format: "\u0000"}, {dateFormat: "\ud800"}, {dateFormat: "x".repeat(4097)}]) {
+for (const args of [{maxItems: 0}, {maxItems: 501}, {maxItems: 1.5}, {limit: 0}, {limit: Number.MAX_SAFE_INTEGER + 1}, {source: "unsupported"}, {output: "yaml"}, {owner: "\ud800"}, {owner: "x".repeat(4097)}, {target: "x\n"}, {format: "\u0000"}, {dateFormat: "\ud800"}, {dateFormat: "x".repeat(4097)}]) {
     assert((await invoke(identity,args)).isError); assert.equal(calls.length,0);
 }
 
@@ -149,6 +157,48 @@ const spawn = (() => {
 const timed = await runWithAbortSignal(undefined, () => registered.execute("synthetic", { source: "ids" }, undefined, undefined, { cwd: "/synthetic" }), { spawn, timeoutMs: 1, abortKillDelayMs: 1, setTimeout: (callback, delay) => { const timer = setTimeout(callback, delay); timers.add(timer); return timer; }, clearTimeout: timer => { timers.delete(timer); clearTimeout(timer); } });
 assert.deepEqual(kills, ["SIGTERM", "SIGKILL"]); assert.equal(timers.size, 0); assert.equal(timed.structuredContent.error.code, "capture_incomplete");
 assert.equal(escalating.stdout.listenerCount("data"), 0); assert.equal(escalating.listenerCount("close"), 0);
+// Nonclosing processes and inherited pipes must retire for both strict read routes.
+// These synthetic children never acknowledge termination; retirement is not stop proof.
+for (const source of ["ids", "xml"] as const) for (const cause of ["timeout", "abort"] as const) for (const behavior of ["ignored", "throwing-kill", "closed-open-pipes"] as const) {
+    const controller = new AbortController(), activeTimers = new Set<NodeJS.Timeout>(), signals: string[] = [];
+    const child = Object.assign(new EventEmitter(), {
+        stdout: new PassThrough(), stderr: new PassThrough(),
+        kill(signal: string) { signals.push(signal); if (behavior === "throwing-kill") throw Error("Cannot stop child"); return false; },
+    });
+    const command = runWithAbortSignal(controller.signal, () => registered.execute("synthetic-retirement", { source }, undefined, undefined, { cwd: "/synthetic" }), {
+        spawn: (() => {
+            queueMicrotask(() => {
+                child.stdout.write(source === "xml" ? "<PLASTICQUERY>" : "42");
+                if (behavior === "closed-open-pipes") child.emit("close", 0);
+                if (cause === "abort") controller.abort();
+            });
+            return child;
+        }) as any,
+        timeoutMs: cause === "timeout" ? 1 : 1000, abortKillDelayMs: 1,
+        setTimeout: (callback, delay) => { const timer = setTimeout(callback, delay); activeTimers.add(timer); return timer; },
+        clearTimeout: timer => { activeTimers.delete(timer); clearTimeout(timer); },
+    });
+    let watchdog: NodeJS.Timeout | undefined;
+    const deadline = new Promise<never>((_, reject) => { watchdog = setTimeout(() => {
+        child.stdout.end(); child.stderr.end(); child.emit("close", 1);
+        reject(Error("Strict review read exceeded retirement deadline"));
+    }, 1000); });
+    let result;
+    try { result = await Promise.race([command, deadline]); }
+    finally { if (watchdog) clearTimeout(watchdog); }
+    assert(result.isError, source + " " + cause + " " + behavior);
+    assert.equal(result.structuredContent.error.code, cause === "abort" ? "aborted" : "capture_incomplete");
+    assert.equal(activeTimers.size, 0);
+    assert.deepEqual(signals, behavior === "closed-open-pipes" ? [] : ["SIGTERM", "SIGKILL"]);
+    assert.equal(child.stdout.listenerCount("data"), 0);
+    assert.equal(child.stderr.listenerCount("data"), 0);
+    assert.equal(child.listenerCount("close"), 0);
+    const frozen = JSON.stringify(result);
+    // Only inert error sinks survive retirement; late native events cannot revise the result.
+    child.emit("error", Error("Late process failure")); child.stdout.emit("error", Error("Late pipe failure"));
+    child.stderr.emit("error", Error("Late pipe failure")); child.emit("close", 0);
+    assert.equal(JSON.stringify(result), frozen);
+}
 const coreCalls:string[][]=[];
 const core = await runWithAbortSignal(undefined, () => codeReviewFind.execute({format:"{title}",dateFormat:"yyyy",workdir:"/synthetic"}), {spawn: ((_cmd:string,argv:string[])=>{
     coreCalls.push(argv); const child=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill:()=>true});

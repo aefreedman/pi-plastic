@@ -6,7 +6,7 @@ Use it to inspect a workspace, review changes without opening a GUI, and perform
 
 ## What you get
 
-- **41 core tools** with producer-owned structured results, plus an on-demand capability loader.
+- **46 core tools** with producer-owned structured results, plus an on-demand capability loader.
 - **Native description edits and review discussions/workflow**, with scoped comment discovery and explicit reviewer/status decisions; see [comment and review tools](docs/2026-10-23-comments-and-review-workflow.md).
 - **Text-only diffs and generated review patches**, with explicit scope and bounded output.
 - **Agent-driven server conflict resolution:** inspect conflicts, validate merged files, and submit per-file JSON decisions without a merge UI.
@@ -33,9 +33,9 @@ Git main can contain unreleased changes; npm installs the published release. See
 ### Requirements
 
 - Node.js **22.19.0 or newer** and the latest stable Pi.
-- An authenticated Plastic CLI (`cm`) on `PATH`, or an explicit executable override.
+- An authenticated Plastic CLI (`cm`) **11.0.16.10616 or newer** on `PATH`, or an explicit executable override.
 - A configured Plastic workspace for workspace-scoped tools.
-- A compatible non-GUI `diff` for text comparisons. Patch generation has a **separate backend policy**, particularly on Windows and macOS; see [diff and patch setup](docs/2026-10-06-setup.md#diff-and-patch-backends).
+- A compatible non-GUI `diff` for text comparisons. Patch generation uses the native CLI and needs no external diff backend; see [diff and patch setup](docs/2026-10-06-setup.md#diff-and-patch-backends).
 
 Restart existing Pi processes after installation or source changes. User-scope installation makes the guards available across workspaces; project-local settings alone do not protect child processes launched elsewhere.
 

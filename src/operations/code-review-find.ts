@@ -1,3 +1,5 @@
+import { parseCodeReviewsXml, type CodeReviewXmlRow } from "../domain/code-review-xml";
+export { reviewXmlDate, validReviewXmlText } from "../domain/review-xml";
 import { cmWhereEquals, cmWhereLike } from "../domain/branches";
 import { toStructuredResult } from "../presentation/results";
 import { runCm, normalizeFindOutputLines } from "../execution/cm";
@@ -5,7 +7,7 @@ import { spawnAndCollect, getCmExecutable } from "../execution/process";
 import { commandExecutionStorage, getActiveAbortSignal } from "../execution/context";
 import { runCodeReviewFindIdsCommand, CodeReviewFindCommandError, CODE_REVIEW_FIND_CAPTURE_LIMITS } from "../execution/code-review-find-command";
 
-export type CodeReviewFindArgs = { status?: string; assignee?: string; owner?: string; target?: string; targetType?: "branch" | "changeset"; titleLike?: string; orderBy?: "date" | "modifieddate" | "status"; descending?: boolean; limit?: number; format?: string; dateFormat?: string; source?: "native" | "ids"; output?: "text" | "json"; maxItems?: number; workdir?: string };
+export type CodeReviewFindArgs = { status?: string; assignee?: string; owner?: string; target?: string; targetType?: "branch" | "changeset"; titleLike?: string; orderBy?: "date" | "modifieddate" | "status"; descending?: boolean; limit?: number; format?: string; dateFormat?: string; source?: "native" | "ids" | "xml"; output?: "text" | "json"; maxItems?: number; workdir?: string };
 export type CodeReviewFindQuery = { status: string | null; assignee: string | null; owner: string | null; target: string | null; targetType: "branch" | "changeset" | null; titleLike: string | null; orderBy: "date" | "modifieddate" | "status" | null; descending: boolean | null; limit: number | null };
 export class CodeReviewFindError extends Error {
     constructor(readonly code: "invalid_identity" | "malformed_output" | "unsupported_query" | "invalid_producer_data" | "output_overflow") { super(`Code review find read failed (${code}); no reusable rows are available.`); }
@@ -20,7 +22,7 @@ export function codeReviewFindRequest(args: CodeReviewFindArgs) {
         if (value !== undefined && (typeof value !== "string" || !validCodeReviewQueryString(value))) throw new CodeReviewFindError("invalid_identity");
     for (const value of [args.format, args.dateFormat])
         if (value !== undefined && (typeof value !== "string" || !validCodeReviewTemplate(value))) throw new CodeReviewFindError("invalid_producer_data");
-    if ((args.source !== undefined && args.source !== "native" && args.source !== "ids")
+    if ((args.source !== undefined && args.source !== "native" && args.source !== "ids" && args.source !== "xml")
         || (args.targetType !== undefined && args.targetType !== "branch" && args.targetType !== "changeset")
         || (args.orderBy !== undefined && !["date", "modifieddate", "status"].includes(args.orderBy))
         || (args.descending !== undefined && typeof args.descending !== "boolean")
@@ -28,7 +30,7 @@ export function codeReviewFindRequest(args: CodeReviewFindArgs) {
         || (args.limit !== undefined && (!Number.isSafeInteger(args.limit) || args.limit < 1))
         || (args.maxItems !== undefined && (!Number.isSafeInteger(args.maxItems) || args.maxItems < 1 || args.maxItems > 500))) throw new CodeReviewFindError("invalid_producer_data");
     const source = args.source ?? "native";
-    if (source === "ids" && (args.format || args.dateFormat)) throw new CodeReviewFindError("unsupported_query");
+    if (source === "xml" && (args.format !== undefined || args.dateFormat !== undefined) || source === "ids" && (args.format || args.dateFormat)) throw new CodeReviewFindError("unsupported_query");
     return { source, maxItems: args.maxItems ?? 100, query: { status: args.status ?? null, assignee: args.assignee ?? null, owner: args.owner ?? null, target: args.target ?? null, targetType: args.targetType ?? null, titleLike: args.titleLike ?? null, orderBy: args.orderBy ?? null, descending: args.descending ?? null, limit: args.limit ?? null } };
 }
 export function codeReviewFindCommand(args: CodeReviewFindArgs): string[] {
@@ -42,7 +44,7 @@ export function codeReviewFindCommand(args: CodeReviewFindArgs): string[] {
         ...(query.limit ? [`limit ${query.limit}`] : []),
         ...(source === "native" && args.format ? [`--format=${args.format}`] : []),
         ...(source === "native" && args.dateFormat ? [`--dateformat=${args.dateFormat}`] : []),
-        "--nototal", ...(source === "ids" ? ["--format={id}", "--encoding=utf-8"] : [])];
+        "--nototal", ...(source === "xml" ? ["--xml", "--encoding=utf-8"] : source === "ids" ? ["--format={id}", "--encoding=utf-8"] : [])];
 }
 export function parseCodeReviewFindIds(bytes: Uint8Array): { ids: string[]; duplicateRecords: number } {
     if (bytes.byteLength > CODE_REVIEW_FIND_CAPTURE_LIMITS.stdoutBytes) throw new CodeReviewFindCommandError("capture_incomplete");
@@ -54,9 +56,18 @@ export function parseCodeReviewFindIds(bytes: Uint8Array): { ids: string[]; dupl
     if (ids.some(id => !validCodeReviewId(id))) throw new CodeReviewFindError("invalid_identity");
     return { ids, duplicateRecords: ids.length - new Set(ids).size };
 }
-export type CodeReviewFindObservation = ReturnType<typeof codeReviewFindRequest> & ({ source: "native"; command: string[]; rawResult: string } | { source: "ids"; ids: string[]; duplicateRecords: number });
+export type CodeReviewFindObservation = ReturnType<typeof codeReviewFindRequest> & ({ source: "native"; command: string[]; rawResult: string } | { source: "ids"; ids: string[]; duplicateRecords: number } | { source: "xml"; rows: CodeReviewXmlRow[] });
 export async function assembleCodeReviewFindObservation(args: CodeReviewFindArgs, typedNative = false): Promise<CodeReviewFindObservation> {
     const request = codeReviewFindRequest(args), command = codeReviewFindCommand(args);
+    if (request.source === "xml") {
+        const bytes = await runCodeReviewFindIdsCommand(command, args.workdir);
+        let rows: CodeReviewXmlRow[];
+        try { rows = parseCodeReviewsXml(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); }
+        catch { throw new CodeReviewFindError("malformed_output"); }
+        if (request.query.limit !== null && rows.length > request.query.limit) throw new CodeReviewFindError("invalid_producer_data");
+        if (getActiveAbortSignal()?.aborted) throw new CodeReviewFindCommandError("aborted");
+        return { ...request, source: "xml", rows };
+    }
     if (request.source === "ids") {
         const bytes = await runCodeReviewFindIdsCommand(command, args.workdir);
         if (getActiveAbortSignal()?.aborted) throw new CodeReviewFindCommandError("aborted");
@@ -81,6 +92,7 @@ export function codeReviewFindPayload(observation: CodeReviewFindObservation) {
     const data = { scope: "workspace_repository", qualifierVerified: false, query: observation.query, limits: { maxItems: observation.maxItems, idDigits: 20, queryCodeUnits: 4096, compactUtf8Bytes: CODE_REVIEW_FIND_MAX_BYTES } } as const;
     const payload = observation.source === "native"
         ? { ...common, completeness: { read: "unknown", capture: "unknown", projection: false }, data: { ...data, mode: "native", basis: "find_review_native", rows: null, counts: null, countBasis: "unavailable" } }
+        : observation.source === "xml" ? { ...common, completeness: { read: "complete", capture: "complete", projection: observation.rows.length <= observation.maxItems }, data: { ...data, mode: "xml", basis: "find_review_xml_utf8", rows: observation.rows.slice(0, observation.maxItems), countBasis: "observed_query_rows", counts: { observed: observation.rows.length, returned: Math.min(observation.rows.length, observation.maxItems), omitted: Math.max(0, observation.rows.length - observation.maxItems), excluded: 0 } } }
         : { ...common, completeness: { read: "complete", capture: "complete", projection: observation.ids.length <= observation.maxItems }, data: { ...data, mode: "ids", basis: "find_review_id_utf8", diagnostics: { duplicateRecords: observation.duplicateRecords }, rows: observation.ids.slice(0, observation.maxItems).map(id => ({ id })), countBasis: "observed_query_rows", counts: { observed: observation.ids.length, returned: Math.min(observation.ids.length, observation.maxItems), omitted: Math.max(0, observation.ids.length - observation.maxItems), excluded: 0 } } };
     if (Buffer.byteLength(JSON.stringify(payload), "utf8") > CODE_REVIEW_FIND_MAX_BYTES) throw new CodeReviewFindError("output_overflow");
     return payload;
@@ -88,6 +100,7 @@ export function codeReviewFindPayload(observation: CodeReviewFindObservation) {
 export async function presentCodeReviewFindObservation(observation: CodeReviewFindObservation, args: CodeReviewFindArgs): Promise<string> {
     if (observation.source === "native") return toStructuredResult("code-review-find", args.output ?? "text", observation.rawResult,
         { command: ["cm", ...observation.command], rawOutput: observation.rawResult, resultCount: normalizeFindOutputLines(observation.rawResult).length }, args.workdir);
+    if (observation.source === "xml") return JSON.stringify(codeReviewFindPayload(observation));
     if (args.output === "json") return JSON.stringify(codeReviewFindPayload(observation));
     const ids = observation.ids.slice(0, observation.maxItems), omitted = observation.ids.length - ids.length;
     return [...(ids.length ? ids : ["(no observed query rows)"]), ...(omitted ? [`(${omitted} observed query rows omitted from presentation.)`] : [])].join("\n");

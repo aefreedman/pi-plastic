@@ -8,10 +8,10 @@ const enm=(v:string[])=>Type.Union(v.map(x=>Type.Literal(x))),nil=(s:any)=>Type.
 const attempt=obj({state:enm(["not-attempted","not-started","started","unknown"]),terminal:enm(["not-observed","observed"]),exitCode:nil(uint(2147483647)),aborted:Type.Boolean(),timedOut:Type.Boolean()});
 const capture=obj({stdoutBytes:uint(),stderrBytes:uint(),stdoutRetainedBytes:uint(65536),stderrRetainedBytes:uint(16384),truncated:Type.Boolean(),complete:Type.Boolean(),validUtf8:Type.Boolean()});
 const artifact=obj({bytes:uint(PATCH_FILE_MAX_BYTES),sha256:Type.String({pattern:"^[a-f0-9]{64}$"}),utf8:Type.Boolean(),empty:Type.Boolean(),binaryLimited:Type.Boolean(),totalChars:nil(uint(PATCH_FILE_MAX_BYTES)),truncated:Type.Boolean(),content:nil(Type.String({maxLength:60500}))});
-const request=obj({source:text,destination:nil(text),output:nil(text),toolPath:nil(text),clean:Type.Boolean(),integration:Type.Boolean(),workdir:text,preflight:Type.Boolean(),format:enm(["text","json"])});
-const data=obj({requested:nil(request),resolved:nil(obj({source:text,destination:nil(text),toolPath:text,output:nil(text)})),intendedArgv:Type.Array(text,{minItems:1,maxItems:7}),attempt,capture:nil(capture),artifact:nil(artifact),publication:enm(["not-requested","not-published","published","unknown"]),cleanup:enm(["not-created","completed","failed","retained","unknown"]),retainedStagingDirectory:nil(text),effect:enm(["not-attempted","unverified","artifact-observed","published"]),workspaceEffects:Type.Literal("unverified"),moveRepresentation:Type.Literal("backend-determined")});
+const request=obj({source:text,destination:nil(text),output:nil(text),includeBinaries:Type.Boolean(),clean:Type.Boolean(),integration:Type.Boolean(),workdir:text,preflight:Type.Boolean(),format:enm(["text","json"])});
+const data=obj({requested:nil(request),resolved:nil(obj({source:text,destination:nil(text),output:nil(text)})),intendedArgv:Type.Array(text,{minItems:1,maxItems:7}),attempt,capture:nil(capture),artifact:nil(artifact),publication:enm(["not-requested","not-published","published","unknown"]),cleanup:enm(["not-created","completed","failed","retained","unknown"]),retainedStagingDirectory:nil(text),effect:enm(["not-attempted","unverified","artifact-observed","published"]),workspaceEffects:Type.Literal("unverified"),moveRepresentation:Type.Literal("unverified")});
 const header={schemaVersion:Type.Literal(1),action:Type.Literal("patch"),provenance:obj({source:Type.Literal("plastic"),producer:Type.Literal("@aefree/pi-plastic"),contentTrust:Type.Literal("external")}),completeness:obj({capture:enm(["complete","incomplete","unknown"]),projection:Type.Literal(true)}),data};
-export const patchOutputSchema=Type.Unsafe<PatchReceipt>(Type.Union([obj({...header,ok:Type.Literal(true),outcome:enm(["preflight","generated","empty"])}),obj({...header,ok:Type.Literal(false),outcome:enm(["failed","uncertain"]),error:obj({code:enm(["invalid_request","setup_failed","command_failed","uncertain","backend_incompatible","artifact_failed","publication_failed","cleanup_failed","producer_failed"]),message:Type.String({minLength:1,maxLength:256})})})]));
+export const patchOutputSchema=Type.Unsafe<PatchReceipt>(Type.Union([obj({...header,ok:Type.Literal(true),outcome:enm(["preflight","generated","empty"])}),obj({...header,ok:Type.Literal(false),outcome:enm(["failed","uncertain"]),error:obj({code:enm(["invalid_request","setup_failed","command_failed","uncertain","artifact_failed","publication_failed","cleanup_failed","producer_failed"]),message:Type.String({minLength:1,maxLength:256})})})]));
 const safe=(s:string)=>s.trim().length>0&&!/[\u0000-\u001f\u007f-\u009f]/.test(s);
 function resolvedSelector(requested:string,observed:string) {const s=requested.trim();return observed===s||/^br:\/.+/i.test(s)&&!s.includes("@")&&observed.startsWith(s+"@")&&observed.slice(s.length+1).split("@").every(p=>p.trim().length>0&&p===p.trim());}
 export function validatePatchOutput(v:unknown):v is PatchReceipt {
@@ -26,7 +26,7 @@ export function validatePatchOutput(v:unknown):v is PatchReceipt {
     if(!validPatchRequest(r))return false;
     if(z) {
         if(!Object.values(z).every(s=>s===null||safe(s))||!resolvedSelector(r.source,z.source)||(r.destination===null?z.destination!==null:z.destination===null||!resolvedSelector(r.destination,z.destination))||JSON.stringify(d.intendedArgv)!==JSON.stringify(patchReceiptArgv(r,z)))return false;
-        if(r.toolPath!==null&&z.toolPath!==r.toolPath.trim()||r.output===null&&z.output!==null||r.output!==null&&z.output!==(isAbsolute(r.output)?r.output:resolve(r.workdir,r.output)))return false;
+        if(r.output===null&&z.output!==null||r.output!==null&&z.output!==(isAbsolute(r.output)?r.output:resolve(r.workdir,r.output)))return false;
         const tails=[r.source,r.destination].map((s,i)=>s!==null&&/^br:\/.+/i.test(s.trim())&&!s.includes("@")?(i===0?z.source:z.destination)!.slice(s.trim().length):null).filter(s=>s!==null);
         if(tails.some(t=>t!==tails[0]))return false;
     } else if(c||f||JSON.stringify(d.intendedArgv)!=='["patch"]'||a.state!=="not-attempted"||d.cleanup!=="not-created")return false;
@@ -40,10 +40,12 @@ export function validatePatchOutput(v:unknown):v is PatchReceipt {
     if(d.cleanup==="retained"&&(a.terminal==="observed"&&!a.aborted&&!a.timedOut||!["started","unknown"].includes(a.state)))return false;
     if(f) {
         if(f.utf8&&(f.totalChars===null||f.totalChars>f.bytes||f.bytes>3*f.totalChars))return false;
-        if(!c?.complete||a.state!=="started"||a.exitCode!==0||c.stderrBytes!==0||f.empty!==(f.bytes===0)||!f.utf8&&!f.binaryLimited||!f.utf8&&(f.content!==null||f.totalChars!==null||f.truncated)||f.utf8&&f.totalChars===null)return false;
+        if(!f.utf8&&f.binaryLimited)return false;
+        if(!c?.complete||a.state!=="started"||a.exitCode!==0||c.stderrBytes!==0||f.empty!==(f.bytes===0)||!f.utf8&&(f.content!==null||f.totalChars!==null||f.truncated)||f.utf8&&f.totalChars===null)return false;
         if(r.output!==null&&(f.content!==null||f.truncated)||r.output===null&&f.utf8&&f.content===null)return false;
         if(r.output===null&&f.utf8) {
             if(f.truncated!==(f.totalChars!>60000))return false;
+            if(!f.truncated&&f.binaryLimited!==/^Binary files? .* differ\r?$/m.test(f.content!))return false;
             if(!f.truncated&&(f.totalChars!==f.content!.length||f.bytes!==Buffer.byteLength(f.content!,"utf8")||f.sha256!==createHash("sha256").update(f.content!).digest("hex")))return false;
             if(f.truncated&&f.content!.length<=60000)return false;
         }

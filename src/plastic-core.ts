@@ -6,7 +6,7 @@ export { shelvesetCreate, shelvesetApply, shelvesetDelete, shelvesetList } from 
 export { codeReviewCreate, codeReviewUpdate, codeReviewDelete, codeReviewFind } from "./operations/reviews";
 export { checkin, __plasticCheckinInternals } from "./operations/checkin";
 export { switchBranch, __plasticSwitchInternals } from "./operations/switch";
-export { getPatchBackendCapabilityWarning, __plasticPatchInternals, patch } from "./operations/patch";
+export { __plasticPatchInternals, patch } from "./operations/patch";
 export { __plasticDiffInternals, diff } from "./operations/diff";
 export { __plasticProcessInternals } from "./execution/test-seams";
 export { changesetEditComment } from "./operations/changeset-comment";
@@ -16,5 +16,5 @@ export { mergeToBranch } from "./operations/closeout";
 
 export { mergeListConflictMarkers, mergeMarkResolved } from "./operations/marker-lifecycle";
 export { branchEditComment, labelEditComment } from "./operations/object-comments";
-export { codeReviewCommentFind, codeReviewCommentAdd, codeReviewCommentReply, codeReviewCommentEdit, codeReviewCommentDelete } from "./operations/review-comments";
-export { codeReviewReviewerAdd, codeReviewReviewerRemove, codeReviewReviewerList, codeReviewSetStatus, codeReviewRequestReview } from "./operations/review-workflow";
+export { codeReviewCommentFind, codeReviewCommentAdd, codeReviewCommentReply, codeReviewCommentEdit, codeReviewCommentDelete, codeReviewCommentApply, codeReviewCommentUnapply } from "./operations/review-comments";
+export { codeReviewReviewerAdd, codeReviewReviewerRemove, codeReviewReviewerList, codeReviewSetStatus, codeReviewRequestReview, codeReviewSubscribe, codeReviewUnsubscribe, codeReviewSubscription } from "./operations/review-workflow";

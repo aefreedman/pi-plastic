@@ -16,10 +16,15 @@ const cases: [string, Record<string, unknown>, string[]][] = [
   ["codeReviewCommentAdd", { review: "1114", comment: "explicit" }, ["codereview", "comment", "add", "1114", "-c=explicit"]],
   ["codeReviewCommentReply", { commentGuid: guid, comment: "explicit" }, ["codereview", "comment", "reply", guid, "-c=explicit"]],
   ["codeReviewCommentEdit", { commentGuid: guid, comment: "explicit" }, ["codereview", "comment", "edit", guid, "-c=explicit"]],
+  ["codeReviewCommentApply", {commentGuid:guid,changeset:"cs:16"}, ["codereview","comment","apply",guid,"--changeset=cs:16"]],
+  ["codeReviewCommentUnapply", {commentGuid:guid}, ["codereview","comment","unapply",guid]],
+  ["codeReviewSubscribe", workflow, ["codereview","subscribe","1110",`--repository=${workflow.repository}`]],
+  ["codeReviewUnsubscribe", workflow, ["codereview","unsubscribe","1110",`--repository=${workflow.repository}`]],
+  ["codeReviewSubscription", workflow, ["codereview","subscription","1110","--format={subscribed}{tab}{reason}{tab}{emails}",`--repository=${workflow.repository}`]],
   ["codeReviewCommentDelete", { commentGuids: [guid] }, ["codereview", "comment", "delete", guid]],
   ["codeReviewReviewerAdd", { ...workflow, users: ["me"] }, ["codereview", "reviewer", "add", "1110", "--users=me", `--repository=${workflow.repository}`]],
   ["codeReviewReviewerRemove", { ...workflow, groups: ["QA"] }, ["codereview", "reviewer", "remove", "1110", "--groups=QA", `--repository=${workflow.repository}`]],
-  ["codeReviewReviewerList", workflow, ["codereview", "reviewer", "list", "1110", `--repository=${workflow.repository}`]],
+  ["codeReviewReviewerList", workflow, ["codereview", "reviewer", "list", "1110", "--xml", "--encoding=utf-8", `--repository=${workflow.repository}`]],
   ["codeReviewSetStatus", { ...workflow, status: "reviewed" }, ["codereview", "review", "1110", "--reviewed", `--repository=${workflow.repository}`]],
   ["codeReviewRequestReview", { ...workflow, all: true }, ["codereview", "review", "1110", "--re-request", "--all", `--repository=${workflow.repository}`]],
 ];
@@ -36,7 +41,7 @@ const deps = { spawn: ((_cmd: string, argv: string[], options: any) => {
 for (const [name, request, argv] of cases) {
   const publicName = `plastic_${name}`, tool = tools.get(publicName)!;
   assert(tool.outputSchema, publicName);
-  const read = name === "codeReviewCommentFind" || name === "codeReviewReviewerList";
+  const read = name === "codeReviewCommentFind" || name === "codeReviewReviewerList" || name === "codeReviewSubscription";
   assert.equal(MUTATING_PLASTIC_TOOLS.has(publicName), !read);
   assert.equal(searchPlasticTools({ toolNames: [publicName] })[0]?.name, publicName);
   const original = { ...request, cwd: process.cwd(), preflight: true, output: "json" };

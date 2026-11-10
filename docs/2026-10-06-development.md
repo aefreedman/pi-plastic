@@ -22,7 +22,7 @@ Default tests are credential-free. They cover schemas/semantic guards, registrat
 
 ## Structured API and transport
 
-All 41 core tools have closed output schemas and direct native producer execution. The capability loader is deliberately schema-less. Core exports remain string-returning views; selected failures reject so compound callers cannot proceed on presentation text.
+All 46 core tools have closed output schemas and direct native producer execution. The capability loader is deliberately schema-less. Core exports remain string-returning views; selected failures reject so compound callers cannot proceed on presentation text.
 
 Producers own request snapshots, source admission, bounded projection and same-observation presentation. Native details vary by route: legacy read presentation can remain in rawResult, while mutation/diff receipts use empty details. Don't parse strings to reconstruct canonical facts.
 
@@ -63,6 +63,25 @@ Read-only smoke, from an intentionally clean sandbox with /main and no merge in 
 ```bash
 PI_PLASTIC_TEST_WORKSPACE=/absolute/path/to/dedicated/sandbox npm run test:live
 ```
+
+For CM 11.0.16.10616 review XML, reviewer/subscription reads and native patch generation:
+
+```bash
+PI_PLASTIC_TEST_WORKSPACE=/absolute/path/to/dedicated/sandbox npm run test:live:native-workflows
+```
+
+This bounded suite uses existing review/comment data, writes patch artifacts only to private temporary evidence storage, and verifies unchanged workspace state. It never creates reviews, comments, reviewers or subscriptions; missing nonempty data is reported as a coverage gap rather than manufactured through mutations.
+
+For native review mutation acceptance, use a clean disposable workspace whose loaded changeset includes a synthetic text-file change:
+
+```bash
+PI_PLASTIC_TEST_WORKSPACE=/absolute/path/to/dedicated/sandbox \
+PI_PLASTIC_ALLOW_MUTATION_TESTS=true \
+PI_PLASTIC_SANDBOX_ATTESTATION=disposable-synthetic-only \
+npm run test:live:reviews
+```
+
+The suite creates uniquely titled reviews of the loaded changeset, checks description text/file replacement and clearing, genuine revision anchors, change-request apply/unapply and own email subscription transitions, then independently verifies deletion of its exact owned reviews/comments and unchanged workspace state. It never switches branches or creates changesets. A missing description file exercises native pre-create rejection without retry; synthetic tests separately cover identity preservation after a genuine post-create failure.
 
 For explicit branch-creation mutation validation:
 

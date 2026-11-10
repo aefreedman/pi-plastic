@@ -7,8 +7,8 @@ const requests={
     "changeset-edit-comment":obj({...common,changeset:text,comment:optionalText,commentsFile:optionalText}),
     "shelveset-create":obj({...common,paths,comment:optionalText,commentsFile:optionalText,all:Type.Boolean(),dependencies:Type.Boolean(),summaryFormat:Type.Boolean()}),
     "shelveset-apply":obj({...common,shelveset:text,changePaths:paths,preview:Type.Boolean(),dontCheckout:Type.Boolean(),comparisonMethod:nil(enm(["ignoreeol","ignorewhitespaces","ignoreeolandwhitespaces","recognizeall"]))}),
-    "code-review-create":obj({...common,target:text,title:text,status:optionalText,users:nil(Type.Array(text,{minItems:1,maxItems:100})),groups:nil(Type.Array(text,{minItems:1,maxItems:100})),repository:optionalText,format:optionalText}),
-    "code-review-update":obj({...common,id:text,status:optionalText,title:optionalText,repository:optionalText}),
+    "code-review-create":obj({...common,target:text,title:text,status:optionalText,users:nil(Type.Array(text,{minItems:1,maxItems:100})),groups:nil(Type.Array(text,{minItems:1,maxItems:100})),repository:optionalText,format:optionalText,description:optionalText,descriptionFile:optionalText}),
+    "code-review-update":obj({...common,id:text,status:optionalText,title:optionalText,repository:optionalText,description:optionalText,descriptionFile:optionalText}),
 };
 const attempt=obj({state:enm(["not-attempted","not-started","started","unknown"]),terminal:enm(["not-observed","observed"]),exitCode:nil(uint(2147483647)),aborted:Type.Boolean(),timedOut:Type.Boolean()}),capture=obj({stdoutBytes:uint(),stderrBytes:uint(),stdoutRetainedBytes:uint(65536),stderrRetainedBytes:uint(16384),truncated:Type.Boolean(),complete:Type.Boolean(),validUtf8:Type.Boolean()});
 function schema<A extends ObjectWriteAction>(action:A) {
@@ -34,7 +34,7 @@ export function validateObjectWriteOutput(v:unknown):v is ObjectWriteReceipt {
         if(a.state==="not-attempted"&&(!a.aborted||c.stdoutBytes||c.stderrBytes||c.validUtf8||c.complete))return false;
     }
     const completed=!!c?.complete&&a.state==="started"&&a.exitCode===0;
-    if(o!==null) {if(!r||!completed||/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(o.text)||Buffer.byteLength(o.text,"utf8")!==c!.stdoutBytes||JSON.stringify(id)!==JSON.stringify(parseObjectWriteIdentity(dto.action,r,o.text)))return false;}
+    if(o!==null) {if(!r||!(completed||dto.action==="code-review-create"&&c?.complete&&a.state==="started")||/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(o.text)||Buffer.byteLength(o.text,"utf8")!==c!.stdoutBytes||JSON.stringify(id)!==JSON.stringify(parseObjectWriteIdentity(dto.action,r,o.text)))return false;}
     else if(id!==null||completed)return false;
     if(d.effect!==(id?"identity-emitted":dto.ok&&dto.outcome==="command-completed"?"not-proven":["started","unknown"].includes(a.state)?"uncertain":"not-attempted"))return false;
     if(r?.preflight)return dto.ok&&dto.outcome==="preflight"&&a.state==="not-attempted"&&a.terminal==="not-observed"&&a.exitCode===null&&!a.aborted&&!a.timedOut&&!c&&!o&&!id;

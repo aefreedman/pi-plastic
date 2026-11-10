@@ -66,6 +66,11 @@ Argument descriptions in the loaded tool schema are the source for exact call pa
 | `plastic_codeReviewCommentReply` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
 | `plastic_codeReviewCommentEdit` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
 | `plastic_codeReviewCommentDelete` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewCommentApply` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewCommentUnapply` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewSubscribe` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewUnsubscribe` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
+| `plastic_codeReviewSubscription` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
 | `plastic_codeReviewReviewerAdd` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
 | `plastic_codeReviewReviewerRemove` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |
 | `plastic_codeReviewReviewerList` | [Comments and review workflow](2026-10-23-comments-and-review-workflow.md) |

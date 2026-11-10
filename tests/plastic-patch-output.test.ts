@@ -10,7 +10,7 @@ import { PATCH_FILE_MAX_BYTES } from "../src/operations/patch-receipt";
 import { patch } from "../src/operations/patch";
 import { loadRegisteredTools } from "./pi-tool-harness";
 const root=await fs.mkdtemp(join(tmpdir(),"pi-plastic-public-patch-test-"));
-const request={source:"cs:42@Example Repository@example@unity",toolPath:"fixture-diff",workdir:root};
+const request={source:"cs:42@Example Repository@example@unity",workdir:root};
 type Reply={file?:Buffer|string;stdout?:Buffer|string;stderr?:Buffer|string;code?:number;noStart?:boolean;race?:string;onSpawn?:()=>void};
 const calls:string[][]=[];
 function deps(reply:Reply) {return {spawn:((_:string,argv:string[])=>{
@@ -20,26 +20,31 @@ function deps(reply:Reply) {return {spawn:((_:string,argv:string[])=>{
 })as any};}
 async function invoke(args:any,reply:Reply={}) {calls.length=0;const d=await runWithAbortSignal(undefined,()=>executePatchOutput(args),deps(reply));assert(validatePatchOutput(d.structuredContent),JSON.stringify(d));assert.deepEqual(d.details,{});return d;}
 try {
-    for(const args of [{},{...request,source:"--apply"},{...request,destination:" - "},{...request,clean:"false"},{...request,integration:0},{...request,format:"markdown"},{...request,preflight:"true"},{...request,output:null},{...request,toolPath:"x\n"},{...request,extra:true},{...request,source:"x".repeat(4097)}]) {
+    for(const args of [{},{...request,source:"--apply"},{...request,destination:" - "},{...request,clean:"false"},{...request,integration:0},{...request,format:"markdown"},{...request,preflight:"true"},{...request,output:null},{...request,toolPath:"obsolete"},{...request,tool:"obsolete"},{...request,tool_path:"obsolete"},{...request,includeBinaries:"true"},{...request,includeBinaries:null},{...request,extra:true},{...request,source:"x".repeat(4097)}]) {
         const d=await invoke(args);assert(d.isError);assert.equal(d.structuredContent.data.requested,null);assert.equal(calls.length,0);
     }
-    const preview=await invoke({...request,preflight:true,clean:true,integration:true});assert(!preview.isError);assert.equal(calls.length,0);assert.deepEqual(preview.structuredContent.data.intendedArgv,["patch",request.source,"--output=<package-owned-staging-file>","--tool=fixture-diff","--clean","--integration"]);assert.equal(preview.structuredContent.data.cleanup,"not-created");
-    if(process.platform==="win32"){
-        const old=process.env.PI_PLASTIC_PATCH_EXECUTABLE;delete process.env.PI_PLASTIC_PATCH_EXECUTABLE;
-        try{const missingBackend=await invoke({source:request.source,workdir:root,preflight:true});assert(missingBackend.isError);assert.equal(calls.length,0);assert.match(missingBackend.structuredContent.error!.message,/PI_PLASTIC_PATCH_EXECUTABLE.*toolPath/);assert.equal(missingBackend.structuredContent.data.effect,"not-attempted");}
-        finally{if(old===undefined)delete process.env.PI_PLASTIC_PATCH_EXECUTABLE;else process.env.PI_PLASTIC_PATCH_EXECUTABLE=old;}
-    }
+    const preview=await invoke({...request,preflight:true,clean:true,integration:true,includeBinaries:true});assert(!preview.isError);assert.equal(calls.length,0);assert.deepEqual(preview.structuredContent.data.intendedArgv,["patch",request.source,"--output=<package-owned-staging-file>","--clean","--integration","--include-binaries"]);assert.equal(preview.structuredContent.data.cleanup,"not-created");
+    assert.equal(preview.structuredContent.data.requested!.includeBinaries,true);
+    assert.equal(preview.structuredContent.data.moveRepresentation,"unverified");
+    const oldBackend=process.env.PI_PLASTIC_PATCH_EXECUTABLE;process.env.PI_PLASTIC_PATCH_EXECUTABLE="nonexistent-obsolete-backend";
+    try {const ignoredPolicy=await invoke({...request,preflight:true});assert(!ignoredPolicy.isError);assert.equal(calls.length,0);assert(!Object.hasOwn(ignoredPolicy.structuredContent.data.resolved!,"toolPath"));}
+    finally {if(oldBackend===undefined)delete process.env.PI_PLASTIC_PATCH_EXECUTABLE;else process.env.PI_PLASTIC_PATCH_EXECUTABLE=oldBackend;}
     const unknownRepository=await invoke({...request,source:"br:/main/synthetic-source",preflight:true});assert(unknownRepository.isError);assert.equal(calls.length,0);assert.match(unknownRepository.structuredContent.error!.message,/selector.*repository.*qualified/i);
     for(const format of ["text","json"]){
 
-        const d=await invoke({...request,format},{file:"--- a\n+++ b\n@@ -1 +1 @@\n-before\n+after\n"});assert(!d.isError);assert.equal(d.structuredContent.outcome,"generated");assert.equal(d.structuredContent.data.artifact!.content,"--- a\n+++ b\n@@ -1 +1 @@\n-before\n+after\n");assert.equal(d.structuredContent.data.cleanup,"completed");assert.equal(calls.length,1);assert(!calls[0].includes("--apply"));
+        const d=await invoke({...request,format},{file:"--- a\n+++ b\n@@ -1 +1 @@\n-before\n+after\n"});assert(!d.isError);assert.equal(d.structuredContent.outcome,"generated");assert.equal(d.structuredContent.data.artifact!.content,"--- a\n+++ b\n@@ -1 +1 @@\n-before\n+after\n");assert.equal(d.structuredContent.data.cleanup,"completed");assert.equal(calls.length,1);assert(!calls[0].some(a=>a.startsWith("--apply")||a.startsWith("--tool")));assert(!calls[0].includes("--include-binaries"));assert.equal(d.structuredContent.data.requested!.includeBinaries,false);
         const forged=structuredClone(d.structuredContent);forged.data.artifact!.bytes++;assert(!validatePatchOutput(forged));
         const hash=structuredClone(d.structuredContent);hash.data.artifact!.sha256="a".repeat(64);assert(!validatePatchOutput(hash));
         const effect=structuredClone(d.structuredContent);effect.data.effect="published";assert(!validatePatchOutput(effect));
         const arbitrary=structuredClone(d.structuredContent);arbitrary.data.resolved!.source="cs:99";assert(!validatePatchOutput(arbitrary));
     }
     const empty=await invoke(request,{file:""});assert(!empty.isError);assert.equal(empty.structuredContent.outcome,"empty");
-    const binary=await invoke(request,{file:Buffer.from([255,254,0])});assert(!binary.isError);assert.equal(binary.structuredContent.data.artifact!.content,null);assert.equal(binary.structuredContent.data.artifact!.utf8,false);
+    const binary=await invoke({...request,includeBinaries:true},{file:Buffer.from([255,254,0])});assert(!binary.isError);assert.equal(binary.structuredContent.data.artifact!.content,null);assert.equal(binary.structuredContent.data.artifact!.utf8,false);assert.equal(binary.structuredContent.data.artifact!.binaryLimited,false);assert.equal(binary.structuredContent.data.artifact!.totalChars,null);assert(calls[0].includes("--include-binaries"));
+    const listed=await invoke(request,{file:"Binary files a/image.bin and b/image.bin differ\n"});assert(!listed.isError);assert.equal(listed.structuredContent.data.artifact!.binaryLimited,true);
+    const requestedButListed=await invoke({...request,includeBinaries:true},{file:"Binary files a/image.bin and b/image.bin differ\n"});assert(!requestedButListed.isError);assert.equal(requestedButListed.structuredContent.data.artifact!.binaryLimited,true,"Requesting raw hunks does not prove binary contents were emitted");
+    const opaqueBound=await invoke({...request,includeBinaries:true},{file:Buffer.alloc(PATCH_FILE_MAX_BYTES,255)});assert(!opaqueBound.isError);assert.equal(opaqueBound.structuredContent.data.artifact!.bytes,PATCH_FILE_MAX_BYTES);assert.equal(opaqueBound.structuredContent.data.artifact!.content,null);
+    const opaqueOver=await invoke({...request,includeBinaries:true},{file:Buffer.alloc(PATCH_FILE_MAX_BYTES+1,255)});assert(opaqueOver.isError);assert.equal(opaqueOver.structuredContent.error!.code,"artifact_failed");
+
     const large=await invoke(request,{file:"x".repeat(60001)});assert(!large.isError);assert(large.structuredContent.data.artifact!.truncated);assert.equal(large.structuredContent.data.artifact!.totalChars,60001);
     const bound=await invoke(request,{file:Buffer.alloc(PATCH_FILE_MAX_BYTES,97)});assert(!bound.isError);assert.equal(bound.structuredContent.data.artifact!.bytes,PATCH_FILE_MAX_BYTES);
     const over=await invoke(request,{file:Buffer.alloc(PATCH_FILE_MAX_BYTES+1,97)});assert(over.isError);assert.equal(over.structuredContent.data.artifact,null);assert.equal(over.structuredContent.error!.code,"artifact_failed");
@@ -48,12 +53,15 @@ try {
         // Any retained staging is disposed only by the test owner; synthetic emitter has no continuing native process.
         if(d.structuredContent.data.cleanup==="retained")await fs.rm(d.structuredContent.data.retainedStagingDirectory!,{recursive:true,force:true});
     }
+    const obsoleteDiagnostic=await invoke(request,{file:"patch",stderr:"unrecognized option --binary",code:1});assert(obsoleteDiagnostic.isError);assert.equal(obsoleteDiagnostic.structuredContent.error!.code,"uncertain");assert.doesNotMatch(JSON.stringify(obsoleteDiagnostic),/GNU|PI_PLASTIC_PATCH_EXECUTABLE|backend_incompatible/);assert.equal(calls.length,1);
     calls.length=0;
     const retired=await runWithAbortSignal(undefined,()=>executePatchOutput(request),{timeoutMs:1,abortKillDelayMs:1,spawn:((_:string,a:string[])=>{calls.push(a);const child=Object.assign(new EventEmitter(),{stdout:new PassThrough(),stderr:new PassThrough(),kill:()=>false});queueMicrotask(()=>{child.emit("spawn");});return child;})as any});
     assert(validatePatchOutput(retired.structuredContent));assert(retired.isError);assert.equal(retired.structuredContent.data.cleanup,"retained");assert.equal(retired.structuredContent.data.attempt.terminal,"not-observed");assert.equal(calls.length,1);
     const retained=retired.structuredContent.data.retainedStagingDirectory!;assert((await fs.lstat(retained)).isDirectory());await fs.rm(retained,{recursive:true,force:true}); // Fake emitter only: distinct test-owner disposal, not producer rollback.
     const output=join(root,"owned ü.patch");
     const published=await invoke({...request,output},{file:"generated bytes"});assert(!published.isError);assert.equal(published.structuredContent.data.publication,"published");assert.equal(published.structuredContent.data.artifact!.content,null);assert.equal(await fs.readFile(output,"utf8"),"generated bytes");
+    const binaryOutput=join(root,"binary.patch"),raw=Buffer.from([100,105,102,102,10,255,0,254]);
+    const binaryPublished=await invoke({...request,output:binaryOutput,includeBinaries:true},{file:raw});assert(!binaryPublished.isError);assert.equal(binaryPublished.structuredContent.data.publication,"published");assert.deepEqual(await fs.readFile(binaryOutput),raw);assert.equal(binaryPublished.structuredContent.data.artifact!.utf8,false);
     const forged=structuredClone(published.structuredContent);forged.data.resolved!.output=join(root,"other.patch");assert(!validatePatchOutput(forged));
     const metrics=structuredClone(published.structuredContent);metrics.data.artifact!.totalChars=PATCH_FILE_MAX_BYTES;assert(!validatePatchOutput(metrics),"Published UTF8 character count cannot exceed observed bytes");
     const truncatedMetrics=structuredClone(large.structuredContent);truncatedMetrics.data.artifact!.totalChars=PATCH_FILE_MAX_BYTES;assert(!validatePatchOutput(truncatedMetrics),"Truncated UTF8 character count cannot exceed observed bytes");

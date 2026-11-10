@@ -53,9 +53,9 @@ Complete apply output does not prove applied items/cleanliness/restoration; obse
 plastic_codeReviewCreate(target="br:/main/owned-feature", title="Owned feature review", output="json")
 ```
 
-Preserve target/title and optional status/users/groups/repository/format. Select reviewers only when requested; singular assignee is removed in the current baseline. Creating a review does not authorize changing another person's assignment or opening a real review conversation.
+Preserve target/title and optional status/users/groups/repository/format. Optional `description` and `descriptionFile` are exclusive; `description=""` explicitly clears a description. `descriptionFile="-"` is rejected (no stdin). File bytes are delegated to native CM; keep the file immutable until completion. Select reviewers only when requested; singular assignee is removed in the current baseline. Creating a review does not authorize changing another person's assignment or opening a real review conversation.
 
-An entire supported default numeric/GUID scalar can be emitted identity evidence. Custom stdout is always opaque; repository scope and requested review attributes stay unverified. A separate explicitly scoped query may provide its own identity evidence, never hidden creation verification.
+An entire supported default numeric/GUID scalar can be emitted identity evidence, **including on native partial failure**: CM can create the review, fail to add its description, print the scalar ID, and exit nonzero. The failure receipt retains that identity and opaque stdout; it never claims stored description, successful completion, rollback or safe retry. Custom stdout is always opaque; repository scope and requested review attributes stay unverified. A separate explicitly scoped query may provide its own identity evidence, never hidden creation verification.
 
 ### Creation and find use different format grammars
 
@@ -67,7 +67,7 @@ plastic_codeReviewCreate(target="br:/main/owned-feature", title="Owned formatted
 
 The native receipt still reports observedCreatedIdentity=null for that custom format. A named `{id}|{title}` creation formatter failed with Invalid format string; no automatic substitution was performed.
 
-`cm find review` is different: the sourced fields `{id}|{status}|{title}` work, but a find `{guid}` field failed. Do not infer support from inconsistent help examples. The canonical tool [ids source](2026-10-06-discovery.md#codereviewfind) returns numeric IDs without attempting GUID/title/status recovery.
+`cm find review` is a different protocol. Use the [rich XML source](2026-10-06-discovery.md#codereviewfind) for GUID/title/status/count metadata on CM 11.0.16.10616, or retain the deliberately minimal ids source. Do not parse arbitrary creation output as find metadata.
 
 ## codeReviewUpdate
 
@@ -75,7 +75,7 @@ The native receipt still reports observedCreatedIdentity=null for that custom fo
 plastic_codeReviewUpdate(id="<observed review ID>", status="Reviewed", output="json")
 ```
 
-One exact `codereview -e` command requires title and/or status, preserving exact ID and optional repository. Status is the native assignee status, not caller own-review status. Exact values: Under review, Reviewed, Rework required. Empty status/repository reject. Legacy assignee is removed with no fallback: this is a breaking current-baseline correction. See [reviewer, own-status and discussion tools](2026-10-23-comments-and-review-workflow.md). No readback or retry is added.
+One exact `codereview -e` command requires title, status, description or descriptionFile, preserving exact ID and optional repository. Status is the native assignee status, not caller own-review status. Exact values: Under review, Reviewed, Rework required. Empty status/repository reject. Legacy assignee is removed with no fallback: this is a breaking current-baseline correction. See [reviewer, own-status and discussion tools](2026-10-23-comments-and-review-workflow.md). Description/file are exclusive; empty description clears and stdin file `-` rejects. No readback or retry is added.
 
 An empty successful stdout means command completion, not verified requested state. In bounded fixtures, directly scoped observations still showed Under review after one requesting Reviewed update. The producer reports observedUpdatedState=null/effect not-proven; it does not infer cause, no-op, absence or eventual consistency.
 

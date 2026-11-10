@@ -13,7 +13,7 @@ Use an explicit structured source when you need reusable rows. Native/custom tab
 | `plastic_branchList` | `source="native"` | `source="names"` | Unqualified branch paths / workspace repository |
 | `plastic_workspaceList` | `source="native"` | `source="fields"` | Name/path/GUID / local client inventory, with ASCII prerequisite |
 | `plastic_shelvesetList` | `source="native"` | `source="ids"` | Decimal ID and unqualified sh selector / workspace repository |
-| `plastic_codeReviewFind` | `source="native"` | `source="ids"` | Decimal ID / workspace repository |
+| `plastic_codeReviewFind` | `source="native"` | `source="ids"` or `source="xml"` | Decimal ID; XML includes GUID/metadata / workspace repository |
 
 Structured list projections default to 100 rows and cap at 500. The optional CLI `limit` is separate; it does not prove repository totals or exhaustion. The entire captured structured response is validated before projection, including omitted rows.
 
@@ -95,6 +95,8 @@ Exact repeated IDs remain in order, with full-response duplicate diagnostics. Co
 `format` and `dateFormat` are native CLI templates; `output` selects text/JSON independently. Meaningful templates conflict with ids; empty strings retain ignored behavior. Native rows/counts stay null and read/capture unknown rather than table-derived facts. Native text/error and `(no output)` behavior remain available; JSON contains the noncanonical native envelope without a new metadata query.
 
 ## codeReviewFind
+
+On CM 11.0.16.10616, `source="xml"` uses one bounded `find review ... --xml --encoding=utf-8` response. Rows expose id, guid, owner, date, title, assignee, targetType, target, destination, modifiedDate, comments, unresolvedIssues, unresolvedChanges, unansweredQuestions, codeReviewStatusName and mergeRequestStatusName. Status names are fixed English (Under review/Reviewed/Rework required and None/Draft/Closed/Open/Merged), never parsed from localized status prefixes. `reviewersRaw` retains the native flattened REVIEWERS value verbatim: names may contain commas/colons, so never split it. Use `plastic_codeReviewReviewerList` XML for structured exact membership. Unknown/missing/duplicate fields, malformed XML, DTD/entity declarations, unsafe counts/dates, invalid GUIDs and duplicate records fail closed before projection. Empty XML queries yield []/0. XML rejects format/dateFormat even when empty; native/ids remain deliberate independent routes. XML returns the structured envelope in either text/JSON presentation, without a version query. Counts describe captured query records, not repository totals/exhaustion.
 
 `source="ids"` uses one `find review … --nototal --format={id} --encoding=utf-8` response. IDs are decimal strings, not JS numbers; no GUID, invented prefix, qualification, target/title/status/owner/assignee is recovered. Reuse only within workspace_repository scope; qualifierVerified=false.
 

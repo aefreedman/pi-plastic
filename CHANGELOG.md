@@ -7,6 +7,24 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+## [0.10.0] - 2026-11-10
+
+### Changed
+
+- Updated validation for Pi 1.5.2.
+
+- Target Plastic CLI 11.0.16.10616 and use native git-diff patch generation without external diff backends, patch executable settings, or startup backend warnings. Add explicit binary-content inclusion while preserving bounded artifacts and atomic no-overwrite publication.
+- Read current review/comment XML, including exact reviewer membership, fixed-English statuses, activity dates, issue counts, and comment item metadata. Comment paths describe the latest checked-in repository item path, not necessarily its review path.
+
+### Fixed
+
+- Bound review-query transport retirement after timeout or cancellation, including unresponsive children and open inherited pipes, without admitting partial rows or retrying.
+
+### Added
+
+- Review description creation, replacement and explicit clearing; revision-anchored comments; explicit change-request apply/unapply; and current-user review email subscription tools.
+- Regression coverage for repeated marker merges exiting nonzero without automatic replay or checkin, and partial review creation retaining an emitted identity when description creation fails.
+
 ## [0.9.4] - 2026-11-02
 
 ### Changed

@@ -20,12 +20,11 @@ cm switch --silent --noinput <branch-spec>
 
 Agent preference: use runtime `plastic_*` methods first; keep shell commands as manual fallback.
 
-## Patch Backend Rejects `--binary` on macOS
+## Patch Binary Content and Native Generation
 
-- Symptom: `plastic_patch(...)` reports that its diff executable rejected `--binary` and names `PI_PLASTIC_PATCH_EXECUTABLE`.
-- With Plastic 11 on macOS, this is the observed result when `cm patch` uses Apple BSD `/usr/bin/diff`: that executable works for text-only diffs but rejects the patch backend's `--binary` argument.
-- Set `PI_PLASTIC_PATCH_EXECUTABLE` to a verified GNU Diffutils-compatible non-GUI executable, or pass that executable as `toolPath` for one call. Keep `PI_PLASTIC_DIFF_EXECUTABLE` configured separately for text-only review tools.
-- This is a macOS diagnostic, not validation of Windows patch backends or two-spec patch behavior; verify those locally.
+- Native CM 11.0.16.10616 patch generation needs no external diff backend or patch executable environment variable. `toolPath` is no longer a generation parameter; CM `--tool` applies only to patch application, which this package does not expose.
+- Changed binaries are listed only unless `includeBinaries=true` requests raw byte hunks. For non-UTF8 artifacts, use a new explicit output file to preserve bytes; the receipt intentionally returns metadata rather than lossy text.
+- After an uncertain attempt, inspect the receipt and retained staging directory before any new deliberate attempt. No automatic retry or older-client backend fallback is provided.
 
 ## Code Review Creation Failed
 

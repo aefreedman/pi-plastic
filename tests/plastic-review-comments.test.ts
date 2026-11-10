@@ -9,16 +9,23 @@ import { join } from "node:path";
 import { runWithAbortSignal } from "../src/execution/context";
 import { parseReviewCommentsXml } from "../src/domain/review-comments-xml";
 import { executeReviewCommentOutput, validateReviewCommentOutput } from "../src/pi/review-comments-output";
-import { REVIEW_COMMENT_ACTIONS, type ReviewCommentAction, validateReviewCommentFile, codeReviewCommentAdd, codeReviewCommentFind, codeReviewCommentReply, codeReviewCommentEdit, codeReviewCommentDelete } from "../src/operations/review-comments";
+import { REVIEW_COMMENT_ACTIONS, type ReviewCommentAction, validateReviewCommentFile, codeReviewCommentAdd, codeReviewCommentFind, codeReviewCommentReply, codeReviewCommentEdit, codeReviewCommentDelete, codeReviewCommentApply, codeReviewCommentUnapply } from "../src/operations/review-comments";
 const fixture = JSON.parse(await readFile(new URL("./fixtures/review-comments/native-selected.json", import.meta.url), "utf8"));
 const capture = (name: string, stream = "stdout") => Buffer.from(fixture.captures.find((c: any) => c.name === name).streams[stream].base64, "base64");
 const guid = "db0ac495-d5cc-4eb8-a888-2d30d3ea9c90";
-const bases = { find: { review: "1114" }, add: { review: "1114", comment: "explicit café Ω\n<xml> & | #" }, reply: { commentGuid: guid, comment: "reply" }, edit: { commentGuid: guid, comment: "replacement" }, delete: { commentGuids: [guid] } };
+const bases = { find: { review: "1114" }, add: { review: "1114", comment: "explicit café Ω\n<xml> & | #" }, reply: { commentGuid: guid, comment: "reply" }, edit: { commentGuid: guid, comment: "replacement" }, delete: { commentGuids: [guid] }, apply: { commentGuid: guid, changeset: "cs:16" }, unapply: { commentGuid: guid } };
 const calls: string[][] = [];
 type Reply = { out?: string | Buffer; err?: string | Buffer; code?: number; start?: boolean; throws?: boolean; mutate?: () => void };
 function deps(reply: Reply) { return { spawn: ((_c: string, argv: string[]) => { calls.push([...argv]); if (reply.throws) throw Error("launch"); const c = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), kill: () => false }); queueMicrotask(() => { if (reply.start !== false) c.emit("spawn"); reply.mutate?.(); c.stdout.end(reply.out ?? ""); c.stderr.end(reply.err ?? ""); c.emit("close", reply.code ?? 0, null); }); return c; }) as any }; }
 async function invoke(action: ReviewCommentAction, args: unknown, reply: Reply = {}) { calls.length = 0; const result = await runWithAbortSignal(undefined, () => executeReviewCommentOutput(action, args), deps(reply)); assert(validateReviewCommentOutput(result.structuredContent), JSON.stringify(result)); return result.structuredContent; }
-const questionXml = capture("comments-read-inline-question").toString("utf8"), replyXml = capture("comments-read-reply").toString("utf8"), wideXml = capture("comments-read-wide").toString("utf8");
+// Synthetic current-profile extensions of historical sanitized captures, not observed 10616 fixtures.
+const currentXml = (xml: string) => xml.replace(/<CHANGEREVIEWCOMMENT>[\s\S]*?<\/CHANGEREVIEWCOMMENT>/g, record => record.replace("</GUID>", `</GUID><ITEMID>${record.includes("<REVISIONID>-1</REVISIONID>") ? "" : "106"}</ITEMID><PATH></PATH><MODIFIEDDATE>2026-10-23T10:48:14-04:00</MODIFIEDDATE>`));
+assert.throws(() => parseReviewCommentsXml(capture("comments-read-inline-question").toString("utf8"), "1114"));
+const questionXml = currentXml(capture("comments-read-inline-question").toString("utf8")), replyXml = currentXml(capture("comments-read-reply").toString("utf8")), wideXml = currentXml(capture("comments-read-wide").toString("utf8"));
+for(const type of ["script","discarded"]) assert(parseReviewCommentsXml(questionXml.replace("<TYPE>question</TYPE>",`<TYPE>${type}</TYPE>`),"1114").some(r=>r.type===type));
+const pathEvidence=questionXml.replace("<ITEMID>106</ITEMID><PATH></PATH>","<ITEMID>106</ITEMID><PATH>/other-branch/latest-name.cs</PATH>");
+assert.equal(parseReviewCommentsXml(pathEvidence,"1114").find(r=>r.itemId==="106")!.lastRepositoryPath,"/other-branch/latest-name.cs");
+for(const bad of [questionXml.replace("<ITEMID></ITEMID>","<ITEMID>0</ITEMID>"),questionXml.replace("<PATH></PATH>","<PATH>C:/local</PATH>"),questionXml.replace("<MODIFIEDDATE>2026-10-23T10:48:14-04:00</MODIFIEDDATE>",""),questionXml.replace("<MODIFIEDDATE>2026-10-23T10:48:14-04:00</MODIFIEDDATE>","<MODIFIEDDATE>yesterday</MODIFIEDDATE>")]) assert.throws(()=>parseReviewCommentsXml(bad,"1114"));
 const rows = parseReviewCommentsXml(questionXml, "1114");
 assert(rows.some(r => r.text === "synthetic café Ω\nsecond line <xml> & | #\n" && r.line === 2 && r.location === "1" && r.type === "question"));
 assert(rows.every(r => r.serverPath === null));
@@ -60,11 +67,14 @@ for (const bad of [[], [guid, guid.toUpperCase()], ["1114"], Array(33).fill(guid
 const mixed = await invoke("delete", { commentGuids: [guid, "00000000-0000-4000-8000-249769890001"] }, { code: 1, err: capture("comment-delete-mixed", "stderr") }); assert(!mixed.ok); assert.equal(mixed.outcome, "uncertain"); assert.equal(calls.length, 1);
 const bounded = await invoke("find", { review: "1114", maxItems: 1 }, { out: questionXml }); assert(bounded.ok); assert.equal(bounded.data.rows!.length, 1); assert.equal(bounded.completeness.projection, false); assert.deepEqual(calls[0], ["find", "changereviewcomment", "where reviewid=1114", "--xml", "--encoding=utf-8"]);
 for (const action of ["reply", "edit", "delete"] as const) for (const extra of [{ review: "1114" }, { type: "Question" }, { path: "/a", line: 1 }]) { assert(!(await invoke(action, { ...bases[action], ...extra })).ok); assert.equal(calls.length, 0); }
+const anchored=await invoke("add",{...bases.add,revision:"revid:102",line:2},{out:guid}); assert(anchored.ok); assert(calls[0].includes("--revision=revid:102"));
+for(const extra of [{revision:"cs:16",line:1},{revision:"revid:0",line:1},{revision:"revid:102"},{revision:"revid:102",path:"/a",line:1}]) {assert(!(await invoke("add",{...bases.add,...extra})).ok);assert.equal(calls.length,0);}
+for(const [action,args,argv] of [["apply",bases.apply,["codereview","comment","apply",guid,"--changeset=cs:16"]],["unapply",bases.unapply,["codereview","comment","unapply",guid]]] as const) {assert((await invoke(action,args)).ok);assert.deepEqual(calls[0],argv); for(const extra of [{commentGuid:"1116"},{discard:true},{comment:"not allowed"},{changeset:"16"}]) {assert(!(await invoke(action,{...args,...extra})).ok);assert.equal(calls.length,0);}}
 const mutable = { review: "1114", comment: "original" };
 const immutable = await invoke("add", mutable, { out: guid, mutate: () => { mutable.comment = "later"; } }); assert(immutable.ok); assert.equal(immutable.data.requested!.comment, "original");
 const aborter = new AbortController(); calls.length = 0;
 const during = await runWithAbortSignal(aborter.signal, () => executeReviewCommentOutput("edit", bases.edit), deps({ mutate: () => aborter.abort() })); assert(during.isError); assert(validateReviewCommentOutput(during.structuredContent)); assert.equal(calls.length, 1); assert.equal(during.structuredContent.data.observation!.attempt.aborted, true);
-const tools = [codeReviewCommentFind, codeReviewCommentAdd, codeReviewCommentReply, codeReviewCommentEdit, codeReviewCommentDelete];
+const tools = [codeReviewCommentFind, codeReviewCommentAdd, codeReviewCommentReply, codeReviewCommentEdit, codeReviewCommentDelete, codeReviewCommentApply, codeReviewCommentUnapply];
 for (let n = 0; n < tools.length; n++) { const a = REVIEW_COMMENT_ACTIONS[n]; calls.length = 0; await tools[n].execute({ ...bases[a], preflight: true }); assert.equal(calls.length, 0); }
 const dir = await mkdtemp(join(tmpdir(), "review-comment-test-"));
 try { for (const bytes of [Buffer.alloc(0), Buffer.from([255]), Buffer.from(" "), Buffer.from("x".repeat(16385))]) { await writeFile(join(dir, "input"), bytes); assert(!(await invoke("edit", { commentGuid: guid, commentsFile: "input", workdir: dir })).ok); assert.equal(calls.length, 0); }

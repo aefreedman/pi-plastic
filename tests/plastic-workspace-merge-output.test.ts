@@ -17,6 +17,7 @@ function deps(mode="connected",mutate?:()=>void){return {spawn:((_:string,args:s
    const sep=(k:string)=>args.find(a=>a.startsWith(k+"="))!.slice(k.length+1),frame=(o:string,f:string[])=>sep("--startlineseparator")+[o,...f].join(sep("--fieldseparator"))+sep("--endlineseparator")+"\r\n";
    out=mode==="conflict"?frame("FILE_CONFLICT",["/fixture.txt","13","15","16","533"]):mode==="unknown"?frame("NEW_OPERATION",["ready"]):mode==="empty"?"":frame("STATUS",["ALREADY_CONNECTED","No merges detected"]);
    if(mode==="nonzero"){out="UNRESOLVED fixture.bin (binary)\n";code=1;}
+   if(mode==="existing-markers"){out="CONFLICT_MARKERS /fixture.txt\n";code=1;}
    if(mode==="warning")err="Warning conflict text not admitted";if(mode==="invalid")out=Buffer.from([255]);if(mode==="overflow")out=Buffer.alloc(65537);
   }else if(args[0]==="status"){
    const machine=args.includes("--machinereadable"),short=args.includes("--short");out=machine?"STATUS\x1f16\x1fExample Repository\x1fexample@unity\r\n":short?"":"/main/target@Example Repository@example@unity (cs:16 - head)\r\n\r\n";
@@ -35,6 +36,19 @@ for(const strategy of ["auto","source","destination"] as const)for(const format 
  for(const patch of [(d:any)=>d.data.commandCompleted=false,(d:any)=>d.data.intendedArgv.push("--to=br:/other"),(d:any)=>d.data.observedFinalizedMetadata=true,(d:any)=>d.data.markers=null,(d:any)=>d.data.markers.state="unknown",(d:any)=>d.data.fullStatus.admission="unsupported",(d:any)=>d.data.commandOutput=null]){const forged=structuredClone(a.structuredContent);patch(forged);assert.equal(validateWorkspaceMergeOutput(forged),false);}
 }
 for(const mode of ["nonzero","warning","invalid","overflow","pending-fail","full-fail","localized","hints","markers"]){calls=[];const r=await runWithAbortSignal(undefined,()=>executeWorkspaceMergeOutput("merge",{source,workdir:cwd}),deps(mode));assert(validateWorkspaceMergeOutput(r.structuredContent),mode);assert(r.isError,mode);assert.equal(calls.filter(c=>c.includes("--merge")).length,1);assert.equal(r.structuredContent.data.checkinReadiness,"unknown");assert.equal(r.structuredContent.data.effect,"uncertain");assert.equal(r.structuredContent.data.commandCompleted,!["nonzero","invalid","overflow"].includes(mode));if(["nonzero","invalid","overflow"].includes(mode))assert.equal(calls.length,1);if(mode==="markers" || !nativeReadinessSupported && !["nonzero","invalid","overflow"].includes(mode))assert.equal(calls.length,2);if(!nativeReadinessSupported)assert.equal(calls.filter(c=>c[0]==="status").length,0);}
+// CM 11.0.16.10616 rejects a repeated marker merge while earlier markers remain.
+// Synthetic transport regression: no marker/status read, replay or checkin may follow.
+calls=[];
+const repeated=await runWithAbortSignal(undefined,()=>executeWorkspaceMergeOutput("merge",{source,workdir:cwd}),deps("existing-markers"));
+assert(validateWorkspaceMergeOutput(repeated.structuredContent));
+assert(repeated.isError);
+assert.equal(repeated.structuredContent.data.commandCompleted,false);
+assert.equal(repeated.structuredContent.data.checkinReadiness,"unknown");
+assert.equal(repeated.structuredContent.data.effect,"uncertain");
+assert.equal(repeated.structuredContent.data.apply.attempt.exitCode,1);
+assert.equal(repeated.structuredContent.data.commandOutput?.stdout,"CONFLICT_MARKERS /fixture.txt\n");
+assert.equal(calls.length,1);
+assert(calls[0].includes("--conflict-markers"));
 // Native exit0 does not depend on legacy applying declaration/action cardinality.
 for(const mode of ["unknown","empty","conflict"]){calls=[];const r=await runWithAbortSignal(undefined,()=>executeWorkspaceMergeOutput("merge",{source,workdir:cwd}),deps(mode));assert(validateWorkspaceMergeOutput(r.structuredContent));assert.equal(r.structuredContent.ok,nativeReadinessSupported);assert.equal(r.structuredContent.data.checkinReadiness,nativeReadinessSupported?"supported-no-unresolved-signals":"unknown");assert.equal(calls.length,nativeReadinessSupported?4:2);}
 for(const input of [{source:"-"},{source:" --to=br:/other"},{source:""},{source:"x\u0000"},{source:"\uD800"},{source:"x".repeat(4097)},{strategy:"banana"},{strategy:"markers"},{strategy:null},{preflight:null},{format:null},{workdir:null},{extra:true},{cherrypicking:null},{forced:1}]){calls=[];const r=await runWithAbortSignal(undefined,()=>executeWorkspaceMergeOutput("merge",{source,workdir:cwd,...input}),deps());assert(validateWorkspaceMergeOutput(r.structuredContent));assert(r.isError);assert.equal(calls.length,0);}

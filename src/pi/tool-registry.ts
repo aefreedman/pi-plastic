@@ -1,5 +1,5 @@
-import { codeReviewReviewerAdd, codeReviewReviewerRemove, codeReviewReviewerList, codeReviewSetStatus, codeReviewRequestReview } from "../operations/review-workflow";
-import { codeReviewCommentFind, codeReviewCommentAdd, codeReviewCommentReply, codeReviewCommentEdit, codeReviewCommentDelete } from "../operations/review-comments";
+import { codeReviewReviewerAdd, codeReviewReviewerRemove, codeReviewReviewerList, codeReviewSetStatus, codeReviewRequestReview, codeReviewSubscribe, codeReviewUnsubscribe, codeReviewSubscription } from "../operations/review-workflow";
+import { codeReviewCommentFind, codeReviewCommentAdd, codeReviewCommentReply, codeReviewCommentEdit, codeReviewCommentDelete, codeReviewCommentApply, codeReviewCommentUnapply } from "../operations/review-comments";
 import { branchEditComment, labelEditComment } from "../operations/object-comments";
 import { mergeListConflictMarkers, mergeMarkResolved } from "../operations/marker-lifecycle";
 import { changesetEditComment } from "../operations/changeset-comment";
@@ -31,11 +31,16 @@ export const PLASTIC_TOOL_REGISTRY = {
   codeReviewCommentReply,
   codeReviewCommentEdit,
   codeReviewCommentDelete,
+  codeReviewCommentApply,
+  codeReviewCommentUnapply,
   codeReviewReviewerAdd,
   codeReviewReviewerRemove,
   codeReviewReviewerList,
   codeReviewSetStatus,
   codeReviewRequestReview,
+  codeReviewSubscribe,
+  codeReviewUnsubscribe,
+  codeReviewSubscription,
   status,
   changesetEditComment,
   update,

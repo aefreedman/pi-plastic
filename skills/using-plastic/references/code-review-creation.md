@@ -2,7 +2,7 @@
 
 ## Tool-first flow
 
-Use `plastic_codeReviewCreate` with an explicitly inspected target and title. Optional `status`, `users`, `groups`, and `repository` retain their native meanings. Legacy singular assignee is removed, with no fallback. Select people/groups only when explicitly requested. Use [review workflow and comments](../../../docs/2026-10-23-comments-and-review-workflow.md) for reviewer membership, caller own status and discussions.
+Use `plastic_codeReviewCreate` with an explicitly inspected target and title. Optional `status`, `users`, `groups`, and `repository` retain their native meanings. `description` and `descriptionFile` are exclusive; empty description clears, file `-` is rejected. File bytes are delegated to native CM. Legacy singular assignee is removed, with no fallback. Select people/groups only when explicitly requested. Use [review workflow and comments](../../../docs/2026-10-23-comments-and-review-workflow.md) for reviewer membership, caller own status and discussions.
 
 ```text
 plastic_codeReviewCreate(target="br:/main/owned-feature", title="Feature: Brief description", output="json")
@@ -10,7 +10,7 @@ plastic_codeReviewCreate(target="br:/main/owned-feature", title="Feature: Brief 
 plastic_codeReviewUpdate(id="<observed ID>", status="Reviewed", output="json")
 ```
 
-Default numeric/GUID creation scalars can be emitted identity evidence. Requested repository scope and requested review state remain unverified. An update completing with empty stdout is command completion, not proof that the status changed. No automatic readback, retry, assignment, or review conversation follows.
+Default numeric/GUID creation scalars can be emitted identity evidence even on native partial failure: the review may be created before adding the description fails. Preserve its emitted ID; do not infer stored description, rollback or safe retry. Requested repository scope and requested review state remain unverified. An update completing with empty stdout is command completion, not proof that the status changed. No automatic readback, retry, assignment, or review conversation follows.
 
 `output="text"|"json"` controls receipt presentation independently of creation `format`, which is passed to CM unchanged. Custom formatted stdout always remains opaque, even when it contains a numeric ID. Do not chain a substring of custom output into an update; an explicitly planned unique-title query can provide separate identity evidence.
 
@@ -26,7 +26,7 @@ cm codereview -e "<observed ID>" --status="Reviewed"
 cm codereview reviewer add "<observed ID>" --users="<requested user>" --repository="<explicit repository>"
 ```
 
-Installed CM11 help documents creation formatter `{0}` as ID and `{1}` as GUID. A bounded owned fixture validated `--format="{0}|{1}"`; a named `{id}|{title}` creation formatter failed with `Invalid format string`. Creation formatting and `cm find review` field formatting are different protocols: the tested find query accepts `{id}|{status}|{title}`, but `{guid}` failed. Do not infer support from an inconsistent help example.
+Installed CM11 help documents creation formatter `{0}` as ID and `{1}` as GUID. A bounded owned fixture validated `--format="{0}|{1}"`; a named `{id}|{title}` creation formatter failed with `Invalid format string`. Creation formatting and `cm find review` are different protocols. Prefer `plastic_codeReviewFind(source="xml")` for current-profile GUID, metadata, fixed-English statuses and issue counts. Its reviewersRaw is retained without splitting; use structured `plastic_codeReviewReviewerList` for exact user/group membership.
 
 ```bash
 cm codereview "br:/main/owned-feature" "Owned review title" --format="{0}|{1}"

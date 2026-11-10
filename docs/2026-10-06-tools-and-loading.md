@@ -2,7 +2,7 @@
 
 [Documentation index](README.md) · [Tool-by-tool routing](README.md#look-up-a-tool)
 
-Pi Plastic registers **41 core tools** with output schemas, plus `plastic_tool_search`. The loader describes/activates capabilities and intentionally has no core receipt schema.
+Pi Plastic registers **46 core tools** with output schemas, plus `plastic_tool_search`. The loader describes/activates capabilities and intentionally has no core receipt schema.
 
 ## Capability loader
 
@@ -33,7 +33,7 @@ Set `PI_PLASTIC_TOOL_LOADING_MODE` before starting Pi:
 |---|---|---|
 | `balanced` | Loader, `plastic_status`, `plastic_currentBranch` | Default; inspect first and activate task capabilities as needed |
 | `loader-only` | Loader | Maximum initial schema reduction |
-| `all-active` | All 41 core tools; loader omitted from the active set | Controlled comparison or intentional full exposure |
+| `all-active` | All 46 core tools; loader omitted from the active set | Controlled comparison or intentional full exposure |
 
 Inactive tools remain registered. Prior loader additions on the active session branch are restored on startup, resume, fork, and reload.
 

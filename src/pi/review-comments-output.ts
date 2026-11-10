@@ -10,21 +10,23 @@ const common = { workdir: text, preflight: Type.Boolean(), output: enm(["text", 
 const content = { comment: optional(text), commentsFile: optional(text), repository: optional(text) };
 const requests = {
     find: obj({ ...common, review: text, maxItems: optional(uint(500)) }),
-    add: obj({ ...common, ...content, review: text, path: optional(text), line: optional(uint()), changeset: optional(text), type: optional(enm(["Change", "Question", "Comment"])) }),
+    add: obj({ ...common, ...content, review: text, path: optional(text), revision: optional(text), line: optional(uint()), changeset: optional(text), type: optional(enm(["Change", "Question", "Comment"])) }),
     reply: obj({ ...common, ...content, commentGuid: text, discard: optional(Type.Boolean()) }),
     edit: obj({ ...common, ...content, commentGuid: text }),
+    apply: obj({ ...common, commentGuid: text, changeset: text, repository: optional(text) }),
+    unapply: obj({ ...common, commentGuid: text, repository: optional(text) }),
     delete: obj({ ...common, commentGuids: Type.Array(text, { minItems: 1, maxItems: 32 }), repository: optional(text) }),
 };
 const attempt = obj({ state: enm(["not-attempted", "not-started", "started", "unknown"]), terminal: enm(["not-observed", "observed"]), exitCode: nil(uint(2147483647)), aborted: Type.Boolean(), timedOut: Type.Boolean() });
 const capture = obj({ stdoutBytes: uint(), stderrBytes: uint(), stdoutRetainedBytes: uint(65536), stderrRetainedBytes: uint(16384), truncated: Type.Boolean(), complete: Type.Boolean(), validUtf8: Type.Boolean() });
 const observation = obj({ attempt, capture, stdout: nil(text), stderr: nil(text), failed: Type.Boolean() });
-const row = obj({ guid: text, id: text, reviewId: text, type: text, text, line: nil(uint()), location: text, revisionId: text, changeset: text, parentId: text, serverPath: Type.Null() });
+const row = obj({ guid: text, id: text, reviewId: text, type: text, text, line: nil(uint()), location: text, revisionId: text, changeset: text, parentId: text, owner: text, date: text, appliedInChangeset: text, itemId: text, lastRepositoryPath: text, modifiedDate: text, serverPath: Type.Null() });
 function schema(action: ReviewCommentAction) {
     return obj({ schemaVersion: Type.Literal(1), action: Type.Literal(action), provenance: obj({ source: Type.Literal("plastic"), producer: Type.Literal("@aefree/pi-plastic"), contentTrust: Type.Literal("external") }), ok: Type.Boolean(), outcome: enm(["failed", "uncertain", "preflight", "command-completed"]), completeness: obj({ capture: enm(["unknown", "complete", "incomplete"]), projection: Type.Boolean() }),
         data: obj({ requested: nil(requests[action]), intendedArgv: Type.Array(text, { maxItems: 40 }), observation: nil(observation), localFailure: nil(enm(["invalid_request", "invalid_file", "aborted", "file_validation_timeout", "producer_failed"])), rows: nil(Type.Array(row, { maxItems: 500 })), observedCount: nil(uint(500)), observedGuid: nil(text), storedState: Type.Null(), repositoryIdentity: Type.Null(), scope: Type.Literal("requested-only"), atomicity: Type.Literal("not-proven"), rollback: Type.Literal("not-proven"), effect: enm(["not-attempted", "uncertain", "not-proven"]), disclaimer: text }), error: nil(obj({ code: enm(["invalid_request", "invalid_file", "producer_failed", "aborted", "file_validation_timeout", "capture_incomplete", "command_failed", "unsupported_profile"]), message: text })) });
 }
-export const codeReviewCommentFindOutputSchema = schema("find"), codeReviewCommentAddOutputSchema = schema("add"), codeReviewCommentReplyOutputSchema = schema("reply"), codeReviewCommentEditOutputSchema = schema("edit"), codeReviewCommentDeleteOutputSchema = schema("delete");
-export const reviewCommentOutputSchemas = { find: codeReviewCommentFindOutputSchema, add: codeReviewCommentAddOutputSchema, reply: codeReviewCommentReplyOutputSchema, edit: codeReviewCommentEditOutputSchema, delete: codeReviewCommentDeleteOutputSchema };
+export const codeReviewCommentFindOutputSchema = schema("find"), codeReviewCommentAddOutputSchema = schema("add"), codeReviewCommentReplyOutputSchema = schema("reply"), codeReviewCommentEditOutputSchema = schema("edit"), codeReviewCommentDeleteOutputSchema = schema("delete"), codeReviewCommentApplyOutputSchema = schema("apply"), codeReviewCommentUnapplyOutputSchema = schema("unapply");
+export const reviewCommentOutputSchemas = { find: codeReviewCommentFindOutputSchema, add: codeReviewCommentAddOutputSchema, reply: codeReviewCommentReplyOutputSchema, edit: codeReviewCommentEditOutputSchema, delete: codeReviewCommentDeleteOutputSchema, apply: codeReviewCommentApplyOutputSchema, unapply: codeReviewCommentUnapplyOutputSchema };
 const canonical = (v: any): string => JSON.stringify(v && typeof v === "object" ? Array.isArray(v) ? v.map(x => JSON.parse(canonical(x))) : Object.fromEntries(Object.keys(v).sort().map(k => [k, JSON.parse(canonical(v[k]))])) : v);
 export function validateReviewCommentOutput(value: unknown): value is ReviewCommentReceipt {
     try {
