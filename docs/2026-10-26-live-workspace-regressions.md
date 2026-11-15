@@ -33,7 +33,7 @@ With the same workspace, mutation permission and attestation settings, run `npm 
 
 ## Writable-Xlink checkin regression
 
-`npm run test:live:xlink-checkin` additionally requires `PI_PLASTIC_TEST_XLINK_REPOSITORY` naming a distinct existing disposable synthetic repository on the sandbox server. The test does not create repositories or additional workspaces. It mounts that repository's empty changeset 0 under a unique run-owned directory, checks in root/linked edits through the registered tool exactly once, and independently verifies both histories and historical bytes. Success restores the original clean root branch/changeset; synthetic branches/history remain. This proves root identity retention and linked emission observation, not multi-link merge/closeout readiness, which remains blocked without repository-aware ownership proof.
+`npm run test:live:xlink-checkin` additionally requires `PI_PLASTIC_TEST_XLINK_REPOSITORY` naming a distinct existing disposable synthetic repository on the sandbox server. The test does not create repositories or additional workspaces. It mounts that repository's empty changeset 0 under a unique run-owned directory, checks in root/linked edits through the registered tool exactly once, and independently verifies both histories and historical bytes. Success restores the original clean root branch/changeset; synthetic branches/history remain. This proves root identity retention and linked emission observation. The separate `npm run test:live:xlink-merge` validates the [bounded present-file one-Xlink subset](2026-11-15-writable-xlink-merges.md) through standalone and compound routes, with independent both-repository ancestry/content and no applying replay.
 
 ## Replaced-checkout regression
 

@@ -6,6 +6,7 @@ export function presentCheckinReceipt(dto: CheckinReceipt, format: "text" | "jso
         ...(dto.outcome === "preflight" ? [`- Would run: ${dto.data.wouldRun ? "yes" : "no"}`, `- Command argv: ${JSON.stringify(dto.data.command)}`] : []),
         ...(dto.data.createdChangeset ? [`- Observed root changeset: cs:${dto.data.createdChangeset.id}@br:${dto.data.createdChangeset.branch}@${dto.data.createdChangeset.repository}@${dto.data.createdChangeset.server}`] : []),
         ...(dto.data.linkedChangesets?.length ? [`- Linked changeset emissions: ${dto.data.linkedChangesets.length}; Xlink effects remain unverified.`] : []),
+        ...(dto.data.assessment?.ownership?.complete ? ["- Merge ownership: one writable mount; repository/source correlation observed, not global Xlink-effect proof."] : []),
         `- Steps: ${dto.data.steps.map(s => `${s.name} (${s.effect})`).join(", ") || "none"}`,
         `- Pending after: ${dto.data.pendingAfter ? dto.data.pendingAfter.totalPending : "not verified"}`,
         ...(dto.data.postObservationIssues ? [`- ${dto.data.postObservationIssues.stage} observation: ${dto.data.postObservationIssues.issues.map(i => i.code).join(", ")}${dto.data.createdChangeset ? "; created identity is retained" : ""}.`] : []),

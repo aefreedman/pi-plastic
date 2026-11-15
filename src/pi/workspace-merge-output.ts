@@ -1,8 +1,8 @@
-import { workspaceAssessmentSchema } from "./workspace-assessment-output";
+import { workspaceAssessmentSchema, validateOwnershipAssessment } from "./workspace-assessment-output";
 import { markerGateSchema, validateMarkerGate } from "./marker-gate-output";
 import { Type } from "typebox";
 import { Check } from "typebox/value";
-import { assembleWorkspaceMergeReceipt, emptyWorkspaceMergeData, workspaceMergeFailure, presentWorkspaceMergeReceipt, buildWorkspaceMergeArgv, safeMergeText, type MergeAction, type WorkspaceMergeReceipt } from "../operations/workspace-merge-receipt";
+import { assembleWorkspaceMergeReceipt, emptyWorkspaceMergeData, workspaceMergeFailure, presentWorkspaceMergeReceipt, buildWorkspaceMergeArgv, safeMergeText, parseWorkspaceMergeSource, type MergeAction, type WorkspaceMergeReceipt } from "../operations/workspace-merge-receipt";
 const obj=(p:Record<string,any>)=>Type.Object(p,{additionalProperties:false}),enm=(v:string[])=>Type.Union(v.map(x=>Type.Literal(x))),nil=(s:any)=>Type.Union([s,Type.Null()]),uint=(max=Number.MAX_SAFE_INTEGER)=>Type.Integer({minimum:0,maximum:max});
 const attempt=obj({state:enm(["not-attempted","not-started","started","unknown"]),terminal:enm(["not-observed","observed"]),exitCode:nil(uint(2147483647)),aborted:Type.Boolean(),timedOut:Type.Boolean()});
 const capture=obj({stdoutBytes:uint(),stderrBytes:uint(),stdoutRetainedBytes:uint(65536),stderrRetainedBytes:uint(16384),truncated:Type.Boolean(),complete:Type.Boolean(),validUtf8:Type.Boolean()});
@@ -29,8 +29,10 @@ export function validateWorkspaceMergeOutput(v:unknown):v is WorkspaceMergeRecei
   if(s.admission==="not-observed"&&(c||a.state!=="not-attempted"||a.aborted||a.timedOut))return false;
  }
  if(d.assessment && (d.assessment.ready !== (d.assessment.blockers.length === 0) || d.assessment.mergeRowCount + d.assessment.ordinaryRowCount > d.assessment.rowCount || d.fileConflictCount !== null && d.fileConflictCount > d.assessment.mergeRowCount || dto.ok && dto.outcome !== "preflight" && !d.assessment.ready))return false;
+ if(d.assessment?.ownership?.complete){const root=d.assessment.ownership.root!;const source=parseWorkspaceMergeSource(d.requestedSource!);if(!source||(source.kind==="branch"?source.branch!==root.sourceBranch:source.changeset!==root.sourceChangeset)||source.repository!==null&&(source.repository!==root.repository||source.server!==root.server))return false;}
  if(d.markers!==null&&!validateMarkerGate(d.markers))return false;
- const captured=[...stages,...(d.markers?[d.markers]:[])].filter(s=>s.capture);if(dto.completeness.capture!==(!captured.length?"unknown":captured.every(s=>s.capture!.complete)?"complete":"incomplete"))return false;
+ if(d.assessment && (!validateOwnershipAssessment(d.assessment)||d.assessment.ownership&&d.assessment.ownership.cwd!==d.workingDirectory))return false;
+ const captured=[...stages,...(d.markers?[d.markers]:[]),...(d.assessment?.ownership?.reads??[])].filter(s=>s.capture);if(dto.completeness.capture!==(!captured.length?"unknown":captured.every(s=>s.capture!.complete)?"complete":"incomplete"))return false;
  if((d.commandOutput!==null)!==Boolean(d.apply.capture?.complete))return false;
  if(d.commandOutput!==null&&(!d.apply.capture?.complete||Buffer.byteLength(d.commandOutput.stdout,"utf8")!==d.apply.capture.stdoutBytes||Buffer.byteLength(d.commandOutput.stderr,"utf8")!==d.apply.capture.stderrBytes))return false;
  if(d.commandCompleted!==Boolean(d.apply.capture?.complete&&d.apply.attempt.state==="started"&&d.apply.attempt.exitCode===0))return false;

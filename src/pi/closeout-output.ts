@@ -1,3 +1,5 @@
+import { sameOwnershipPins } from "../operations/xlink-ownership";
+import { workspaceAssessmentSchema, validateOwnershipAssessment } from "./workspace-assessment-output";
 import { Type } from "typebox";
 import { Check } from "typebox/value";
 import { resolve } from "node:path";
@@ -12,7 +14,7 @@ const capture=obj({stdoutBytes:uint(),stderrBytes:uint(),stdoutRetainedBytes:uin
 const branch=obj({branch:str(),repository:str(),server:str(),basis:Type.Literal("standard-status"),scope:Type.Literal("loaded-workspace")});
 const summary=obj(Object.fromEntries(["totalPending","tracked","private","added","changed","moved","deleted","other"].map(k=>[k,uint(20000)])));
 const changeset=obj({id:Type.String({pattern:"^(0|[1-9][0-9]{0,19})$"}),branch:str(),repository:str(),server:str(),mount:Type.Literal("/")});
-const read=obj({argv:Type.Array(str(16384),{minItems:1,maxItems:5}),attempt,capture:nil(capture),admission:enm(["unsupported","admitted"]),branch:nil(branch),parentPath:nil(str()),emptyParentResult:Type.Boolean(),summary:nil(summary)});
+const read=obj({assessment:Type.Optional(workspaceAssessmentSchema),argv:Type.Array(str(16384),{minItems:1,maxItems:5}),attempt,capture:nil(capture),admission:enm(["unsupported","admitted"]),branch:nil(branch),parentPath:nil(str()),emptyParentResult:Type.Boolean(),summary:nil(summary)});
 const stage=Type.Union([obj({name:enm(CLOSEOUT_STAGE_NAMES),kind:Type.Literal("read"),result:read}),...[["switch",switchOutputSchema],["update",updateOutputSchema],["merge",workspaceMergeOutputSchema],["checkin",checkinOutputSchema]].map(([k,s])=>obj({name:enm(CLOSEOUT_STAGE_NAMES),kind:Type.Literal(k as string),result:s}))]);
 const requested=obj({source:nil(str()),target:nil(str()),message:nil(str()),cardRef:nil(str()),strategy:enm(["auto","source","destination"]),updateTarget:Type.Boolean(),includePrivate:Type.Boolean(),preflight:Type.Boolean(),outputFormat:enm(["text","json"]),workdir:str()});
 const data=obj({requested:nil(requested),sourceBranch:nil(str()),targetBranch:nil(str()),targetSource:enm(["unresolved","explicit","parent-read"]),checkinMessage:nil(str(16384)),stages:Type.Array(stage,{maxItems:16}),unattemptedStages:Type.Array(enm(CLOSEOUT_STAGE_NAMES),{maxItems:14,uniqueItems:true}),unobservedChild:nil(enm(["switch","update","merge","checkin-preflight","checkin"])),createdChangeset:nil(changeset),pendingAfter:nil(summary),targetVerification:enm(["unverified","name-only","exact-qualifier-spelling"]),serverAliasEquivalence:Type.Literal("unverified"),sourceLink:Type.Literal("unverified"),branchHead:Type.Literal("unverified"),exclusiveScope:Type.Literal("unverified"),rollback:Type.Literal("not-proven"),effect:enm(["not-attempted","command-completed","uncertain","changeset-created"])});
@@ -22,6 +24,7 @@ const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
 const normal=(s:CloseoutRead)=>s.capture?.complete&&s.attempt.state==="started"&&s.attempt.terminal==="observed"&&s.attempt.exitCode===0&&!s.attempt.aborted&&!s.attempt.timedOut&&s.capture.stderrBytes===0;
 function validateRead(s:CloseoutStage&{kind:"read"}):boolean {
  const r=s.result,c=r.capture,a=r.attempt;
+ if(r.assessment&&(!validateOwnershipAssessment(r.assessment)||r.assessment.ready!==(r.assessment.blockers.length===0)||r.admission==="admitted"&&!r.assessment.ready||s.name!=="loaded-before-checkin"))return false;
  if(a.exitCode!==null&&a.terminal!=="observed")return false;
  if(c&&(c.stdoutRetainedBytes>c.stdoutBytes||c.stderrRetainedBytes>c.stderrBytes||c.complete&&(!c.validUtf8||c.truncated||c.stdoutRetainedBytes!==c.stdoutBytes||c.stderrRetainedBytes!==c.stderrBytes||a.state!=="started"||a.terminal!=="observed"||a.exitCode===null||a.aborted||a.timedOut)))return false;
  if(r.admission==="admitted"&&!normal(r))return false;
@@ -74,6 +77,8 @@ export function validateCloseoutOutput(value:unknown):value is CloseoutReceipt {
  const pending=stages.find(s=>s.name==="pending-before");if(pending&&pending.kind==="read"&&pending.result.summary&&d.targetBranch&&initial){const v=compareSwitchTarget(initial,d.targetBranch);if(!stages.some(s=>s.name.startsWith("loaded-")&&s.name!=="loaded-before"&&s.kind==="read"&&s.result.branch))lastVerification=v;if(v==="unverified"&&pending.result.summary.totalPending>0&&stages.some(s=>s.kind!=="read"))return false;}
  if(d.targetVerification!==lastVerification)return false;
  if(dto.ok||stages.some(s=>s.kind!=="read")){if(!initial||!d.targetBranch||!d.sourceBranch||parseSwitchTarget(d.sourceBranch)!.branch===parseSwitchTarget(d.targetBranch)!.branch)return false;for(const spec of [d.sourceBranch,d.targetBranch]){const p=parseSwitchTarget(spec)!;if(p.repository!==null&&(p.repository!==initial.repository||p.server!==initial.server))return false;}}
+ const mergeOwnership=stages.find(s=>s.kind==="merge");
+ if(mergeOwnership?.kind==="merge"&&mergeOwnership.result.data.assessment?.ownership?.complete)for(const child of stages.filter(s=>s.kind==="checkin")){if(child.kind==="checkin"&&child.result.ok&&(!child.result.data.assessment?.ownership||!sameOwnershipPins(mergeOwnership.result.data.assessment.ownership,child.result.data.assessment.ownership)))return false;}
  const checked=stages.find(s=>s.name==="checkin"&&s.kind==="checkin") as (CloseoutStage&{kind:"checkin"})|undefined;
  if(!same(d.createdChangeset,checked?.result.data.createdChangeset??null))return false;
  const final=stages.find(s=>s.name==="pending-final"&&s.kind==="read") as (CloseoutStage&{kind:"read"})|undefined;

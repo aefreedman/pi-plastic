@@ -1,4 +1,4 @@
-import { workspaceAssessmentSchema } from "./workspace-assessment-output";
+import { workspaceAssessmentSchema, validateOwnershipAssessment } from "./workspace-assessment-output";
 import { markerGateSchema, validateMarkerGate } from "./marker-gate-output";
 import { Type, type TProperties } from "typebox";
 import { Check } from "typebox/value";
@@ -27,6 +27,7 @@ export const checkinOutputSchema = Type.Unsafe<CheckinReceipt>(Type.Union([
 export function validateCheckinOutput(value: unknown): value is CheckinReceipt {
     if (!Check(checkinOutputSchema, value) || Buffer.byteLength(JSON.stringify(value), "utf8") > 131072) return false;
     const d = (value as CheckinReceipt).data, dto = value as CheckinReceipt;
+    if (d.assessment && !validateOwnershipAssessment(d.assessment)) return false;
     if (d.assessment && (d.assessment.ready !== (d.assessment.blockers.length === 0) || d.assessment.mergeRowCount + d.assessment.ordinaryRowCount > d.assessment.rowCount || dto.ok && !d.assessment.ready)) return false;
     if (d.postObservationIssues && !d.steps.some(s => s.name === d.postObservationIssues!.stage && s.operation === "status" && s.evidence === "unadmitted" && s.summary === null)) return false;
     if (d.markers !== null && !validateMarkerGate(d.markers)) return false;
@@ -37,6 +38,12 @@ export function validateCheckinOutput(value: unknown): value is CheckinReceipt {
     const validCs = (c: NonNullable<typeof d.createdChangeset>) => !!parseCheckinChangeset(`cs:${c.id}@br:${c.branch}@${c.repository}@${c.server} (mount:'/')`);
     if (!d.observedChangesets.every(validCs) || d.createdChangeset && !validCs(d.createdChangeset)) return false;
     const linked = d.linkedChangesets ?? [];
+    const ownership = d.assessment?.ownership;
+    if (ownership?.complete && d.createdChangeset) {
+        const root = ownership.root!, mount = ownership.mount!;
+        if (d.createdChangeset.branch !== root.branch || d.createdChangeset.repository !== root.repository || d.createdChangeset.server !== root.server) return false;
+        if ((dto.completeness.projection || linked.length) && (linked.length !== 1 || linked[0].mount !== mount.path || linked[0].branch !== mount.branch || linked[0].repository !== mount.repository || linked[0].server !== mount.server)) return false;
+    }
     if (linked.some(c => c.mount === "/" || !parseCheckinEmission(`cs:${c.id}@br:${c.branch}@${c.repository}@${c.server} (mount:'${c.mount}')`)) || new Set(linked.map(c => c.mount.toLowerCase())).size !== linked.length) return false;
     if (linked.length && !d.steps.some(s => s.operation === "checkin" && s.evidence === "admitted")) return false;
     for (const e of d.itemEvents) if (!checkinSafeValue(e.path) || e.operation === "MV" && !checkinSafeValue(e.sourcePath)) return false;
@@ -68,7 +75,7 @@ export function validateCheckinOutput(value: unknown): value is CheckinReceipt {
     if ((dto.outcome === "failed" || dto.outcome === "unsupported") && mutations.length) return false;
     if (d.usedFallbackRetry !== d.steps.some(s => s.name === "fallback-checkin")) return false;
     if (d.usedPrivateAutoAddRecovery !== d.steps.some(s => s.name === "private-add" && s.effect === "command-completed")) return false;
-    if (dto.completeness.capture !== (d.steps.length ? d.steps.every(s => s.capture.complete) && (!d.markers || d.markers.capture?.complete === true) ? "complete" : "incomplete" : "unknown")) return false;
+    if (dto.completeness.capture !== (d.steps.length ? d.steps.every(s => s.capture.complete) && (d.assessment?.ownership?.reads??[]).every(s=>s.capture.complete) && (!d.markers || d.markers.capture?.complete === true) ? "complete" : "incomplete" : "unknown")) return false;
     if (d.pendingBefore && !same(d.pendingBefore, d.steps.find(s => s.name === "pending-before")?.summary)) return false;
     if (d.pendingAfter && !d.steps.some(s => ["pending-recovery", "pending-after"].includes(s.name) && same(s.summary, d.pendingAfter))) return false;
     return true;

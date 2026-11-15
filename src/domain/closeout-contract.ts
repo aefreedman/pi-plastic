@@ -1,3 +1,4 @@
+import type { WorkspaceAssessment } from "./workspace-observation";
 import { parseSwitchTarget } from "./switch-contract";
 import { cmWhereEquals } from "./branches";
 /** Name is a leaf filter; emitted full name, not the filter, is identity.
@@ -15,7 +16,7 @@ import type { UpdateReceipt } from "./update-contract";
 export type CloseoutRequest = { source?: string; target?: string; cardRef?: string; message?: string; strategy?: MergeStrategy; updateTarget?: boolean; includePrivate?: boolean; preflight?: boolean; format?: "text" | "json"; workdir?: string };
 export const CLOSEOUT_STAGE_NAMES = ["loaded-before", "parent", "pending-before", "switch", "loaded-after-switch", "update", "loaded-before-merge", "merge", "readiness", "loaded-before-checkin", "checkin-preflight", "checkin", "loaded-final", "pending-final"] as const;
 export type CloseoutStageName = typeof CLOSEOUT_STAGE_NAMES[number];
-export type CloseoutRead = { argv: string[]; attempt: WorkspaceMergeAttempt; capture: WorkspaceMergeCapture | null; admission: "unsupported" | "admitted"; branch: SwitchBranchObservation | null; parentPath: string | null; emptyParentResult: boolean; summary: SwitchSummary | null };
+export type CloseoutRead = { assessment?: WorkspaceAssessment; argv: string[]; attempt: WorkspaceMergeAttempt; capture: WorkspaceMergeCapture | null; admission: "unsupported" | "admitted"; branch: SwitchBranchObservation | null; parentPath: string | null; emptyParentResult: boolean; summary: SwitchSummary | null };
 export type CloseoutStage = { name: CloseoutStageName } & (
  { kind: "read"; result: CloseoutRead } | { kind: "switch"; result: SwitchReceipt } | { kind: "update"; result: UpdateReceipt } | { kind: "merge"; result: WorkspaceMergeReceipt } | { kind: "checkin"; result: CheckinReceipt }
 );
@@ -27,4 +28,4 @@ export const CLOSEOUT_DTO_BYTES = 1048576;
 /** Ledger keeps the five complete bounded child receipts and at most eleven compact reads.
  * No child text/stdout/stderr is duplicated, no positive changeset is projected away. */
 export function closeoutChildEffect(s: CloseoutStage): CloseoutData["effect"] { if(s.kind==="read")return "not-attempted";const e=s.result.data.effect;return e==="not-proven"?"command-completed":e; }
-export function closeoutCaptures(stages: CloseoutStage[]) { return stages.flatMap(s=>s.kind==="read"?[s.result.capture]:s.kind==="update"?[s.result.data.capture]:s.kind==="merge"?[s.result.data.apply.capture,s.result.data.shortStatus.capture,s.result.data.fullStatus.capture,s.result.data.markers?.capture??null]:[...s.result.data.steps.map(x=>x.capture),...("markers" in s.result.data&&s.result.data.markers?[s.result.data.markers.capture]:[])]).filter((x):x is WorkspaceMergeCapture=>x!==null); }
+export function closeoutCaptures(stages: CloseoutStage[]) { return [...stages.flatMap(s=>s.kind==="read"?[s.result.capture]:s.kind==="update"?[s.result.data.capture]:s.kind==="merge"?[s.result.data.apply.capture,s.result.data.shortStatus.capture,s.result.data.fullStatus.capture,s.result.data.markers?.capture??null]:[...s.result.data.steps.map(x=>x.capture),...("markers" in s.result.data&&s.result.data.markers?[s.result.data.markers.capture]:[])]).filter((x):x is WorkspaceMergeCapture=>x!==null), ...stages.flatMap(s=>s.kind==="read"?s.result.assessment?.ownership?.reads??[]:s.kind==="merge"||s.kind==="checkin"?s.result.data.assessment?.ownership?.reads??[]:[]).map(r=>r.capture)]; }

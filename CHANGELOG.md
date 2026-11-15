@@ -15,6 +15,8 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Bounded one-writable-Xlink merge/checkin and compound closeout readiness for 2–32 present RP/CO/CP files, using per-path ownership and immutable root/source mount-tree observations. Unsupported compositions remain blocked; linked emissions do not imply global effect verification.
+
 - Opt-in live regression for pinned merges, independent target history/content verification, no-op integration and current-client loaded-base diffs; separate writable-Xlink checkin coverage independently verifies both repository histories and historical bytes.
 
 ## [0.10.0] - 2026-11-10

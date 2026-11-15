@@ -1,8 +1,9 @@
+import { observeXlinkOwnership, correlateOwnedCheckin, sameOwnershipPins } from "./xlink-ownership";
 import { canonicalWorkspaceDirectory, observeWorkspaceStandard, assessWorkspaceState, workspaceBlockerMessage } from "../domain/workspace-observation";
 import { inspectConflictMarkers } from "./marker-lifecycle";
 import { compactMarkerGate } from "../domain/marker-gate";
 import { receiptRelativePath } from "../domain/receipt-paths";
-import { correlateMergedCheckin } from "../domain/merged-workspace";
+import { correlateMergedCheckin, type MergedPending } from "../domain/merged-workspace";
 import { parseSwitchLoadedBranch } from "../domain/switch-contract";
 import { randomBytes } from "node:crypto";
 import { buildFallbackScopePaths } from "../domain/paths";
@@ -22,7 +23,7 @@ function validateRequest(input: unknown): asserts input is CheckinRequest {
     const values = [r.message, r.workdir ?? "", ...(r.paths as string[] ?? [])] as string[];
     if (values.reduce((n, s) => n + s.length, 0) > 16384 || Buffer.byteLength(JSON.stringify(values), "utf8") > 32768) throw Error("Checkin input exceeds aggregate bound.");
 }
-export async function assembleCheckinReceipt(input: unknown): Promise<CheckinReceipt> {
+export async function assembleCheckinReceipt(input: unknown, expectedOwnership?: import("../domain/xlink-ownership").XlinkOwnership): Promise<CheckinReceipt> {
     const data: CheckinData = { markers: null, sourceAdmission: "validated-cm-output", requestedPaths: [], includedPaths: [], fallbackPaths: [], excludedPaths: [], privateAddPaths: [], blockedPrivatePaths: [], itemEvents: [], observedChangesets: [], command: null, steps: [], autoEnabledApplyChanged: false, usedFallbackRetry: false, usedPrivateAutoAddRecovery: false, pendingBefore: null, pendingAfter: null, wouldRun: false, omittedReferences: 0, scopeExhaustion: "unverified", branchHead: "unverified", serverAliasEquivalence: "unverified", xlinkEffects: "unverified", mergeLinkIdentity: "unverified" };
     let created: CheckinReceipt["data"]["createdChangeset"] = null;
     const finish = (outcome: CheckinReceipt["outcome"], code = "uncertain", stage: "input" | "pending" | "checkin" | "producer" = "checkin", message = "Checkin evidence is uncertain; inspect workspace/repository state before deciding whether to retry."): CheckinReceipt => {
@@ -35,7 +36,7 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         if (data.linkedChangesets) data.linkedChangesets = project(data.linkedChangesets);
         if (data.command) { if (data.command.length > remaining) { data.omittedReferences += data.command.length; data.command = null; } else remaining -= data.command.length; }
         const ok = outcome === "preflight" || outcome === "completed";
-        const dto = { schemaVersion: 1, action: "checkin", provenance: { source: "plastic", producer: "@aefree/pi-plastic", contentTrust: "external" }, ok, outcome, completeness: { capture: data.steps.length ? data.steps.every(s => s.capture.complete) && (!data.markers || data.markers.capture?.complete === true) ? "complete" : "incomplete" : "unknown", projection: data.omittedReferences === 0 }, data: { ...data, effect, createdChangeset: created }, ...(!ok ? { error: { code, stage, message } } : {}) } as CheckinReceipt;
+        const dto = { schemaVersion: 1, action: "checkin", provenance: { source: "plastic", producer: "@aefree/pi-plastic", contentTrust: "external" }, ok, outcome, completeness: { capture: data.steps.length ? data.steps.every(s => s.capture.complete) && (data.assessment?.ownership?.reads??[]).every(s=>s.capture.complete) && (!data.markers || data.markers.capture?.complete === true) ? "complete" : "incomplete" : "unknown", projection: data.omittedReferences === 0 }, data: { ...data, effect, createdChangeset: created }, ...(!ok ? { error: { code, stage, message } } : {}) } as CheckinReceipt;
         if (Buffer.byteLength(JSON.stringify(dto), "utf8") > 131072) {
             const d = dto.data;
             for (const key of ["requestedPaths", "includedPaths", "fallbackPaths", "excludedPaths", "privateAddPaths", "blockedPrivatePaths", "itemEvents", "observedChangesets"] as const) { d.omittedReferences += d[key].length; d[key] = [] as any; }
@@ -81,7 +82,8 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         data.pendingBefore = summary(before.items, cwd);
         data.markers = compactMarkerGate(await inspectConflictMarkers(cwd));
         if (data.markers.state !== "clear") return finish("unsupported", "marker_readiness_unknown", "pending", "Native marker listing is unknown or pending; edit/validate and re-inspect. No mutation or automatic retry.");
-        const merged = before.merged;
+        let merged = before.merged;
+        let ownership: import("../domain/xlink-ownership").XlinkOwnership | undefined;
         let loaded: ReturnType<typeof parseSwitchLoadedBranch> = null;
         // Full-state safety is shared with merge and closeout, not inferred from
         // which captured copied/merged/ordinary profile happened to match.
@@ -89,10 +91,13 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
             const { o, s } = await record("merge-readiness", ["status"]);
             const standard = observeWorkspaceStandard(o.stdout ?? "", before.observation);
             loaded = standard.branch;
-            data.assessment = assessWorkspaceState(before.observation, standard, { allowOrdinary: !merged });
+            ownership = standard.links.length === 2 ? await observeXlinkOwnership(before.observation,standard) : undefined;
+            data.assessment = assessWorkspaceState(before.observation, standard, { allowOrdinary: !merged, ...(ownership?{ownership}:{}) });
             if (!success(o) || !data.assessment.ready) return finish("unsupported", data.assessment.blockers.some(b => b.code === "unrelated_controlled_pending") ? "mixed_merge_scope" : "merge_readiness_unadmitted", "pending", !success(o) ? "standard_observation_incomplete: no checkin was dispatched." : workspaceBlockerMessage(data.assessment));
             s.evidence = "admitted";
+            if (ownership?.complete && ownership.root) merged = { changeset: before.observation.changeset!, repository: before.repository!, server: before.server!, mergeChangeset: ownership.root.sourceChangeset, paths: ownership.rows.map(r=>r.path), rows: ownership.rows.map(r=>({path:r.path,status:r.status as MergedPending["rows"][number]["status"],isDirectory:r.isDirectory})), privateRows: [], ordinaryRows: [] };
         }
+        if (expectedOwnership && (!ownership || !sameOwnershipPins(expectedOwnership,ownership))) return finish("unsupported","ownership_pin_changed","pending","Previously observed root/source/mount ownership changed; no checkin dispatched.");
         if (merged && input.includePrivate) return finish("unsupported", "merged_private_scope", "pending", "Merged checkin does not admit private inclusion; leave unrelated private work excluded.");
         let includedAbsolute: string[] = [], scoped = before.items, apply = input.applyChanged ?? false;
         if (input.paths?.length) {
@@ -120,7 +125,7 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         if (input.preflight) return finish("preflight");
         const attempt = async (name: "initial-checkin" | "private-retry" | "fallback-checkin", argv: string[]) => {
             const { o, s } = await record(name, argv), p = parseCheckinEvidence(o.stdout ?? "", seps); s.records = p.records;
-            const mergedEvents = !merged || correlateMergedCheckin(p.events, merged, cwd);
+            const mergedEvents = ownership?.complete ? correlateOwnedCheckin(p.events,ownership,cwd,p.linkedChangesets) : !merged || correlateMergedCheckin(p.events, merged, cwd);
             const admitted = p.admitted && mergedEvents && (!p.linkedChangesets.length || loaded !== null) && p.changesets.every(c => c.repository === before.repository && c.server === before.server && (!loaded || c.branch === loaded.branch));
             if (admitted && normal(o)) {
                 s.evidence = "admitted";

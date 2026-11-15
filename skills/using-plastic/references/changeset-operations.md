@@ -112,4 +112,4 @@ cm find changeset --orderby="date desc" --limit=20 \
 
 ## Writable-Xlink checkin receipts
 
-A current-client checkin can emit linked and root identities in one record. The receipt retains one independently correlated root changeset and optional bounded `linkedChangesets` observations. Emissions do not prove Xlink effects; malformed/duplicate identity lists remain uncertain. Never retry an uncertain checkin automatically; inspect both histories and workspace state. Multi-link merge readiness remains a separate conservative boundary.
+A current-client checkin can emit linked and root identities in one record. The receipt retains one independently correlated root changeset and optional bounded `linkedChangesets` observations. Emissions do not prove Xlink effects; malformed/duplicate identity lists remain uncertain. Never retry an uncertain checkin automatically; inspect both histories and workspace state. Merged checkin supports only the [bounded present-file one-writable-Xlink subset](../../../docs/2026-11-15-writable-xlink-merges.md); ownership uncertainty or partial scope stops before checkin.

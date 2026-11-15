@@ -1,3 +1,4 @@
+import { observeXlinkOwnership } from "./xlink-ownership";
 import { canonicalWorkspaceDirectory, observeWorkspacePending, observeWorkspaceStandard, assessWorkspaceState, parseWorkspaceMergeSource, workspacePendingArgv, workspaceBlockerMessage } from "../domain/workspace-observation";
 import { parseSwitchLoadedBranch } from "../domain/switch-contract";
 import { inspectConflictMarkers } from "./marker-lifecycle";
@@ -14,7 +15,7 @@ export { safeMergeText, buildWorkspaceMergeArgv } from "../domain/workspace-merg
 export { presentWorkspaceMergeReceipt } from "../presentation/workspace-merge-results";
 export const emptyMergeStage = (): MergeStage => ({attempt:emptyWorkspaceMergeAttempt(),capture:null,admission:"not-observed"});
 export function emptyWorkspaceMergeData(): WorkspaceMergeData { return {markers:null,intendedArgv:["merge"],workingDirectory:null,requestedSource:null,strategy:null,cherrypicking:null,forced:null,previewRequested:null,outputFormatRequested:null,apply:emptyMergeStage(),shortStatus:emptyMergeStage(),fullStatus:emptyMergeStage(),pendingReadMode:"short",commandOutput:null,commandCompleted:false,observedWorkspaceIdentity:null,observedSourceIdentity:null,observedPendingItems:null,fileConflictCount:null,protocol:"not-observed",checkinReadiness:"unknown",verification:"unverified",effect:"not-attempted"}; }
-function header(action:MergeAction,data:WorkspaceMergeData) {const stages=[data.apply,data.shortStatus,data.fullStatus],observed=[...stages,...(data.markers?[data.markers]:[])].filter(s=>s.capture);return {schemaVersion:1 as const,action,provenance:{source:"plastic" as const,producer:"@aefree/pi-plastic" as const,contentTrust:"external" as const},completeness:{capture:!observed.length?"unknown" as const:observed.every(s=>s.capture!.complete)?"complete" as const:"incomplete" as const,projection:true as const},data};}
+function header(action:MergeAction,data:WorkspaceMergeData) {const stages=[data.apply,data.shortStatus,data.fullStatus],observed=[...stages,...(data.markers?[data.markers]:[]),...(data.assessment?.ownership?.reads??[])].filter(s=>s.capture);return {schemaVersion:1 as const,action,provenance:{source:"plastic" as const,producer:"@aefree/pi-plastic" as const,contentTrust:"external" as const},completeness:{capture:!observed.length?"unknown" as const:observed.every(s=>s.capture!.complete)?"complete" as const:"incomplete" as const,projection:true as const},data};}
 export function workspaceMergeFailure(action:MergeAction,data:WorkspaceMergeData,code:WorkspaceMergeReceipt extends infer T ? T extends {error:{code:infer C}} ? C : never : never,message:string):WorkspaceMergeReceipt {return {...header(action,data),ok:false,outcome:data.effect==="not-attempted"?"failed":data.checkinReadiness==="blocked"?"blocked":"uncertain",error:{code,message}};}
 export async function assembleWorkspaceMergeReceipt(action:MergeAction,args:unknown):Promise<WorkspaceMergeReceipt>{
  const data=emptyWorkspaceMergeData();let active: "apply"|"shortStatus"|"fullStatus"|null=null;
@@ -45,7 +46,9 @@ export async function assembleWorkspaceMergeReceipt(action:MergeAction,args:unkn
    data.shortStatus.admission=observation.issues.length?"unsupported":"admitted";
    active="fullStatus";const stateRead=await captureWorkspaceMergeCommand(["status"],directory);data.fullStatus={attempt:stateRead.attempt,capture:stateRead.capture,admission:"unsupported"};active=null;
    if(!stateRead.capture.complete||stateRead.failed||stateRead.attempt.exitCode!==0||stateRead.stderr!=="")return workspaceMergeFailure(action,data,"unsupported_readiness","standard_observation_incomplete: merge completed; inspect current state without replay.");
-   data.assessment=assessWorkspaceState(observation,observeWorkspaceStandard(stateRead.stdout!,observation),{source});
+   const standard = observeWorkspaceStandard(stateRead.stdout!,observation);
+   const ownership = standard.links.length === 2 ? await observeXlinkOwnership(observation,standard) : undefined;
+   data.assessment=assessWorkspaceState(observation,standard,{source,...(ownership?{ownership}:{})});
    if(observation.rows.some(r=>r.mergeChangeset!==null)){data.protocol="merged-candidate";data.pendingReadMode="merged-machine";data.fileConflictCount=observation.rows.filter(r=>r.status==="CO"&&r.mergeChangeset!==null).length;}
    data.fullStatus.admission=data.assessment.ready?"admitted":"unsupported";
    if(cherry||forced)return workspaceMergeFailure(action,data,"unsupported_readiness","nonstandard_merge_policy: independent normal merge readiness is not authorization for forced/cherrypicked closeout.");
@@ -86,3 +89,5 @@ export async function assembleWorkspaceMergeReceipt(action:MergeAction,args:unkn
   return workspaceMergeFailure(action,data,"producer_failed","Merge evidence collection failed; prior effects remain possible and checkin readiness unknown.");
  }
 }
+
+export { parseWorkspaceMergeSource } from "../domain/workspace-observation";

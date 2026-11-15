@@ -1,3 +1,6 @@
+import type { WorkspaceIssue, WorkspacePendingRow, WorkspacePendingObservation, WorkspaceStandardObservation } from "./workspace-facts";
+export type { WorkspaceIssue, WorkspacePendingRow, WorkspacePendingObservation, WorkspaceStandardObservation } from "./workspace-facts";
+import { correlateOwnedWorkspace, type XlinkOwnership } from "./xlink-ownership";
 import { resolve } from "node:path";
 import { receiptAbsolutePath, receiptPathApi, receiptPathKey, receiptPathWithin, receiptRelativePath } from "./receipt-paths";
 import { parseSwitchLoadedBranch, parseSwitchTarget, safeSwitchValue, type SwitchBranchObservation } from "./switch-contract";
@@ -5,10 +8,7 @@ import { parseSwitchLoadedBranch, parseSwitchTarget, safeSwitchValue, type Switc
 /** Parsing records facts. Assessments below decide whether those facts are enough
  * for a particular operation. Neither an unfamiliar row nor a display difference
  * is silently converted to an empty workspace. */
-export type WorkspaceIssue = { code: string; path: string | null };
-export type WorkspacePendingRow = { status: string; path: string; isDirectory: boolean; revision: string; mergeChangeset: string | null; sourcePath?: string };
-export type WorkspacePendingObservation = { cwd: string; changeset: string | null; repository: string | null; server: string | null; rows: WorkspacePendingRow[]; issues: WorkspaceIssue[]; records: number };
-export type WorkspaceAssessment = { ready: boolean; complete: boolean; rowCount: number; mergeRowCount: number; ordinaryRowCount: number; linkCount: number; blockers: WorkspaceIssue[] };
+export type WorkspaceAssessment = { ownership?: XlinkOwnership; ready: boolean; complete: boolean; rowCount: number; mergeRowCount: number; ordinaryRowCount: number; linkCount: number; blockers: WorkspaceIssue[] };
 export const workspacePendingArgv = ["status", "--machinereadable", "--includeRevId", "--fieldseparator=\x1f"];
 const decimal = /^(0|[1-9][0-9]{0,19})$/;
 const positive = /^[1-9][0-9]{0,19}$/;
@@ -57,7 +57,6 @@ export function observeWorkspacePending(text: string, workdir: string): Workspac
     return result;
 }
 const labels: Record<string, readonly string[]> = { "CO+RP": ["Replaced / Checked-out (unchanged)"], RP: ["Replaced"], CP: ["Copied (new)"], CO: ["Checked-out (changed)", "Checked-out (unchanged)"], CH: ["Changed"], AD: ["Added"], PR: ["Private"], DE: ["Removed", "Deleted"], LD: ["Locally deleted", "Deleted"], MV: ["Moved"] };
-export type WorkspaceStandardObservation = { branch: SwitchBranchObservation | null; links: Array<{ changeset: string; branch: string; repository: string | null; server: string | null }>; issues: WorkspaceIssue[] };
 export function observeWorkspaceStandard(text: string, pending: WorkspacePendingObservation): WorkspaceStandardObservation {
     const result: WorkspaceStandardObservation = { branch: parseSwitchLoadedBranch(text), links: [], issues: [] };
     const issue = (code: string, path: string | null = null) => { if (result.issues.length < 8) result.issues.push({ code, path }); };
@@ -114,25 +113,27 @@ export function parseWorkspaceMergeSource(value: string) {
     if (repository !== null && (!safe(repository) || !safe(server))) return null;
     return { kind: "changeset" as const, changeset: match[1], repository, server };
 }
-export function assessWorkspaceState(pending: WorkspacePendingObservation, standard: WorkspaceStandardObservation, options: { source?: string; allowOrdinary?: boolean } = {}): WorkspaceAssessment {
+export function assessWorkspaceState(pending: WorkspacePendingObservation, standard: WorkspaceStandardObservation, options: { source?: string; allowOrdinary?: boolean; ownership?: XlinkOwnership } = {}): WorkspaceAssessment {
     const blockers = [...pending.issues, ...standard.issues], merged = pending.rows.filter(r => r.mergeChangeset !== null), ordinary = pending.rows.filter(r => r.mergeChangeset === null && r.status !== "PR");
     const add = (code: string, path: string | null = null) => blockers.push({ code, path });
     if (!standard.branch || standard.branch.repository !== pending.repository || standard.branch.server !== pending.server) add("workspace_identity_mismatch");
-    if (standard.links.length > 1) add("multiple_merge_links");
+    const owned = standard.links.length === 2 && options.ownership !== undefined && correlateOwnedWorkspace(options.ownership, pending, standard);
+    if (standard.links.length > 1 && !owned) add("multiple_merge_links");
+    if (options.ownership && !owned) add("ownership_unverified");
     if (merged.length) {
-        const link = standard.links[0];
-        if (!link || merged.some(r => r.mergeChangeset !== link.changeset) || link.repository !== pending.repository || link.server !== pending.server) add("merge_link_mismatch");
+        const link = owned ? standard.links.find(l => l.repository === pending.repository && l.server === pending.server)! : standard.links[0];
+        if (!owned && (!link || merged.some(r => r.mergeChangeset !== link.changeset) || link.repository !== pending.repository || link.server !== pending.server)) add("merge_link_mismatch");
         if (options.source) {
             const requested = parseWorkspaceMergeSource(options.source);
             if (!requested || !link || (requested.kind === "branch" ? requested.branch !== link.branch : requested.changeset !== link.changeset) || requested.repository !== null && (requested.repository !== link.repository || requested.server !== link.server)) add("merge_source_mismatch");
         }
-        if (!options.allowOrdinary && ordinary.length) for (const row of ordinary) add("unrelated_controlled_pending", row.path);
+        if ((!options.allowOrdinary || owned) && ordinary.length) for (const row of ordinary) add("unrelated_controlled_pending", row.path);
         for (const row of pending.rows.filter(r => r.status === "PR")) if (merged.some(m => receiptPathWithin(row.path, m.path) || receiptPathWithin(m.path, row.path))) add("private_scope_overlap", row.path);
     } else if (standard.links.length) add("merge_link_without_resolved_rows");
     // Unresolved merges can emit ordinary CO/-1/NO_MERGES. Full status must be
     // genuinely ordinary (no links or unknown conflict sections), not guessed.
     const unique = blockers.filter((b, i) => blockers.findIndex(a => a.code === b.code && a.path === b.path) === i);
-    return { ready: unique.length === 0, complete: pending.issues.length === 0 && standard.issues.length === 0, rowCount: pending.rows.length, mergeRowCount: merged.length, ordinaryRowCount: ordinary.length, linkCount: standard.links.length, blockers: unique.slice(0, 8) };
+    return { ...(options.ownership ? { ownership: options.ownership } : {}), ready: unique.length === 0, complete: pending.issues.length === 0 && standard.issues.length === 0 && (!options.ownership || options.ownership.complete), rowCount: pending.rows.length, mergeRowCount: merged.length, ordinaryRowCount: ordinary.length, linkCount: standard.links.length, blockers: unique.slice(0, 8) };
 }
 export const workspaceBlockerMessage = (assessment: WorkspaceAssessment): string => {
     const message = assessment.blockers.map(b => b.code + (b.path ? `: ${b.path}` : "")).join("; ");
