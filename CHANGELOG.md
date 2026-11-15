@@ -23,6 +23,7 @@ and this project follows semantic versioning for public package releases.
 ### Added
 
 - Live regression coverage for native selectors, scoped checkin beside unrelated/private work, conflict refusal, pinned merges and Xlink merges/closeout with more than 32 changed linked files/tree entries.
+- SDK-host regression coverage for schema v2 receipts, zero-command previews, exact single mutation attempts and completion independent of diagnostic presentation.
 
 ## [0.10.0] - 2026-11-10
 

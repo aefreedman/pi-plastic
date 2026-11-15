@@ -93,7 +93,7 @@ if (cfg?.kind === "closeout") {
  if(cmd==="status"){
   if(args.includes("--machinereadable")){process.stdout.write(header+(cfg.pending?"CH\x1f"+path.join(process.cwd(),"fictional.txt")+"\x1fFalse\x1f125\x1fNO_MERGES\r\n":""));if(cfg.mode==="final-pending-fail"&&machine===7){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC final pending");process.exitCode=1;}}
   else if(args.includes("--short"))process.stdout.write("");
-  else {process.stdout.write(branch+"@Example Repository@example@unity (cs:16 - head)\r\n\r\n");if(cfg.mode==="initial-fail"&&std===1||cfg.mode==="final-branch-fail"&&std===9){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC loaded read");process.exitCode=1;}if(cfg.mode==="later-warning"&&std===7)process.stderr.write("PRIVATE_HOST_DIAGNOSTIC later warning");if(cfg.mode==="invalid-utf8"&&std===1)process.stdout.write(Buffer.from([255]));if(cfg.mode==="overflow"&&std===1)process.stdout.write("x".repeat(65537));}
+  else {process.stdout.write(branch+"@Example Repository@example@unity (cs:16 - head)\r\n\r\n");if(cfg.mode==="initial-fail"&&std===1||cfg.mode==="final-branch-fail"&&args.includes("--header")){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC loaded read");process.exitCode=1;}if(cfg.mode==="later-warning"&&std===3)process.stderr.write("PRIVATE_HOST_DIAGNOSTIC later warning");if(cfg.mode==="invalid-utf8"&&std===1)process.stdout.write(Buffer.from([255]));if(cfg.mode==="overflow"&&std===1)process.stdout.write("x".repeat(65537));}
  }else if(cmd==="merge"){process.stdout.write(frame("STATUS","ALREADY_CONNECTED","No merges detected"));if(cfg.mode==="partial-merge"){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC partial apply");process.exitCode=1;}}
  else if(cmd==="checkin"){process.stdout.write(frame("CI_START")+frame("STAGE",""));if(cfg.mode==="checkin-fail"){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC permission");process.exitCode=1;}else process.stdout.write(frame("CHANGESET","cs:9007199254740993@br:"+target+"@Example Repository@example@unity (mount:'/')"));}
  else if(cmd==="find"){process.stdout.write("/main/source|/main\r\n");if(cfg.mode==="parent-fail"){process.stderr.write("PRIVATE_HOST_DIAGNOSTIC parent");process.exitCode=1;}}
@@ -649,10 +649,10 @@ await writeFile(modifierPath, `export default function(pi) {
   const receiptRun = (scenario: string, name: string, args: Record<string, unknown>, mode = "completed", parent = "loaded") => run(scenario, name, args, JSON.stringify({kind:"receipts",mode,parent}));
   const checkinRequest = {message:"Fixture résumé é 日本語 😀",paths:["résumé-é-日本-😀.txt"]};
   const branchRequest = {branch:"br:/main/task-é-é-日本-😀@Example Repository@example@unity",comment:"Fixture branch"};
-  const normalizedCheckin = (dto: any) => { const d = structuredClone(dto); d.data.command = d.data.command?.map((a: string) => /^--(?:startlineseparator|endlineseparator|fieldseparator)=/.test(a) ? a.replace(/[a-f0-9]{32}/, "nonce") : a); return d; };
+  const normalizedCheckin = (dto: any) => JSON.parse(JSON.stringify(dto).replace(/__PI_CI_(?:START|END|FIELD)_[a-f0-9]{32}__/g,"CI_NONCE"));
   const names = (r: any) => r.calls.map((c: string) => JSON.parse(c)[0].split(/[\\/]/).at(-1));
   for (const [tool, schema, request, validate, normalize, sequence] of [
-    ["plastic_checkin",checkinOutputSchema,checkinRequest,validateCheckinOutput,normalizedCheckin,["status","checkin","status"]],
+    ["plastic_checkin",checkinOutputSchema,checkinRequest,validateCheckinOutput,normalizedCheckin,["checkin"]],
     ["plastic_branchCreate",branchCreateOutputSchema,branchRequest,validateBranchCreateOutput,(d: any) => d,["branch"]],
   ] as const) {
     assert.deepEqual(session.getToolDefinition(tool).outputSchema, schema);
@@ -666,7 +666,9 @@ await writeFile(modifierPath, `export default function(pi) {
     for (const format of ["text","json"]) {
       const input = tool === "plastic_checkin" ? {...request,format} : request;
       const result = await receiptRun("receipt-code-"+format,"codemode",{code:`text(await tools.${tool}(${JSON.stringify(input)}));`});
-      assert.deepEqual(normalize(result.children[0].result.structuredContent),normalize(dto));
+      const expected = structuredClone(dto);
+      if (tool === "plastic_checkin") expected.data.requested.format = format;
+      assert.deepEqual(normalize(result.children[0].result.structuredContent),normalize(expected));
       assert.equal(result.parent.details.calls[0].status,"ok"); assert.deepEqual(names(result),sequence);
     }
     const nested = await receiptRun("receipt-nested","fixture_nested",{child:tool,request});
@@ -681,14 +683,14 @@ await writeFile(modifierPath, `export default function(pi) {
     assert.equal(blocked.calls.length,0); assert.equal(blocked.children[0].result.structuredContent,undefined);
     const replaced = await receiptRun("content-only","codemode",{code:`text(await tools.${tool}(${JSON.stringify(request)}));`});
     assert.equal(replaced.children[0].result.structuredContent,undefined); assert.match(text(replaced.parent),/foreign replacement/); assert.deepEqual(names(replaced),sequence);
-    for (const mode of tool === "plastic_checkin" ? ["unknown","empty","overflow","invalid-utf8","no-changes","recovery-failed"] : ["uncertain","overflow","invalid-utf8"]) {
+    for (const mode of tool === "plastic_checkin" ? ["invalid-utf8","no-changes","recovery-failed"] : ["uncertain","overflow","invalid-utf8"]) {
       const error = await receiptRun("receipt-error","codemode",{code:`text(await tools.${tool}(${JSON.stringify(request)}));`},mode);
       const failed = error.children[0].result.structuredContent; assert(validate(failed)); assert(!failed.ok); assert.equal(failed.outcome,"uncertain");
       assert.equal(error.children[0].isError,true); assert.equal(error.parent.details.calls[0].status,"error");
       assert.doesNotMatch(JSON.stringify(failed),/PRIVATE_HOST_DIAGNOSTIC/); assert.deepEqual(error.children[0].result.details,{});
       assert(Buffer.byteLength(JSON.stringify(failed)) <= 131072); assert(Buffer.byteLength(text(error.children[0].result)) <= 24000);
-      assert.deepEqual(names(error),tool === "plastic_checkin" ? ["status","checkin",...(["no-changes","recovery-failed"].includes(mode)?["status"]:[])] : ["branch"]);
-      if (tool === "plastic_checkin") { assert.equal(failed.data.createdChangeset,null); assert.equal(failed.data.pendingAfter?.totalPending ?? null,mode === "no-changes"?0:null); }
+      assert.deepEqual(names(error),tool === "plastic_checkin" ? ["checkin"] : ["branch"]);
+      if (tool === "plastic_checkin") { assert.equal(failed.schemaVersion,2); assert.equal(failed.data.createdChangeset,null); assert(!("pendingAfter" in failed.data)); }
       else assert.equal(failed.data.observedCreatedIdentity,null);
       assert.deepEqual(JSON.parse(JSON.stringify(error.children[0])),error.children[0]);
     }
@@ -696,24 +698,26 @@ await writeFile(modifierPath, `export default function(pi) {
   for (const format of ["text","json"]) {
     const preview = await receiptRun("checkin-preflight","plastic_checkin",{...checkinRequest,preflight:true,format});
     const dto = preview.children[0].result.structuredContent; assert(validateCheckinOutput(dto)); assert.equal(dto.outcome,"preflight");
-    assert.deepEqual(names(preview),["status"]); assert.equal(dto.data.effect,"not-attempted"); assert.equal(dto.data.createdChangeset,null);
+    assert.deepEqual(names(preview),[]); assert.equal(dto.schemaVersion,2); assert.equal(dto.data.effect,"not-attempted"); assert.equal(dto.data.createdChangeset,null);
   }
   const updateBlocked = await receiptRun("checkin-update-blocked","plastic_checkin",{...checkinRequest,updateAfter:true});
-  assert.equal(updateBlocked.calls.length,0); assert.equal(updateBlocked.children[0].result.structuredContent.error.code,"UNATTENDED_UPDATE_AFTER_BLOCKED");
-  const pendingBlocked = await receiptRun("checkin-pending-unadmitted","plastic_checkin",checkinRequest,"pending-unadmitted");
-  assert.deepEqual(names(pendingBlocked),["status"]); assert.equal(pendingBlocked.children[0].result.structuredContent.outcome,"unsupported");
-  for (const mode of ["compound","compound-after-failed","compound-retry-failed","fallback","after-failed","projection"]) {
-    const result = await receiptRun("checkin-effects","plastic_checkin",checkinRequest,mode), dto = result.children[0].result.structuredContent;
-    assert(validateCheckinOutput(dto)); assert.equal(dto.ok,mode !== "compound-retry-failed");
-    assert.deepEqual(names(result),mode.startsWith("compound") ? ["status","checkin","add","checkin",...(mode === "compound-retry-failed"?[]:["status"])] : mode === "fallback" ? ["status","checkin","checkin","status"] : ["status","checkin","status"]);
-    if (mode.startsWith("compound")) { assert.equal(dto.data.steps[2].effect,"command-completed"); assert.equal(dto.data.usedPrivateAutoAddRecovery,true); }
-    if (mode.endsWith("after-failed")) { assert.equal(dto.data.pendingAfter,null); assert.equal(dto.data.effect,"changeset-created"); }
-    if (mode === "compound-retry-failed") { assert.equal(dto.data.effect,"uncertain"); assert.equal(dto.data.createdChangeset,null); }
-    if (mode === "projection") { assert(dto.data.omittedReferences>0); assert.equal(dto.completeness.projection,false); }
-    if (mode === "fallback") assert.equal(dto.data.usedFallbackRetry,true);
+  assert.equal(updateBlocked.calls.length,0); assert.equal(updateBlocked.children[0].result.structuredContent.error.code,"invalid_request");
+  for (const mode of ["pending-unadmitted","after-failed","projection","unknown","empty","overflow"]) {
+    const result = await receiptRun("checkin-observations","codemode",{code:`text(await tools.plastic_checkin(${JSON.stringify(checkinRequest)}));`},mode), dto = result.children[0].result.structuredContent;
+    assert(validateCheckinOutput(dto)); assert(dto.ok); assert.equal(dto.schemaVersion,2);
+    assert.equal(dto.outcome,"command-completed"); assert.equal(dto.data.commandCompleted,true);
+    assert.deepEqual(names(result),["checkin"]); assert.equal(result.parent.details.calls[0].status,"ok");
+    assert.deepEqual(dto.data.command.filter((a:string)=>!a.startsWith("--")&&!a.startsWith("-c=")),["checkin",...checkinRequest.paths]);
+    assert.equal(dto.data.createdChangeset?.id ?? null,["empty","overflow"].includes(mode)?null:"9007199254740997");
+    if (mode === "overflow") { assert.equal(dto.completeness.projection,false); assert.equal(dto.data.capture.truncated,true); }
   }
-  const ineligible = await receiptRun("private-ineligible","plastic_checkin",{message:checkinRequest.message},"private-ineligible");
-  assert.deepEqual(names(ineligible),["status","checkin"]); assert.equal(ineligible.children[0].result.structuredContent.error.code,"private_items_ineligible");
+  for (const mode of ["compound","compound-after-failed","compound-retry-failed","fallback","private-ineligible"]) {
+    const result = await receiptRun("checkin-no-recovery","codemode",{code:`text(await tools.plastic_checkin(${JSON.stringify(checkinRequest)}));`},mode), dto = result.children[0].result.structuredContent;
+    assert(validateCheckinOutput(dto)); assert(!dto.ok); assert.equal(dto.error.code,"native_failure");
+    assert.equal(dto.data.createdChangeset,null); assert.deepEqual(names(result),["checkin"]);
+    assert.equal(result.parent.details.calls[0].status,"error");
+    assert(!("usedPrivateAutoAddRecovery" in dto.data)); assert(!("usedFallbackRetry" in dto.data));
+  }
   for (const input of [{branch:"child@repo"},{branch:"child",parent:"/main@repo@server"},{branch:"/root"}]) {
     const result = await receiptRun("branch-input-blocked","plastic_branchCreate",input); assert.equal(result.calls.length,0); assert(result.parent.isError);
   }
@@ -822,14 +826,21 @@ await writeFile(modifierPath, `export default function(pi) {
    const request={source:"br:/main/café-é-日本-😀@Example Repository@example@unity"};
    const invoke=(scenario:string,tool:string,args:Record<string,unknown>,mode="connected")=>run(scenario,tool,args,JSON.stringify({kind:"workspace-merge",mode}));
    const normalize=(dto:any)=>JSON.stringify(dto).replace(/__WM_[a-f0-9]{24}__/g,"NONCE");
-   const direct=await invoke(name+"-direct",name,request),dto=direct.children[0].result.structuredContent;assert(validateWorkspaceMergeOutput(dto));assert(dto.ok);assert.deepEqual(names(direct),["merge","status","status"]);assert.equal(dto.data.markers.state,"clear");
+   const direct=await invoke(name+"-direct",name,request),dto=direct.children[0].result.structuredContent;assert(validateWorkspaceMergeOutput(dto));assert(dto.ok);assert.deepEqual(names(direct),["merge"]);assert.equal(dto.schemaVersion,2);assert.equal(dto.data.commandCompleted,true);
    const code=await invoke(name+"-code","codemode",{code:`text(await tools.${name}(${JSON.stringify(request)}));`});assert.equal(normalize(code.children[0].result.structuredContent),normalize(dto));
    const nested=await invoke(name+"-nested","fixture_nested",{child:name,request});assert.equal(normalize(state.nested.result.structuredContent),normalize(dto));
    const abort=await invoke(name+"-abort","fixture_nested",{child:name,request,abort:true});assert.equal(abort.calls.length,0);assert(state.nested.isError);
-   const selective=await invoke(name+"-selective","codemode",{code:`const d=await tools.${name}(${JSON.stringify(request)});text({readiness:d.data.checkinReadiness});`});assert.doesNotMatch(text(selective.parent),/schemaVersion|workingDirectory/);
+   const selective=await invoke(name+"-selective","codemode",{code:`const d=await tools.${name}(${JSON.stringify(request)});text({completed:d.data.commandCompleted});`});assert.doesNotMatch(text(selective.parent),/schemaVersion|workingDirectory/);
    const blocked=await invoke("blocked","codemode",{code:`text(await tools.${name}(${JSON.stringify(request)}));`});assert.equal(blocked.calls.length,0);assert.equal(blocked.children[0].result.structuredContent,undefined);
    const foreign=await invoke("content-only","codemode",{code:`text(await tools.${name}(${JSON.stringify(request)}));`});assert.equal(foreign.children[0].result.structuredContent,undefined);
-   for(const mode of ["partial","warning","invalid-utf8","overflow","conflict","short-fail","full-fail","pending"]){const r=await invoke(name+"-"+mode,"codemode",{code:`text(await tools.${name}(${JSON.stringify(request)}));`},mode),d=r.children[0].result.structuredContent;assert(validateWorkspaceMergeOutput(d));assert.equal(d.ok,false);assert.equal(names(r).filter(n=>n==="merge").length,1);assert.equal(r.parent.details.calls[0].status,"error");assert.doesNotMatch(JSON.stringify(d,(k,v)=>k==="commandOutput"?undefined:v),/PRIVATE_HOST_DIAGNOSTIC/);}
+   for(const mode of ["partial","warning","invalid-utf8","overflow","conflict","unknown","short-fail","full-fail","pending"]){
+    const r=await invoke(name+"-"+mode,"codemode",{code:`text(await tools.${name}(${JSON.stringify(request)}));`},mode),d=r.children[0].result.structuredContent;
+    const completed=!["partial","conflict","invalid-utf8"].includes(mode);
+    assert(validateWorkspaceMergeOutput(d));assert.equal(d.ok,completed);assert.equal(d.data.commandCompleted,completed);
+    assert.deepEqual(names(r),["merge"]);assert.equal(r.parent.details.calls[0].status,completed?"ok":"error");
+    if(mode==="overflow")assert.equal(d.completeness.projection,false);
+    assert.doesNotMatch(JSON.stringify(d,(k,v)=>k==="commandOutput"?undefined:v),/PRIVATE_HOST_DIAGNOSTIC/);
+   }
    for(const format of ["text","json"]){const p=await invoke(name+"-preview","codemode",{code:`text(await tools.${name}(${JSON.stringify({...request,preflight:true,format})}));`});assert(validateWorkspaceMergeOutput(p.children[0].result.structuredContent));assert.equal(p.calls.length,0);}
    for(const source of ["-"," --to=br:/other"]){const p=await invoke(name+"-invalid","codemode",{code:`text(await tools.${name}(${JSON.stringify({source,preflight:true})}));`});assert(validateWorkspaceMergeOutput(p.children[0].result.structuredContent));assert.equal(p.calls.length,0);assert(p.children[0].result.isError);}
    const alias=await invoke(name+"-alias",name,{...request,cherry_picking:true,format:"markdown",preflight:true});assert(alias.children[0].result.structuredContent.ok);assert.equal(alias.calls.length,0);
@@ -861,21 +872,33 @@ await writeFile(modifierPath, `export default function(pi) {
   const request={source:"/main/source",target:"/main/target",message:"Fixture"},invoke=(scenario:string,name:string,args:Record<string,unknown>,mode="success",pending=false)=>run(scenario,name,args,JSON.stringify({kind:"closeout",mode,pending}));
   const normalize=(d:any)=>JSON.stringify(d).replace(/__WM_[a-f0-9]{24}__/g,"WM_NONCE").replace(/__PI_CI_(?:START|END|FIELD)_[a-f0-9]{32}__/g,"CI_NONCE");
   const direct=await invoke("closeout-direct","plastic_mergeToBranch",request),dto=direct.children[0].result.structuredContent;
-  assert(validateCloseoutOutput(dto));assert(dto.ok);assert.equal(dto.data.createdChangeset.id,"9007199254740993");assert.equal(dto.data.stages.length,13);assert.equal(names(direct).filter(n=>n==="checkin").length,1);
+  assert(validateCloseoutOutput(dto));assert(dto.ok);assert.equal(dto.data.createdChangeset.id,"9007199254740993");assert.equal(dto.schemaVersion,2);assert.deepEqual(names(direct),["status","status","switch","status","update","status","merge","checkin","status"]);
   const code=await invoke("closeout-code","codemode",{code:`text(await tools.plastic_mergeToBranch(${JSON.stringify(request)}));`});assert.equal(normalize(code.children[0].result.structuredContent),normalize(dto));
   const nested=await invoke("closeout-nested","fixture_nested",{child:"plastic_mergeToBranch",request});assert.equal(normalize(state.nested.result.structuredContent),normalize(dto));
   const abort=await invoke("closeout-abort","fixture_nested",{child:"plastic_mergeToBranch",request,abort:true});assert.equal(abort.calls.length,0);assert(state.nested.isError); // SDK may reject before producer, not a producer DTO guarantee.
   const selective=await invoke("closeout-selective","codemode",{code:`const d=await tools.plastic_mergeToBranch(${JSON.stringify(request)});text({outcome:d.outcome,created:d.data.createdChangeset?.id});`});assert.match(text(selective.parent),/9007199254740993/);assert.doesNotMatch(text(selective.parent),/schemaVersion|stages/);
   const blocked=await invoke("blocked","codemode",{code:`text(await tools.plastic_mergeToBranch(${JSON.stringify(request)}));`});assert.equal(blocked.calls.length,0);assert.equal(blocked.children[0].result.structuredContent,undefined);
   const foreign=await invoke("content-only","codemode",{code:`text(await tools.plastic_mergeToBranch(${JSON.stringify(request)}));`});assert.equal(foreign.children[0].result.structuredContent,undefined);assert.match(text(foreign.parent),/foreign replacement/);
-  for(const mode of ["initial-fail","invalid-utf8","overflow","update-fail","partial-merge","later-warning","checkin-fail","final-branch-fail","final-pending-fail"]){const r=await invoke("closeout-"+mode,"codemode",{code:`text(await tools.plastic_mergeToBranch(${JSON.stringify(request)}));`},mode),d=r.children[0].result.structuredContent;assert(validateCloseoutOutput(d));assert(!d.ok);assert.equal(r.parent.details.calls[0].status,"error");assert.equal(names(r).filter(n=>n==="checkin").length,["checkin-fail","final-branch-fail","final-pending-fail"].includes(mode)?1:0);if(mode.startsWith("final-")){assert.equal(d.data.createdChangeset.id,"9007199254740993");assert.equal(d.data.effect,"changeset-created");assert.equal(d.data.pendingAfter,null);}assert.doesNotMatch(JSON.stringify(d,(k,v)=>k==="commandOutput"?undefined:v),/PRIVATE_HOST_DIAGNOSTIC/);}
+  for(const mode of ["initial-fail","invalid-utf8","overflow","update-fail","partial-merge","checkin-fail"]){
+   const r=await invoke("closeout-"+mode,"codemode",{code:`text(await tools.plastic_mergeToBranch(${JSON.stringify(request)}));`},mode),d=r.children[0].result.structuredContent;
+   assert(validateCloseoutOutput(d));assert(!d.ok);assert.equal(r.parent.details.calls[0].status,"error");
+   assert.equal(names(r).filter(n=>n==="checkin").length,mode==="checkin-fail"?1:0);
+   assert.equal(d.data.createdChangeset,null);assert.doesNotMatch(JSON.stringify(d,(k,v)=>k==="commandOutput"?undefined:v),/PRIVATE_HOST_DIAGNOSTIC/);
+  }
+  for(const mode of ["later-warning","final-branch-fail"]){
+   const r=await invoke("closeout-observations","codemode",{code:`text(await tools.plastic_mergeToBranch(${JSON.stringify(request)}));`},mode),d=r.children[0].result.structuredContent;
+   assert(validateCloseoutOutput(d));assert(d.ok);assert.equal(r.parent.details.calls[0].status,"ok");
+   assert.equal(d.data.createdChangeset.id,"9007199254740993");assert.equal(d.data.effect,"command-completed");
+   assert.deepEqual(names(r),names(direct));
+   if(mode==="final-branch-fail")assert.equal(d.data.stages.at(-1).result.commandCompleted,false);
+  }
   const canceled=await invoke("closeout-cancel","plastic_mergeToBranch",request,"success",true);assert(validateCloseoutOutput(canceled.children[0].result.structuredContent));assert.equal(canceled.children[0].result.structuredContent.outcome,"blocked");assert.deepEqual(names(canceled),["status","status"]);
-  for(const format of ["text","json"]){const p=await invoke("closeout-preview","codemode",{code:`text(await tools.plastic_mergeToBranch(${JSON.stringify({...request,format,preflight:true})}));`});assert(validateCloseoutOutput(p.children[0].result.structuredContent));assert.equal(p.children[0].result.structuredContent.outcome,"preflight");assert.deepEqual(names(p),["status","status"]);}
-  const defaults=await invoke("closeout-defaults","plastic_mergeToBranch",{preflight:true,message:"Fixture"});assert(validateCloseoutOutput(defaults.children[0].result.structuredContent));assert(defaults.children[0].result.structuredContent.ok);assert.deepEqual(names(defaults),["status","find","status"]);
-  const parentFail=await invoke("closeout-parent-fail","plastic_mergeToBranch",{preflight:true,message:"Fixture"},"parent-fail");assert(validateCloseoutOutput(parentFail.children[0].result.structuredContent));assert(!parentFail.children[0].result.structuredContent.ok);assert.deepEqual(names(parentFail),["status","find"]);
+  for(const format of ["text","json"]){const p=await invoke("closeout-preview","codemode",{code:`text(await tools.plastic_mergeToBranch(${JSON.stringify({...request,format,preflight:true})}));`});assert(validateCloseoutOutput(p.children[0].result.structuredContent));assert.equal(p.children[0].result.structuredContent.outcome,"preflight");assert.deepEqual(names(p),[]);}
+  const defaults=await invoke("closeout-defaults","plastic_mergeToBranch",{preflight:true,message:"Fixture"});assert(validateCloseoutOutput(defaults.children[0].result.structuredContent));assert(defaults.children[0].result.structuredContent.ok);assert.deepEqual(names(defaults),[]);assert.equal(defaults.children[0].result.structuredContent.data.sourceBranch,null);assert.equal(defaults.children[0].result.structuredContent.data.targetBranch,null);
+  const parentFail=await invoke("closeout-parent-fail","plastic_mergeToBranch",{message:"Fixture"},"parent-fail");assert(validateCloseoutOutput(parentFail.children[0].result.structuredContent));assert(!parentFail.children[0].result.structuredContent.ok);assert.deepEqual(names(parentFail),["status","find"]);
   const alias=await invoke("closeout-alias","plastic_mergeToBranch",{source_branch:request.source,destination_branch:request.target,update_target:false,include_private:false,message:"Fixture",format:"markdown",preflight:true});assert(alias.children[0].result.structuredContent.ok);assert.equal(alias.children[0].result.structuredContent.data.requested.updateTarget,false);
   for(const source of ["cs:16","-"," --to=br:/other"]){const p=await invoke("closeout-invalid","codemode",{code:`text(await tools.plastic_mergeToBranch(${JSON.stringify({...request,source,preflight:true})}));`});assert(validateCloseoutOutput(p.children[0].result.structuredContent));assert(!p.children[0].result.structuredContent.ok);assert.equal(p.calls.length,0);}
-  const qualified=await invoke("closeout-alias-unverified","plastic_mergeToBranch",{...request,target:request.target+"@Example Repository@1111111111111@cloud"});assert(validateCloseoutOutput(qualified.children[0].result.structuredContent));assert(!qualified.children[0].result.structuredContent.ok);assert.deepEqual(names(qualified),["status"]);
+  const qualified=await invoke("closeout-alias-unverified","plastic_mergeToBranch",{...request,target:request.target+"@Example Repository@1111111111111@cloud"});assert(validateCloseoutOutput(qualified.children[0].result.structuredContent));assert(!qualified.children[0].result.structuredContent.ok);assert.deepEqual(names(qualified),["status","status","switch","status"]);
   }
   {
   assert.deepEqual(session.getToolDefinition("plastic_branchDelete").outputSchema,branchDeleteOutputSchema);
