@@ -7,7 +7,7 @@ export type MergeConflictStrategy = "auto" | "source" | "destination";
 export const merge = tool({
  description:"Request one non-interactive workspace merge with an explicit strategy; command completion is not conflict resolution or checkin readiness.",
  args:{
- source:tool.schema.string().min(1).describe("Exact branch/changeset/label/shelveset source operand; not CLI options."),
+ source:tool.schema.string().min(1).describe("Exact source operand, not CLI options. Auto requires a branch or cs:<decimal> with optional repository/server qualifiers; label/shelveset resolution is unsupported in auto."),
  strategy:tool.schema.enum(["auto","source","destination"]).optional().describe("Default auto uses CM 11.0.16.10512+ native conflict markers without GUI; marker absence is not all-conflict readiness. source/destination explicitly force contributor preference."),
  cherrypicking:tool.schema.boolean().optional().describe("Request cherry-picking mode."),
  forced:tool.schema.boolean().optional().describe("Request connected-branch-check override where CM supports it."),

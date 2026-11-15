@@ -65,6 +65,8 @@ Pending STATUS records use the [shared workspace observation and assessment](202
 
 Explicit resolved paths suppress `--all`, even when `includeAll=true`, so selection cannot silently sweep in unrelated controlled files. Caller workdirs are canonicalized once; observed paths remain validated evidence. Default text reports the blocker stage/code; the additive assessment records bounded observation gaps and safety blockers without mutation replay.
 
+One framed `CHANGESET` field may contain the current client's comma-separated root/linked emissions (at most 16, with unique safe mounts and exactly one root). Only the independently correlated root on successful complete capture supports `changeset-created`; additive optional `linkedChangesets` retains emitted mounted identities, not proof of Xlink effects. Linked emissions require an independently observed loaded branch. Ambiguous/duplicate roots or mounts remain uncertain without retry.
+
 Only one admitted root changeset on successful complete capture supports `changeset-created`. Empty output/exit 0 alone does not. Unknown/malformed/full-tail records, incomplete capture and invalid UTF-8 fail before projection.
 
 ### Existing recovery, not general retry permission

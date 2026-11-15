@@ -26,6 +26,12 @@ for (const workdir of [cwd, cwd.replaceAll("\\", "/"), "c:/Example/workspace/"])
         assert(assessment.ready, JSON.stringify(assessment)); assert.equal(assessment.mergeRowCount, 4);
     }
 }
+// A changeset operand must match the actual link, never a branch-name parser.
+{
+    const pending = observeWorkspacePending(machine, cwd), standard = observeWorkspaceStandard(full, pending);
+    for (const pinned of ["cs:43", "cs:43@Example Repository@example@unity", "cs:43@rep:Example Repository@repserver:example@unity"]) assert(assessWorkspaceState(pending, standard, { source: pinned }).ready);
+    for (const pinned of ["cs:44", "cs:043", "cs:43@Other@example@unity", "cs:43@Example Repository@other@unity", "lb:release", "sh:43", "cs:43@Example Repository", "cs:43 "]) assert(!assessWorkspaceState(pending, standard, { source: pinned }).ready, pinned);
+}
 // Relative user workdirs are resolved once; observed path spellings stay intact.
 for (const workdir of [".", process.cwd()]) {
     const absolute = canonicalWorkspaceDirectory(workdir), path = receiptPathApi(absolute).join(absolute, "ordinary.txt");

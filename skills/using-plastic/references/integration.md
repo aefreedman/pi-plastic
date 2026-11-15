@@ -12,7 +12,7 @@
 Plastic does not perform a Git-style fast-forward. It applies the merge into the branch currently loaded in the workspace, and the resulting merge changeset belongs to the branch where checkin runs. Switching branches afterward does not move an incorrectly placed changeset.
 
 - Switch to the target branch/workspace and ensure you understand the current pending state.
-- Run `plastic_merge(...)`.
+- Run `plastic_merge(...)`. Auto mode accepts exact branch or pinned `cs:<decimal>` operands, optionally `@repository@server`; label/shelveset operands are rejected before dispatch because their source identities are not resolved. Pinned changesets are checked against the exact observed pending link, not a guessed branch.
 - If Plastic stops on a delete/change directory conflict and source deletion is the intended resolution, run `plastic_resolveDeleteChangeConflict(...)`, then rerun `plastic_merge(...)`.
 - Immediately run `plastic_status()` and treat it as the source of truth.
 - Do not treat merge-tool success alone as proof that the merge is finished.

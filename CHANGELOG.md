@@ -7,6 +7,16 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Fixed
+
+- Correlate pinned workspace merge sources with exact pending changeset links instead of interpreting them as branch names. Auto-mode label/shelveset selectors now stop before dispatch when source identity cannot be verified.
+
+- Retain the root changeset from current-client writable-Xlink checkin identity lists and expose bounded linked emissions without claiming verified Xlink effects. Ambiguous lists remain uncertain without retry.
+
+### Added
+
+- Opt-in live regression for pinned merges, independent target history/content verification, no-op integration and current-client loaded-base diffs; separate writable-Xlink checkin coverage independently verifies both repository histories and historical bytes.
+
 ## [0.10.0] - 2026-11-10
 
 ### Changed

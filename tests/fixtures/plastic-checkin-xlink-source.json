@@ -1,0 +1,10 @@
+{
+  "client": "cm 11.0.16.10616",
+  "note": "Sanitized native writable-Xlink checkin; exact record/list grammar retained. Emitted identities do not prove Xlink effects.",
+  "separators": {
+    "start": "__START__",
+    "end": "__END__",
+    "field": "__FIELD__"
+  },
+  "created": "__START__CI_START__END__\r\n__START__STAGE__FIELD__Checkin operation starting...__END__\r\n__START__STAGE__FIELD__Validating checkin data__END__\r\n__START__STAGE__FIELD__Validating checkin data__END__\r\n__START__STAGE__FIELD__Uploading file data__END__\r\n__START__STAGE__FIELD__Uploading file data__END__\r\n__START__STAGE__FIELD__Confirming checkin operation__END__\r\n__START__STAGE__FIELD__Confirming checkin operation__END__\r\n__START__STAGE__FIELD____END__\r\n__START__CO__FIELD__C:\\Example\\workspace\\fixtures\\synthetic-xlink\\root.txt__END__\r\n__START__CO__FIELD__C:\\Example\\workspace\\fixtures\\synthetic-xlink\\mount__END__\r\n__START__CHANGESET__FIELD__cs:1@br:/main/synthetic-linked@Linked Repository@example@unity (mount:'/fixtures/synthetic-xlink/mount'),cs:44@br:/main/synthetic-root@Example Repository@example@unity (mount:'/')__END__\r\n"
+}

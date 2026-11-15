@@ -32,12 +32,14 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         let remaining = 100;
         const project = <T>(a: T[]): T[] => { const n = Math.min(a.length, remaining); remaining -= n; data.omittedReferences += a.length - n; return a.slice(0, n); };
         data.requestedPaths = project(data.requestedPaths); data.includedPaths = project(data.includedPaths); data.fallbackPaths = project(data.fallbackPaths); data.excludedPaths = project(data.excludedPaths); data.privateAddPaths = project(data.privateAddPaths); data.blockedPrivatePaths = project(data.blockedPrivatePaths); data.itemEvents = project(data.itemEvents); data.observedChangesets = project(data.observedChangesets);
+        if (data.linkedChangesets) data.linkedChangesets = project(data.linkedChangesets);
         if (data.command) { if (data.command.length > remaining) { data.omittedReferences += data.command.length; data.command = null; } else remaining -= data.command.length; }
         const ok = outcome === "preflight" || outcome === "completed";
         const dto = { schemaVersion: 1, action: "checkin", provenance: { source: "plastic", producer: "@aefree/pi-plastic", contentTrust: "external" }, ok, outcome, completeness: { capture: data.steps.length ? data.steps.every(s => s.capture.complete) && (!data.markers || data.markers.capture?.complete === true) ? "complete" : "incomplete" : "unknown", projection: data.omittedReferences === 0 }, data: { ...data, effect, createdChangeset: created }, ...(!ok ? { error: { code, stage, message } } : {}) } as CheckinReceipt;
         if (Buffer.byteLength(JSON.stringify(dto), "utf8") > 131072) {
             const d = dto.data;
             for (const key of ["requestedPaths", "includedPaths", "fallbackPaths", "excludedPaths", "privateAddPaths", "blockedPrivatePaths", "itemEvents", "observedChangesets"] as const) { d.omittedReferences += d[key].length; d[key] = [] as any; }
+            if (d.linkedChangesets) { d.omittedReferences += d.linkedChangesets.length; d.linkedChangesets = []; }
             if (d.command) { d.omittedReferences += d.command.length; d.command = null; } dto.completeness.projection = false;
         }
         return dto;
@@ -119,10 +121,11 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
         const attempt = async (name: "initial-checkin" | "private-retry" | "fallback-checkin", argv: string[]) => {
             const { o, s } = await record(name, argv), p = parseCheckinEvidence(o.stdout ?? "", seps); s.records = p.records;
             const mergedEvents = !merged || correlateMergedCheckin(p.events, merged, cwd);
-            const admitted = p.admitted && mergedEvents && p.changesets.every(c => c.repository === before.repository && c.server === before.server && (!loaded || c.branch === loaded.branch));
+            const admitted = p.admitted && mergedEvents && (!p.linkedChangesets.length || loaded !== null) && p.changesets.every(c => c.repository === before.repository && c.server === before.server && (!loaded || c.branch === loaded.branch));
             if (admitted && normal(o)) {
                 s.evidence = "admitted";
                 data.itemEvents.push(...p.events); data.observedChangesets.push(...p.changesets);
+                if (p.linkedChangesets.length) data.linkedChangesets = p.linkedChangesets;
             }
             if (success(o) && admitted && p.changesets.length === 1) { created = p.changesets[0]; s.changeset = created; s.effect = "changeset-created"; }
             // Only genuine complete native failure without a created record may drive the existing recovery policy.
@@ -175,5 +178,5 @@ export async function assembleCheckinReceipt(input: unknown): Promise<CheckinRec
 }
 
 export { presentCheckinReceipt } from "../presentation/checkin-results";
-export { checkinSafeValue, parseCheckinChangeset } from "../domain/checkin-contract";
+export { checkinSafeValue, parseCheckinChangeset, parseCheckinEmission } from "../domain/checkin-contract";
 export type { CheckinReceipt } from "../domain/checkin-contract";

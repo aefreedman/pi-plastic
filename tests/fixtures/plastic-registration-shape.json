@@ -1600,7 +1600,7 @@
       "properties": {
         "source": {
           "type": "string",
-          "description": "Exact branch/changeset/label/shelveset source operand; not CLI options.",
+          "description": "Exact source operand, not CLI options. Auto requires a branch or cs:<decimal> with optional repository/server qualifiers; label/shelveset resolution is unsupported in auto.",
           "minimum": 1
         },
         "strategy": {

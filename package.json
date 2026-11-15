@@ -45,6 +45,8 @@
     "test:live:native-workflows": "tsx tests/plastic-native-workflows-live.test.ts",
     "test:live:reviews": "tsx tests/plastic-review-native-live.test.ts",
     "test:live:merge": "tsx tests/plastic-workspace-merge-live.test.ts",
+    "test:live:pinned-merge": "tsx tests/plastic-pinned-merge-live.test.ts",
+    "test:live:xlink-checkin": "tsx tests/plastic-xlink-checkin-live.test.ts",
     "test:live:replaced-checkout": "tsx tests/plastic-replaced-checkout-live.test.ts",
     "test:live:contract": "tsx tests/plastic-live-contract.test.ts",
     "test:live:branch-create": "tsx tests/plastic-branch-create-live.test.ts",

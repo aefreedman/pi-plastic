@@ -103,6 +103,17 @@ export function observeWorkspaceStandard(text: string, pending: WorkspacePending
     for (const row of remaining) if (!(row.status === "CO" && row.mergeChangeset === null)) issue("standard_row_missing", row.path);
     return result;
 }
+// Pinned changesets identify a link by exact decimal ID, not by its branch.
+// Qualifiers use the same repository/server spelling as branch selectors.
+export function parseWorkspaceMergeSource(value: string) {
+    const branch = parseSwitchTarget(value);
+    if (branch) return { kind: "branch" as const, ...branch };
+    const match = /^cs:(0|[1-9][0-9]{0,19})(?:@([^@]+)@([^@]+(?:@(?:cloud|unity))?))?$/u.exec(value);
+    if (!safe(value) || !match) return null;
+    const repository = match[2]?.replace(/^rep:/, "") ?? null, server = match[3]?.replace(/^repserver:/, "") ?? null;
+    if (repository !== null && (!safe(repository) || !safe(server))) return null;
+    return { kind: "changeset" as const, changeset: match[1], repository, server };
+}
 export function assessWorkspaceState(pending: WorkspacePendingObservation, standard: WorkspaceStandardObservation, options: { source?: string; allowOrdinary?: boolean } = {}): WorkspaceAssessment {
     const blockers = [...pending.issues, ...standard.issues], merged = pending.rows.filter(r => r.mergeChangeset !== null), ordinary = pending.rows.filter(r => r.mergeChangeset === null && r.status !== "PR");
     const add = (code: string, path: string | null = null) => blockers.push({ code, path });
@@ -111,7 +122,10 @@ export function assessWorkspaceState(pending: WorkspacePendingObservation, stand
     if (merged.length) {
         const link = standard.links[0];
         if (!link || merged.some(r => r.mergeChangeset !== link.changeset) || link.repository !== pending.repository || link.server !== pending.server) add("merge_link_mismatch");
-        if (options.source) { const requested = parseSwitchTarget(options.source); if (!requested || !link || requested.branch !== link.branch || requested.repository !== null && (requested.repository !== link.repository || requested.server !== link.server)) add("merge_source_mismatch"); }
+        if (options.source) {
+            const requested = parseWorkspaceMergeSource(options.source);
+            if (!requested || !link || (requested.kind === "branch" ? requested.branch !== link.branch : requested.changeset !== link.changeset) || requested.repository !== null && (requested.repository !== link.repository || requested.server !== link.server)) add("merge_source_mismatch");
+        }
         if (!options.allowOrdinary && ordinary.length) for (const row of ordinary) add("unrelated_controlled_pending", row.path);
         for (const row of pending.rows.filter(r => r.status === "PR")) if (merged.some(m => receiptPathWithin(row.path, m.path) || receiptPathWithin(m.path, row.path))) add("private_scope_overlap", row.path);
     } else if (standard.links.length) add("merge_link_without_resolved_rows");

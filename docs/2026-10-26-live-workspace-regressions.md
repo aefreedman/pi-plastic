@@ -27,6 +27,14 @@ npm run test:live:merge
 
 The three environment settings are deliberate separate choices: exact target, mutation permission, and a declaration that the workspace content is disposable/synthetic. An absolute path is mandatory; symlinks are resolved. There is no configured machine-specific workspace default. PowerShell users can set the same names through `$env:` before running npm.
 
+## Pinned-changeset and loaded-base diff regression
+
+With the same workspace, mutation permission and attestation settings, run `npm run test:live:pinned-merge`. It creates unique source/target branches, verifies implicit loaded-base unchanged/changed diffs against the current client, applies one pinned changeset merge with divergent contributors, checks in through the registered tool, and independently verifies exact content and source ancestry. An explicit already-integrated no-op merge must not create a changeset. Success restores the original clean branch/changeset; failure preserves state without replay or native checkin workaround. This single-repository scenario does not establish Xlink support.
+
+## Writable-Xlink checkin regression
+
+`npm run test:live:xlink-checkin` additionally requires `PI_PLASTIC_TEST_XLINK_REPOSITORY` naming a distinct existing disposable synthetic repository on the sandbox server. The test does not create repositories or additional workspaces. It mounts that repository's empty changeset 0 under a unique run-owned directory, checks in root/linked edits through the registered tool exactly once, and independently verifies both histories and historical bytes. Success restores the original clean root branch/changeset; synthetic branches/history remain. This proves root identity retention and linked emission observation, not multi-link merge/closeout readiness, which remains blocked without repository-aware ownership proof.
+
 ## Replaced-checkout regression
 
 With the same exact disposable workspace, mutation permission and attestation settings, run `npm run test:live:replaced-checkout` for the standalone `CO+RP` checkin profile. It creates two synthetic revisions on a unique descendant branch, reverts only its owned file to the earlier revision (which checks it out), and requires native `CO+RP` with a positive revision and `NO_MERGES`. It verifies a read-only preflight, one typed checkin, exact reverted bytes and native changeset history, then restores the original clean branch. On failure it preserves state without undo, retry or a native checkin workaround.

@@ -62,7 +62,7 @@ async function invoke(scenario: Scenario = {}, args: any = input, core = false, 
                     case "overflow": out = "x".repeat(65537); break;
                     case "stderrOverflow": err = "x".repeat(16385); break;
                     case "records": out = record("CI_START") + Array.from({ length: 501 }, () => record("STAGE", [""])).join(""); break;
-                    case "projection": out = record("CI_START") + Array.from({ length: 101 }, (_, i) => record("AD", [cwd + "\\" + i + "-" + name])).join("") + record("CHANGESET", [payload]); break;
+                    case "projection": out = record("CI_START") + Array.from({ length: 101 }, (_, i) => record("AD", [cwd + "\\" + i + "-" + name])).join("") + record("CHANGESET", [scenario.payload ?? payload]); break;
                     case "mv": out = record("CI_START") + record("DE", [path]) + record("MV", [path, cwd + "\\new-" + name]) + record("CHANGESET", [payload]); break;
                 }
                 if (scenario.stderr) err = scenario.stderr;
@@ -89,6 +89,25 @@ async function invoke(scenario: Scenario = {}, args: any = input, core = false, 
 }
 {
 let r = await invoke(); assert(r.dto.ok); assert.equal(r.dto.data.createdChangeset.id, "9007199254740997"); assert.equal(r.dto.data.createdChangeset.branch, "/main/café-é-日本-😀"); assert.equal(r.dto.data.createdChangeset.server, "example@unity"); assert.equal(r.calls.length, 3);
+const linked = "cs:17@br:/main/linked@Linked Repository@example@unity (mount:'/linked')";
+r = await invoke({ pending: checkedOutRow(), payload: linked + "," + payload });
+assert(r.dto.ok); assert.equal(r.dto.data.createdChangeset.mount, "/");
+assert.equal(r.dto.data.linkedChangesets[0].mount, "/linked"); assert.equal(r.dto.data.xlinkEffects, "unverified");
+assert.match(r.result.content[0].text, /Linked changeset emissions: 1/);
+for (const bad of [linked + "," + payload + "," + payload, linked + "," + linked + "," + payload, linked.replace("/linked'", "/../escape'") + "," + payload, linked + "," + payload + ",garbage", linked, linked + "," + payload.replace("Example Repository", "Foreign Repository")]) {
+    r = await invoke({ pending: checkedOutRow(), payload: bad }); assert(!r.dto.ok); assert.equal(r.dto.data.createdChangeset, null); assert.equal(r.calls.filter(c => c[0] === "checkin").length, 1);
+}
+for (const scenario of [{code: 1}, {abort: true}, {mode: "overflow"}, {timeout: true}]) {
+    r = await invoke({ ...scenario, pending: checkedOutRow(), payload: linked + "," + payload }); assert(!r.dto.ok); assert.equal(r.dto.data.createdChangeset, null); assert.equal(r.calls.filter(c => c[0] === "checkin").length, 1);
+}
+r = await invoke({pending: checkedOutRow(), payload: linked + "," + payload});
+const projectedLinked = await invoke({mode: "projection", pending: checkedOutRow(), payload: linked + "," + payload});
+assert(projectedLinked.dto.ok); assert.equal(projectedLinked.dto.data.linkedChangesets.length, 0); assert(projectedLinked.dto.data.omittedReferences > 0); assert(projectedLinked.dto.data.createdChangeset);
+const wrongBranch = await invoke({pending: checkedOutRow(), payload: linked + "," + payload.replace("/main/café-é-日本-😀", "/main/foreign")});
+assert(!wrongBranch.dto.ok); assert.equal(wrongBranch.dto.data.createdChangeset, null);
+const unobservedBranch = await invoke({payload: linked + "," + payload}); assert(!unobservedBranch.dto.ok);
+const badMount = structuredClone(r.dto); badMount.data.linkedChangesets[0].mount = "/"; assert(!validateCheckinOutput(badMount));
+const duplicateMount = structuredClone(r.dto); duplicateMount.data.linkedChangesets.push(duplicateMount.data.linkedChangesets[0]); assert(!validateCheckinOutput(duplicateMount));
 const registered = (await loadRegisteredTools()).get("plastic_checkin")!;
 for (const newline of ["\n", "\r\n", "\r"]) {
     const message = `  Fixture 😀${newline}Details${newline}  `;
@@ -217,6 +236,13 @@ const aggregate = structuredClone(r.dto); aggregate.data.requestedPaths = Array(
 const core = await invoke({}, { ...input, preflight: true, format: "json" }, true); assert.equal(typeof core.result, "string"); assert.match(core.result as string, /"outcome":"preflight"/);
 console.log("PASS: checkin closed receipts, native compound policy, source admission, Unicode precision, bounded full classification/projection, uncertainty and injected lifecycle cleanup");
 }
+const xlinkFixture = JSON.parse(readFileSync(new URL("./fixtures/plastic-checkin-xlink-source.json", import.meta.url), "utf8"));
+const xlinkParsed = parseCheckinEvidence(xlinkFixture.created, xlinkFixture.separators);
+const tooMany = Array.from({length: 16}, (_, i) => `cs:${i + 1}@br:/main/link@Linked Repository@example@unity (mount:'/link-${i}')`).concat(payload).join(",");
+assert(!parseCheckinEvidence(`__START__CI_START__END__
+__START__CHANGESET__FIELD__${tooMany}__END__
+`, xlinkFixture.separators).admitted);
+assert(xlinkParsed.admitted); assert.equal(xlinkParsed.changesets[0].id, "44"); assert.equal(xlinkParsed.linkedChangesets.length, 1);
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/plastic-checkin-source.json", import.meta.url), "utf8"));
 assert(parseCheckinPending(fixture.pending, cwd).admitted);
 const fixtureCreated = parseCheckinEvidence(fixture.created, fixture.separators);
