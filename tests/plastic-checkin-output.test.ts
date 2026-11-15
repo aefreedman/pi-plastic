@@ -15,6 +15,7 @@ for (const options of [{}, { stderr: "native warning" }, { prefix: "x".repeat(10
     else { assert.equal(dto.data.createdChangeset, null); assert.equal(dto.data.identityObservation.complete, false); }
     if (options.prefix) { assert(dto.data.capture?.truncated); assert(dto.data.capture.complete); assert(dto.data.identityObservation.complete); assert.equal(dto.completeness.projection, false); }
     const forged = structuredClone(dto); forged.data.commandCompleted = !forged.data.commandCompleted; assert(!validateCheckinOutput(forged));
+    assert.equal(validateCheckinOutput({ ...dto, ok: false, outcome: "failed", error: undefined }), false);
 }
 const preview = nativeFixture(); const p = await preview.run(() => executeCheckinOutput({ message: "preview", paths: Array.from({ length: 130 }, (_, i) => `file-${i}`), preflight: true }));
 assert(p.structuredContent.ok); assert.equal(preview.calls.length, 0); assert.equal(p.structuredContent.data.requested?.paths?.length, 130);
@@ -23,6 +24,11 @@ const core=nativeFixture({checkinCode:1});await assert.rejects(()=>core.run(()=>
 const s={start:"__S__",end:"__E__",field:"__F__"};const list=Array.from({length:40},(_,i)=>`cs:${i}@br:/main@Repo${i}@example@unity (mount:'/mount${i}')`).join(",")+",cs:99@br:/main@Root@example@unity (mount:'/')";
 const parsed=parseCheckinEvidence(s.start+"CHANGESET"+s.field+list+s.end+"\n",s);assert(parsed.admitted);assert.equal(parsed.linkedChangesets.length,40);
 const collector=checkinIdentityCollector(s);collector.feed(s.start+"CHANGESET"+s.field+"x".repeat(70000)+s.end);assert.equal(collector.result().identityObservation.complete,false);
+const repeatedRoot = "cs:1@br:/main@Root@example@unity (mount:\'/\')";
+const projected = parseCheckinEvidence(s.start+"CHANGESET"+s.field+Array(900).fill(repeatedRoot).join(",")+s.end,s);
+assert(projected.identityObservation.omitted > 0);
+assert(projected.identityObservation.ambiguousRoot);
+assert(Buffer.byteLength(JSON.stringify(projected.observedChangesets), "utf8") <= 32768, "Identity budget includes JSON array separators.");
 console.log("PASS: v2 one-shot exact checkin, native refusals, identities after large output, chunked UTF8, no hidden recovery, pure preview, arbitrary counts projected not gated");
 
 for (const name of ["plastic-checkin-source.json", "plastic-checkin-xlink-source.json"]) {

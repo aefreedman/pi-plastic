@@ -11,6 +11,8 @@ for(const options of [{},{initialTarget:true},{prefix:"x".repeat(80000)+"😀\n"
  if(options.initialTarget)assert(!f.calls.some(c=>c[0]==="switch"));
  if(options.dirty||options.links)assert(f.calls.every(c=>["status","find"].includes(c[0])));
  const forged=structuredClone(d);forged.data.effect="uncertain";if(d.data.effect!=="uncertain")assert(!validateCloseoutOutput(forged));
+ assert.equal(validateCloseoutOutput({ ...d, ok: false, outcome: "failed", error: undefined }), false);
+ if(d.ok)assert.equal(validateCloseoutOutput({ ...d, error: {code:"unexpected",stage:"input",message:"Not a success receipt."} }), false);
 }
 for(const args of [{preflight:true},{source:"/main/source",target:"/main/target",preflight:true}]){const f=nativeFixture();const r=await f.run(()=>executeCloseoutOutput(args));assert(r.structuredContent.ok);assert.equal(f.calls.length,0);assert.equal(r.structuredContent.data.targetBranch,args.target??null);}
 const f=nativeFixture();const r=await f.run(()=>executeCloseoutOutput({target:"/main/target",updateTarget:false}));assert(r.structuredContent.ok);assert.equal(r.structuredContent.data.sourceBranch,"/main/source");

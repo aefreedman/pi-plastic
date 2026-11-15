@@ -29,7 +29,7 @@ export function parseCheckinChangeset(payload: string): CheckinChangeset | null 
  * Memory is bounded by retained identity bytes and one incomplete frame, never
  * by the number of files that Plastic may check in. */
 export function checkinIdentityCollector(s: CheckinSeparators) {
-    const observed: CheckinEmission[] = []; let buffer = "", discarding = false, malformed = false, omitted = 0, retainedBytes = 0;
+    const observed: CheckinEmission[] = []; let buffer = "", discarding = false, malformed = false, omitted = 0, retainedBytes = 2;
     const accept = (frame: string) => {
         const fields = frame.split(s.field);
         if (fields[0] !== "CHANGESET") return;
@@ -37,7 +37,8 @@ export function checkinIdentityCollector(s: CheckinSeparators) {
         for (const payload of fields[1].split(/(?<='\)),(?=cs:)/)) {
             const emission = parseCheckinEmission(payload);
             if (!emission) { malformed = true; continue; }
-            const bytes = Buffer.byteLength(JSON.stringify(emission), "utf8");
+            // Include array separators in the retained identity byte budget.
+            const bytes = Buffer.byteLength(JSON.stringify(emission), "utf8") + 1;
             if (retainedBytes + bytes > (emission.mount === "/" ? 32768 : 16384)) { omitted++; continue; }
             observed.push(emission); retainedBytes += bytes;
         }

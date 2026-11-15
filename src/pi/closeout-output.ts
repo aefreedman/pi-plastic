@@ -18,6 +18,7 @@ export const closeoutOutputSchema = Type.Unsafe<CloseoutReceipt>(obj({ schemaVer
 export function validateCloseoutOutput(value: unknown): value is CloseoutReceipt {
     if (!Check(closeoutOutputSchema, value) || Buffer.byteLength(JSON.stringify(value), "utf8") > CLOSEOUT_DTO_BYTES) return false;
     const dto = value as CloseoutReceipt, d = dto.data, r = d.requested, stages = d.stages;
+    if (dto.ok ? "error" in dto : !dto.error) return false;
     const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
     const captures = closeoutCaptures(stages), effects = stages.map(closeoutChildEffect);
     if (dto.completeness.capture !== (!captures.length ? "unknown" : captures.every(c => c.complete) ? "complete" : "incomplete") || dto.completeness.projection !== captures.every(c => !c.truncated) || d.effect !== (effects.includes("uncertain") ? "uncertain" : effects.includes("command-completed") ? "command-completed" : "not-attempted")) return false;

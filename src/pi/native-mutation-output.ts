@@ -10,6 +10,7 @@ export function nativeReceiptSchema(action: string, data: ReturnType<typeof Type
     return nativeObject({ schemaVersion: Type.Literal(2), action: Type.Literal(action), provenance: nativeObject({ source: Type.Literal("plastic"), producer: Type.Literal("@aefree/pi-plastic"), contentTrust: Type.Literal("external") }), completeness: nativeObject({ capture: Type.Union(["complete", "incomplete", "unknown"].map(s => Type.Literal(s))), projection: Type.Boolean() }), ok: Type.Boolean(), outcome: Type.Union(["preflight", "command-completed", "failed", "uncertain"].map(s => Type.Literal(s))), error: Type.Optional(nativeObject({ code: Type.String(), message: Type.String() })), data });
 }
 export function validateNativeReceipt(dto: NativeHeader & NativeOutcome & { data: NativeCommandData }): boolean {
+    if (!dto.ok && !dto.error) return false;
     const d = dto.data, a = d.attempt, c = d.capture;
     if (Buffer.byteLength(JSON.stringify(dto), "utf8") > 262144 || d.command && Buffer.byteLength(JSON.stringify(d.command), "utf8") > 32768) return false;
     if (a.exitCode !== null && a.terminal !== "observed" || ["not-attempted", "not-started"].includes(a.state) && (a.terminal !== "not-observed" || a.exitCode !== null)) return false;

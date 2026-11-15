@@ -11,5 +11,6 @@ for(const source of ["--merge","-"," ","bad\u0000"]){const f=nativeFixture();con
 const preview=nativeFixture();const r=await preview.run(()=>executeWorkspaceMergeOutput("merge",{source:"lb:release",preflight:true}));assert(r.structuredContent.ok);assert.equal(preview.calls.length,0);
 const failed=nativeFixture({mergeCode:1});const negative=await failed.run(()=>executeWorkspaceMergeOutput("merge",{source:"cs:42"}));assert(!negative.structuredContent.ok);assert.equal(failed.calls.length,1);assert.equal(negative.structuredContent.data.attempt.exitCode,1);
 const forged=structuredClone(negative.structuredContent);forged.data.commandCompleted=true;assert(!validateWorkspaceMergeOutput(forged));
+assert.equal(validateWorkspaceMergeOutput({ ...negative.structuredContent, error: undefined }), false);
 await assert.rejects(()=>failed.run(()=>merge.execute({source:"cs:42"})));
 console.log("PASS: v2 native selector/strategy forwarding, one merge, no semantic ownership gates, bounded draining diagnostics and native failure propagation");

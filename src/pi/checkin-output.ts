@@ -10,7 +10,7 @@ export const checkinOutputSchema = Type.Unsafe<CheckinReceipt>(nativeReceiptSche
 export function validateCheckinOutput(value: unknown): value is CheckinReceipt {
     if (!Check(checkinOutputSchema, value)) return false;
     const dto = value as CheckinReceipt, d = dto.data;
-    if (!validateNativeReceipt(dto) || Buffer.byteLength(JSON.stringify(d.observedChangesets), "utf8") > 32770) return false;
+    if (!validateNativeReceipt(dto) || Buffer.byteLength(JSON.stringify(d.observedChangesets), "utf8") > 32768) return false;
     const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
     if (d.observedChangesets.some(c => !parseCheckinEmission(`cs:${c.id}@br:${c.branch}@${c.repository}@${c.server} (mount:'${c.mount}')`))) return false;
     const roots = d.observedChangesets.filter(c => c.mount === "/"), ambiguous = roots.length > 1 || new Set(d.observedChangesets.map(c => c.mount)).size !== d.observedChangesets.length;
