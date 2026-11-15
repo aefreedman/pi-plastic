@@ -7,7 +7,9 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
-### Changed
+## [0.11.0] - 2026-11-15
+
+### Breaking changes
 
 - Workspace merge, checkin and compound closeout now use receipt schema v2: native completion, diagnostics and emitted changeset observations are separate. Unknown progress/identity formats do not turn native success into adapter failure.
 - Delegate workspace and Xlink eligibility to Plastic instead of reconstructing ownership or enforcing file/link/status composition limits. Exact standalone paths/options are passed once, without automatic add, inferred flags, path rewrites or fallback checkins.
