@@ -92,7 +92,9 @@ Parent/agent restoration is a separate action with its own scope and evidence. I
 
 Standalone exact paths/options are not rewritten or retried. Compound closeout requires a clean initial workspace/merge state because it automatically checks in. Its ordered ledger stops after execution failure, retaining prior effects. There is no ownership proof or per-file eligibility policy.
 
-Bounded stdout/stderr retention continues draining streams: diagnostic overflow does not kill a mutation. Terminal/stream/UTF-8 failure remains execution uncertainty; presentation truncation alone does not. Unknown terminal state, deadline or cancellation never establishes rollback or replay safety.
+Diagnostic retention is 64 KiB stdout and 16 KiB stderr while both streams continue draining: retention overflow does not kill a mutation. Terminal/stream/UTF-8 failure remains execution uncertainty; presentation truncation alone does not. Unknown terminal state, deadline or cancellation never establishes rollback or replay safety.
+
+Checkin identities are observed incrementally even after the diagnostic prefix fills. Identity memory has a separate byte budget; omitted, malformed or oversized frames and ambiguous roots are explicit in `identityObservation`. Argument limits bound execution bytes rather than file counts, and a large checkin is never automatically split into several mutations.
 
 ## Evidence and transport limits
 

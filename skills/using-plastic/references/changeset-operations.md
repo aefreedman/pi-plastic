@@ -107,4 +107,4 @@ cm find changeset --orderby="date desc" --limit=20 \
 
 ## Writable-Xlink checkin receipts
 
-A current-client checkin can emit linked and root identities in one record. The receipt retains observed mounted identities with explicit completeness, without requiring ownership/source-tree reconstruction. A unique root emission appears as `createdChangeset`; missing/ambiguous roots remain unknown even if the native command completed. See [native Xlink operations](../../../docs/2026-11-15-writable-xlink-merges.md). Never retry an uncertain checkin automatically; inspect actual histories and workspace state.
+A current-client checkin can emit linked and root identities in one record. The receipt retains observed mounted identities with explicit completeness, without requiring ownership/source-tree reconstruction. A unique root emission appears as `createdChangeset`; missing/ambiguous roots remain unknown even if the native command completed. See [native Xlink operations](../../../docs/2026-10-06-merging.md#xlinks). Never retry an uncertain checkin automatically; inspect actual histories and workspace state.

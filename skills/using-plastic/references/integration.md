@@ -12,7 +12,7 @@
 Plastic does not perform a Git-style fast-forward. It applies the merge into the branch currently loaded in the workspace, and the resulting merge changeset belongs to the branch where checkin runs. Switching branches afterward does not move an incorrectly placed changeset.
 
 - Switch to the target branch/workspace and ensure you understand the current pending state.
-- [Native Xlink operations](../../../docs/2026-11-15-writable-xlink-merges.md) are delegated to Plastic without ownership reconstruction, mount/file-count gates or status matrices.
+- [Native Xlink operations](../../../docs/2026-10-06-merging.md#xlinks) are delegated to Plastic without ownership reconstruction, mount/file-count gates or status matrices.
 - Run `plastic_merge(...)` with the exact native branch, changeset, label or shelveset operand. It executes one noninteractive merge and reports the native result.
 - If Plastic stops on a delete/change directory conflict and source deletion is the intended resolution, run `plastic_resolveDeleteChangeConflict(...)`, then rerun `plastic_merge(...)`.
 - Immediately run `plastic_status()` and treat it as the source of truth.

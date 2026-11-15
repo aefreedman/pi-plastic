@@ -67,7 +67,7 @@ The v2 receipt separates `commandCompleted`/actual attempt and exit from `create
 
 Output retention is bounded while draining the native process; diagnostic truncation does not terminate the mutation. Identity frames are observed separately after the retained prefix fills. Incomplete identity observation or presentation does not erase actual terminal success. Failed execution/unknown terminal state is never permission for automatic retry.
 
-Standalone checkin accepts deliberately selected existing pending work; [compound closeout](2026-10-06-merging.md#mergetobranch) additionally requires a clean start because it chooses an automatic checkin. See [native Xlink behavior](2026-11-15-writable-xlink-merges.md).
+Standalone checkin accepts deliberately selected existing pending work; [compound closeout](2026-10-06-merging.md#mergetobranch) additionally requires a clean start because it chooses an automatic checkin. See [native Xlink behavior](2026-10-06-merging.md#xlinks).
 
 ## branchCreate
 
