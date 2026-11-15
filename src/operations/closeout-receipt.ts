@@ -1,85 +1,78 @@
 import { resolve } from "node:path";
-import { observeXlinkOwnership } from "./xlink-ownership";
-import { canonicalWorkspaceDirectory, observeWorkspacePending, observeWorkspaceStandard, assessWorkspaceState, type WorkspacePendingObservation } from "../domain/workspace-observation";
-import { parseSwitchTarget, parseSwitchLoadedBranch, compareSwitchTarget, parseSwitchPending, switchPendingArgv, safeSwitchValue } from "../domain/switch-contract";
-import { checkinSafeComment, checkinSafeValue } from "../domain/checkin-contract";
-import { admitCleanStandardStatus } from "../domain/workspace-merge-contract";
-import { parseCopiedPending } from "../domain/copied-merge";
-import { parseMergedPending, admitMergedStandardStatus, type MergedPending } from "../domain/merged-workspace";
-import { cmWhereEquals } from "../domain/branches";
-import { buildCloseoutParentArgv, CLOSEOUT_STAGE_NAMES, closeoutChildEffect, closeoutCaptures, type CloseoutData, type CloseoutReceipt, type CloseoutRequest, type CloseoutStageName, type CloseoutRead, type CloseoutStage } from "../domain/closeout-contract";
-import { captureWorkspaceMergeCommand, emptyWorkspaceMergeAttempt } from "../execution/workspace-merge-command";
-import { assembleSwitchReceipt } from "./switch-receipt";
-import { assembleUpdateReceipt } from "./update-receipt";
+import { nativeCommandCompleted, safeNativeText } from "../domain/native-mutation";
+import { checkinSafeComment } from "../domain/checkin-contract";
+import { parseSwitchLoadedBranch, parseSwitchTarget, compareSwitchTarget, switchPendingArgv } from "../domain/switch-contract";
+import { buildCloseoutParentArgv, closeoutCaptures, closeoutChildEffect, type CloseoutData, type CloseoutReceipt, type CloseoutRequest, type CloseoutRead, type CloseoutStageName } from "../domain/closeout-contract";
+import { emptyNativeData, runNativeMutation } from "./native-mutation";
 import { assembleWorkspaceMergeReceipt } from "./workspace-merge-receipt";
 import { assembleCheckinReceipt } from "./checkin-receipt";
 export { presentCloseoutReceipt } from "../presentation/closeout-results";
-export { CLOSEOUT_STAGE_NAMES, CLOSEOUT_DTO_BYTES, closeoutChildEffect, closeoutCaptures } from "../domain/closeout-contract";
+export { buildCloseoutParentArgv, CLOSEOUT_STAGE_NAMES, CLOSEOUT_DTO_BYTES, closeoutCaptures, closeoutChildEffect } from "../domain/closeout-contract";
 export type { CloseoutReceipt, CloseoutStage, CloseoutRead } from "../domain/closeout-contract";
-export { compareSwitchTarget, parseSwitchTarget, safeSwitchValue, switchPendingArgv } from "../domain/switch-contract";
-export { checkinSafeComment, checkinSafeValue } from "../domain/checkin-contract";
-export { cmWhereEquals } from "../domain/branches";
-export { buildCloseoutParentArgv } from "../domain/closeout-contract";
-export function emptyCloseoutData(): CloseoutData { return {requested:null,sourceBranch:null,targetBranch:null,targetSource:"unresolved",checkinMessage:null,stages:[],unattemptedStages:[...CLOSEOUT_STAGE_NAMES],unobservedChild:null,createdChangeset:null,pendingAfter:null,targetVerification:"unverified",serverAliasEquivalence:"unverified",sourceLink:"unverified",branchHead:"unverified",exclusiveScope:"unverified",rollback:"not-proven",effect:"not-attempted"}; }
-function admitRequest(input:unknown):asserts input is CloseoutRequest { if(!input||typeof input!=="object"||Array.isArray(input))throw Error();const r=input as Record<string,unknown>;if(Object.keys(r).some(k=>!["source","target","message","cardRef","strategy","updateTarget","includePrivate","preflight","format","workdir"].includes(k)))throw Error();for(const k of ["source","target"])if(r[k]!==undefined&&(!safeSwitchValue(r[k])||!parseSwitchTarget(r[k])))throw Error();if(r.message!==undefined&&!checkinSafeComment(r.message))throw Error();if(r.cardRef!==undefined&&!checkinSafeValue(r.cardRef))throw Error();if(r.workdir!==undefined&&!safeSwitchValue(r.workdir))throw Error();if(r.strategy!==undefined&&!["auto","source","destination"].includes(r.strategy as string)||r.format!==undefined&&!["text","json"].includes(r.format as string))throw Error();for(const k of ["updateTarget","includePrivate","preflight"])if(r[k]!==undefined&&typeof r[k]!=="boolean")throw Error();if(Buffer.byteLength(JSON.stringify(r),"utf8")>32768)throw Error(); }
-export async function assembleCloseoutReceipt(input:unknown):Promise<CloseoutReceipt> {
- const data=emptyCloseoutData();let stage:"input"|CloseoutStageName|"producer"="input";let childEntered=false;
- const finish=(outcome:CloseoutReceipt["outcome"],code:Extract<CloseoutReceipt,{ok:false}>["error"]["code"]="observation_failed",message="Closeout paused; inspect earlier effects before deciding whether to retry."):CloseoutReceipt=>{
-  // Bound the parent view without discarding the complete child receipt, and
-  // never split a surrogate pair while projecting a path-bearing diagnosis.
-  let bounded="";for(const point of message){if(bounded.length+point.length>256)break;bounded+=point;}message=bounded;
-  const effects=data.stages.map(closeoutChildEffect);data.effect=data.createdChangeset?"changeset-created":effects.includes("uncertain")||childEntered?"uncertain":effects.includes("command-completed")?"command-completed":"not-attempted";
-  const captures=closeoutCaptures(data.stages),projection=data.stages.every(s=>s.kind==="read"||s.result.completeness.projection);
-  const ok=outcome==="completed"||outcome==="preflight";const actual=!ok&&data.effect!=="not-attempted"?"uncertain":outcome;
-  return {schemaVersion:1,action:"merge-to-branch",provenance:{source:"plastic",producer:"@aefree/pi-plastic",contentTrust:"external"},completeness:{capture:!captures.length?"unknown":!data.unobservedChild&&data.stages.every(s=>s.kind!=="read"||s.result.capture!==null)&&captures.every(c=>c.complete)?"complete":"incomplete",projection},data,ok,outcome:actual,...(!ok?{error:{code,stage,message}}:{})} as CloseoutReceipt;
- };
- const push=(s:CloseoutStage)=>{if(data.stages.length>=16)throw Error();data.stages.push(s);data.unattemptedStages=data.unattemptedStages.filter(n=>n!==s.name);};
- const read=async(name:CloseoutStageName,argv:string[])=>{stage=name;const s:CloseoutRead={argv:[...argv],attempt:{...emptyWorkspaceMergeAttempt(),state:"unknown"},capture:null,admission:"unsupported",branch:null,parentPath:null,emptyParentResult:false,summary:null};push({name,kind:"read",result:s});const o=await captureWorkspaceMergeCommand([...argv],data.requested!.workdir);s.attempt=o.attempt;s.capture=o.capture;const success=o.capture.complete&&!o.failed&&o.attempt.state==="started"&&o.attempt.terminal==="observed"&&o.attempt.exitCode===0&&!o.attempt.aborted&&!o.attempt.timedOut&&o.stderr===""&&o.stdout!==null;return {s,o,success};};
- const loaded=async(name:CloseoutStageName,verify=false,mergedPending?:MergedPending|null,ownedPending?:WorkspacePendingObservation)=>{const {s,o,success}=await read(name,["status"]);if(success){s.branch=parseSwitchLoadedBranch(o.stdout!);if(ownedPending){const standard=observeWorkspaceStandard(o.stdout!,ownedPending);const ownership=await observeXlinkOwnership(ownedPending,standard);s.assessment=assessWorkspaceState(ownedPending,standard,{source:data.sourceBranch!,ownership});if(!s.assessment.ready)s.branch=null;}if(s.branch&&(!mergedPending||admitMergedStandardStatus(o.stdout!,mergedPending,data.sourceBranch!,data.requested!.workdir)))s.admission="admitted";else s.branch=null;}if(!s.branch)return false;if(verify){data.targetVerification=compareSwitchTarget(s.branch,data.targetBranch!);if(data.targetVerification==="unverified")return false;}return true;};
- const pending=async(name:"pending-before"|"pending-final")=>{const {s,o,success}=await read(name,[...switchPendingArgv]);if(success){const p=parseSwitchPending(o.stdout!,data.requested!.workdir);if(p.summary){s.admission="admitted";s.summary=p.summary;}}return s.summary;};
- try{
-  const submitted=input&&typeof input==="object"&&!Array.isArray(input)?Object.freeze({...input}):input;admitRequest(submitted);const cwd=canonicalWorkspaceDirectory(submitted.workdir??process.cwd());if(!safeSwitchValue(cwd)||!safeSwitchValue(resolve(cwd)))return finish("failed","invalid_request","Closeout needs a bounded workdir.");data.requested={source:submitted.source??null,target:submitted.target??null,message:submitted.message??null,cardRef:submitted.cardRef??null,strategy:submitted.strategy??"auto",updateTarget:submitted.updateTarget??true,includePrivate:submitted.includePrivate??false,preflight:submitted.preflight??false,outputFormat:submitted.format??"text",workdir:cwd};
-  if(!await loaded("loaded-before"))return finish("failed");const start=(data.stages[0] as Extract<CloseoutStage,{kind:"read"}>).result.branch!;data.sourceBranch=submitted.source??start.branch;
-  const source=parseSwitchTarget(data.sourceBranch)!;const inScope=(spec:string)=>{const t=parseSwitchTarget(spec)!;return t.repository===null||t.repository===start.repository&&t.server===start.server;};
-  if(!inScope(data.sourceBranch)||submitted.target!==undefined&&!inScope(submitted.target))return finish("failed","target_unverified","Qualified branch repository/server spelling differs from the observed workspace; alias equivalence is unverified. No target mutation permitted.");
-  if(submitted.target!==undefined){data.targetBranch=submitted.target;data.targetSource="explicit";}
-  else{
-   const {s,o,success}=await read("parent",buildCloseoutParentArgv(data.sourceBranch));if(!success)return finish("failed");
-   const lines=o.stdout!.split(/\r?\n/);if(lines.at(-1)==="")lines.pop();
-   if(!lines.length){s.admission="admitted";s.emptyParentResult=true;return finish("failed","observation_failed","Parent query returned no admitted matching branch; pass an explicit target.");}
-   if(lines.length!==1)return finish("failed","observation_failed","Parent leaf query is ambiguous or malformed; pass an explicit target.");
-   const f=lines[0].split("|"),expectedParent=source.branch.slice(0,source.branch.lastIndexOf("/"));
-   if(f.length!==2||f[0]!==source.branch||!parseSwitchTarget(f[0])||!f[1]||f[1]!==expectedParent||!parseSwitchTarget(f[1])||parseSwitchTarget(f[1])!.repository!==null)return finish("failed","observation_failed","Parent read did not admit one matching full branch and direct parent path; pass an explicit target.");
-   s.parentPath=f[1];s.admission="admitted";const target=source.repository===null?f[1]:`${f[1]}@${source.repository}@${source.server}`;
-   if(!parseSwitchTarget(target))return finish("failed","invalid_request","Derived target is outside the bounded branch admission; pass a bounded explicit target.");data.targetBranch=target;data.targetSource="parent-read";
-  }
-  if(source.branch===parseSwitchTarget(data.targetBranch!)!.branch)return finish("failed","invalid_request","Refusing a same-branch closeout within the admitted workspace scope.");
-  const cardLine=submitted.cardRef?.trim()?`\n\n${submitted.cardRef.trim()}`:"";data.checkinMessage=submitted.message?.trim()?submitted.message:`Merge ${data.sourceBranch} into ${data.targetBranch}${cardLine}`;
-  // Reuse child comment admission before any target mutation.
-  if(!checkinSafeComment(data.checkinMessage)||[data.checkinMessage,cwd].reduce((n,s)=>n+s.length,0)>16384||Buffer.byteLength(JSON.stringify([data.checkinMessage,cwd]),"utf8")>32768)return finish("failed","invalid_request","Derived checkin message is outside the existing child admission; supply an admitted explicit message before any target mutation.");
-  const before=await pending("pending-before");if(!before)return finish("failed");data.targetVerification=compareSwitchTarget(start,data.targetBranch!);
-  if(data.requested.preflight)return finish("preflight");
-  if(data.targetVerification==="unverified"&&before.totalPending>0)return finish("blocked","policy_blocked","Pending changes block switching under the unchanged cancel policy; no target mutation permitted.");
-  stage="switch";childEntered=true;const switched=await assembleSwitchReceipt({branch:data.targetBranch!,pendingChanges:"cancel",workdir:cwd});push({name:"switch",kind:"switch",result:switched});childEntered=false;if(!switched.ok)return finish("failed","child_failed");
-  if(!await loaded("loaded-after-switch",true))return finish("failed","target_unverified");
-  if(data.requested.updateTarget){stage="update";childEntered=true;const updated=await assembleUpdateReceipt({workdir:cwd});push({name:"update",kind:"update",result:updated});childEntered=false;if(!updated.ok)return finish("failed","child_failed");}
-  if(!await loaded("loaded-before-merge",true))return finish("failed","target_unverified");
-  stage="merge";childEntered=true;const merged=await assembleWorkspaceMergeReceipt("merge",{source:data.sourceBranch!,strategy:data.requested.strategy,workdir:cwd});push({name:"merge",kind:"merge",result:merged});childEntered=false;if(!merged.ok)return finish("failed","child_failed",`merge/${merged.error.code}: ${merged.error.message}`);
-  const copiedReady=merged.data.protocol==="apply-add-copied",mergedReady=merged.data.protocol==="merged-candidate";
-  const ready=await read("readiness",copiedReady||mergedReady?[...switchPendingArgv]:["status"]);
-  const owned = merged.data.assessment?.ownership?.complete === true;
-  const ownedPending=owned&&ready.success?observeWorkspacePending(ready.o.stdout!,cwd):undefined;
-  const mergedPending=mergedReady&&ready.success&&!owned?parseMergedPending(ready.o.stdout!,cwd):null;
-  if(!ready.success||ready.o.stderr!==""||!(owned?!!ownedPending&&ownedPending.issues.length===0&&ownedPending.rows.length>0&&ownedPending.rows.every(r=>r.mergeChangeset!==null):mergedReady?!!mergedPending:copiedReady?!!parseCopiedPending(ready.o.stdout!,cwd):admitCleanStandardStatus(ready.o.stdout!)))return finish("failed","observation_failed","Independent post-merge readiness is outside the admitted profile; no checkin permitted. Prior effects remain possible.");ready.s.admission="admitted";
-  // The independent machine snapshot is not readiness proof by itself: the next
-  // full status must still correlate its source link, namespace and resolved rows.
-  if(!await loaded("loaded-before-checkin",true,mergedPending,ownedPending))return finish("failed","target_unverified");
-  const checkinArgs={message:data.checkinMessage,includeAll:true,includePrivate:data.requested.includePrivate,workdir:cwd};
-  stage="checkin-preflight";childEntered=true;const preview=await assembleCheckinReceipt({...checkinArgs,preflight:true},merged.data.assessment?.ownership);push({name:"checkin-preflight",kind:"checkin",result:preview});childEntered=false;if(!preview.ok)return finish("failed","child_failed",`checkin-preflight/${preview.error.code}: ${preview.error.message}`);
-  stage="checkin";childEntered=true;const checked=await assembleCheckinReceipt(checkinArgs,merged.data.assessment?.ownership);push({name:"checkin",kind:"checkin",result:checked});childEntered=false;data.createdChangeset=checked.data.createdChangeset;if(!checked.ok)return finish("failed","child_failed",`checkin/${checked.error.code}: ${checked.error.message}`);
-  if(!await loaded("loaded-final",true))return finish("failed","target_unverified");
-  const final=(data.stages.at(-1)! as Extract<CloseoutStage,{kind:"read"}>).result.branch!;
-  if(!data.createdChangeset||data.createdChangeset.branch!==final.branch||data.createdChangeset.repository!==final.repository||data.createdChangeset.server!==final.server)return finish("failed","target_unverified","Observed changeset retained but its branch/repository/server spelling is not the final loaded target. No alias equivalence or target checkin proof inferred.");
-  const after=await pending("pending-final");if(!after)return finish("failed");data.pendingAfter=after;return finish("completed");
- }catch{if(childEntered){data.unobservedChild=stage as CloseoutData["unobservedChild"];data.unattemptedStages=data.unattemptedStages.filter(n=>n!==stage);}return finish("failed",stage==="input"?"invalid_request":"producer_failed",stage==="input"?"Use only declared bounded branch selectors, strict closeout controls and admitted checkin text.":"Closeout observation failed; prior effects remain possible. No compensation or automatic replay.");}
+export async function assembleCloseoutReceipt(input: unknown): Promise<CloseoutReceipt> {
+    const data: CloseoutData = { requested: null, workingDirectory: null, sourceBranch: null, targetBranch: null, plan: ["discover unresolved branches", "require clean initial workspace and merge state", "switch target if needed", "update target if requested", "merge once", "checkin once"], stages: [], createdChangeset: null, linkedChangesets: [], stoppedAt: null, effect: "not-attempted" };
+    const finish = (code?: string, message = "Closeout stopped; inspect earlier effects before any new operation.", blocked = false): CloseoutReceipt => {
+        const effects = data.stages.map(closeoutChildEffect);
+        data.effect = effects.includes("uncertain") ? "uncertain" : effects.includes("command-completed") ? "command-completed" : "not-attempted";
+        const captures = closeoutCaptures(data.stages);
+        const header = { schemaVersion: 2 as const, action: "merge-to-branch" as const, provenance: { source: "plastic" as const, producer: "@aefree/pi-plastic" as const, contentTrust: "external" as const }, completeness: { capture: !captures.length ? "unknown" as const : captures.every(c => c.complete) ? "complete" as const : "incomplete" as const, projection: captures.every(c => !c.truncated) }, data };
+        return code ? { ...header, ok: false, outcome: data.effect === "not-attempted" ? blocked ? "blocked" : "failed" : "uncertain", error: { code, stage: data.stoppedAt ?? "input", message } } : { ...header, ok: true, outcome: data.requested?.preflight ? "preflight" : "completed" };
+    };
+    if (!input || typeof input !== "object" || Array.isArray(input)) return finish("invalid_request");
+    const r = { ...input } as CloseoutRequest;
+    if (Object.keys(r).some(k => !["source", "target", "cardRef", "message", "strategy", "updateTarget", "includePrivate", "preflight", "format", "workdir"].includes(k)) || [r.source, r.target].some(s => s !== undefined && !parseSwitchTarget(s)) || r.message !== undefined && !checkinSafeComment(r.message) || [r.cardRef, r.workdir].some(s => s !== undefined && !safeNativeText(s)) || r.strategy !== undefined && !["auto", "source", "destination"].includes(r.strategy) || r.format !== undefined && !["text", "json"].includes(r.format) || [r.updateTarget, r.includePrivate, r.preflight].some(v => v !== undefined && typeof v !== "boolean") || Buffer.byteLength(JSON.stringify(r), "utf8") > 24576) return finish("invalid_request");
+    data.requested = r; data.workingDirectory = resolve(r.workdir ?? process.cwd()); data.sourceBranch = r.source ?? null; data.targetBranch = r.target ?? null;
+    if (r.preflight) return finish();
+    const read = async (name: CloseoutStageName, command: string[]) => {
+        data.stoppedAt = name;
+        const result: CloseoutRead = { ...emptyNativeData(), command, workingDirectory: data.workingDirectory, branch: null };
+        data.stages.push({ name, kind: "read", result }); await runNativeMutation(result);
+        if (nativeCommandCompleted(result) && !result.capture?.truncated && result.commandOutput?.stdout !== null) result.branch = parseSwitchLoadedBranch(result.commandOutput!.stdout!);
+        return result;
+    };
+    const readable = (r: CloseoutRead) => r.commandCompleted && !r.capture?.truncated && r.commandOutput?.stdout !== null;
+    const initial = await read("loaded-before", ["status"]);
+    if (!readable(initial) || !initial.branch) return finish("observation_failed", "Loaded branch observation is unavailable.");
+    if (!data.sourceBranch) data.sourceBranch = initial.branch.branch;
+    if (!data.targetBranch) {
+        const source = parseSwitchTarget(data.sourceBranch)!;
+        const parent = await read("parent", buildCloseoutParentArgv(data.sourceBranch));
+        const rows = parent.commandOutput?.stdout?.trimEnd().split(/\r?\n/), fields = rows?.[0]?.split("|");
+        if (!readable(parent) || rows?.length !== 1 || fields?.length !== 2 || fields[0] !== source.branch || fields[1] !== source.branch.slice(0, source.branch.lastIndexOf("/")) || !parseSwitchTarget(fields[1])) return finish("observation_failed", "Source parent is missing or ambiguous; pass an explicit target.");
+        data.targetBranch = source.repository === null ? fields[1] : `${fields[1]}@${source.repository}@${source.server}`;
+    }
+    if (parseSwitchTarget(data.sourceBranch)!.branch === parseSwitchTarget(data.targetBranch)!.branch) return finish("invalid_request", "Source and target branches must differ.");
+    const message = r.message?.trim() ? r.message : `Merge ${data.sourceBranch} into ${data.targetBranch}${r.cardRef?.trim() ? "\n\n" + r.cardRef.trim() : ""}`;
+    if (!checkinSafeComment(message)) return finish("invalid_request", "Derived comment exceeds input bounds; supply a comment.");
+    const pending = await read("pending-before", [...switchPendingArgv]);
+    const lines = pending.commandOutput?.stdout?.trimEnd().split(/\r?\n/) ?? [], h = lines[0]?.split("\x1f");
+    // Automatic checkin must not include preexisting work. Any pending record
+    // or non-header status is dirty, regardless of its status code or owner.
+    if (!readable(pending) || h?.length !== 4 || h[0] !== "STATUS" || !/^[0-9]+$/.test(h[1]) || !h[2] || !h[3]) return finish("observation_failed", "Complete initial pending inventory is unavailable.");
+    if (lines.length !== 1 || initial.commandOutput!.stdout!.split(/\r?\n/).slice(1).some(line => line.trim())) return finish("dirty_workspace", "Compound closeout requires a clean initial workspace and no pending merge state; use standalone operations for existing work.", true);
+    if (compareSwitchTarget(initial.branch, data.targetBranch) === "unverified") {
+        data.stoppedAt = "switch"; const result = { ...emptyNativeData(), command: ["switch", "--silent", "--noinput", data.targetBranch], workingDirectory: data.workingDirectory };
+        data.stages.push({ name: "switch", kind: "command", result }); await runNativeMutation(result);
+        if (!result.commandCompleted) return finish("child_failed");
+    }
+    const target = await read("loaded-target", ["status"]);
+    if (!readable(target) || !target.branch || compareSwitchTarget(target.branch, data.targetBranch) === "unverified") return finish("target_unverified");
+    if (r.updateTarget !== false) {
+        data.stoppedAt = "update"; const result = { ...emptyNativeData(), command: ["update", "--dontmerge", "--noinput"], workingDirectory: data.workingDirectory };
+        data.stages.push({ name: "update", kind: "command", result }); await runNativeMutation(result);
+        if (!result.commandCompleted) return finish("child_failed");
+        const loaded = await read("loaded-before-merge", ["status"]);
+        if (!readable(loaded) || !loaded.branch || compareSwitchTarget(loaded.branch, data.targetBranch) === "unverified") return finish("target_unverified");
+    }
+    data.stoppedAt = "merge";
+    const merged = await assembleWorkspaceMergeReceipt("merge", { source: data.sourceBranch, strategy: r.strategy ?? "auto", workdir: data.workingDirectory });
+    data.stages.push({ name: "merge", kind: "merge", result: merged });
+    if (!merged.ok) return finish("child_failed");
+    data.stoppedAt = "checkin";
+    const checked = await assembleCheckinReceipt({ message, includeAll: true, includePrivate: r.includePrivate ?? false, workdir: data.workingDirectory });
+    data.stages.push({ name: "checkin", kind: "checkin", result: checked }); data.createdChangeset = checked.data.createdChangeset; data.linkedChangesets = checked.data.linkedChangesets;
+    if (!checked.ok) return finish("child_failed");
+    // Final observation is informational, not a second native admission policy.
+    await read("loaded-final", ["status", "--header"]); data.stoppedAt = null;
+    return finish();
 }

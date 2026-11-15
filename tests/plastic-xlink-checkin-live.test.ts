@@ -27,7 +27,7 @@ try {
   assert.equal(checked.data.linkedChangesets.length, 1);
   const linked = checked.data.linkedChangesets[0];
   assert.equal(linked.repository, linkedRepository); assert.equal(linked.server, server);
-  assert.equal(checked.data.xlinkEffects, "unverified", "Emitted identity alone is not a verified linked effect.");
+  assert(checked.data.identityObservation.complete, "Identity observation is separate from independently verified effects below.");
   assert.equal(live.toolCommands.slice(start).filter(c => c.args[0] === "checkin").length, 1, "No applying retry.");
   const rootLog = parseLiveXml(live.native(["log", `cs:${checked.data.createdChangeset.id}`, "--xml"]).stdout);
   assert.equal(xmlTexts(rootLog, "Branch")[0], target);

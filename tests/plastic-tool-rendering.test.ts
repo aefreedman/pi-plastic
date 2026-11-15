@@ -160,7 +160,7 @@ try {
 
   const nativeReceipt = (action: string, outcome: string, data: object, ok = true) => ({ ...textResult("presentation only"), details: {}, structuredContent: { action, outcome, data, ok, ...(!ok ? {error:{message:"Do not retry automatically"}} : {}) } });
   assert.match(render("checkin", nativeReceipt("checkin", "completed", {createdChangeset:{id:"9007199254740997"},pendingAfter:null,steps:[{name:"private-add",effect:"command-completed"},{name:"private-retry",effect:"changeset-created"}],omittedReferences:3})), /Checkin: completed.*9007199254740997[\s\S]*3 references omitted/);
-  assert.match(render("checkin", nativeReceipt("checkin", "uncertain", {steps:[{name:"private-add",effect:"command-completed"}],pendingAfter:null}, false), false, {isError:true}), /Checkin: uncertain[\s\S]*Do not retry automatically[\s\S]*private-add: command-completed/);
+  assert.match(render("checkin", nativeReceipt("checkin", "uncertain", {commandCompleted:false,linkedChangesets:[],identityObservation:{complete:false}}, false), false, {isError:true}), /Checkin: uncertain[\s\S]*Do not retry automatically[\s\S]*Native command completed: false/);
   assert.match(render("branchCreate", nativeReceipt("branch-create", "command-completed", {observedCreatedIdentity:null})), /Branch create: command-completed[\s\S]*Created identity and repository effects unverified/);
   assert.match(render("checkin", nativeReceipt("checkin", "preflight", {wouldRun:true})), /Preview: would run/);
 

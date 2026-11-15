@@ -4,7 +4,7 @@ export { update, add, undo, resolveDeleteChangeConflict, workspaceCreate, worksp
 export { branchCreate, currentBranch, branchList, branchExists, branchDelete, __plasticBranchInternals } from "./operations/branches";
 export { shelvesetCreate, shelvesetApply, shelvesetDelete, shelvesetList } from "./operations/shelvesets";
 export { codeReviewCreate, codeReviewUpdate, codeReviewDelete, codeReviewFind } from "./operations/reviews";
-export { checkin, __plasticCheckinInternals } from "./operations/checkin";
+export { checkin } from "./operations/checkin";
 export { switchBranch, __plasticSwitchInternals } from "./operations/switch";
 export { __plasticPatchInternals, patch } from "./operations/patch";
 export { __plasticDiffInternals, diff } from "./operations/diff";

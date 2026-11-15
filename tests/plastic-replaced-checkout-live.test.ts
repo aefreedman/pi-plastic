@@ -43,11 +43,11 @@ try {
   const previewStart = live.toolCommands.length;
   const preview = await live.tool("plastic_checkin", { message: "pi-plastic replaced-checkout preview", paths: [file], preflight: true });
   assert.equal(preview.outcome, "preflight");
-  assert(preview.data.assessment.ready);
+  assert.equal(live.toolCommands.length, previewStart, "Preflight dispatches zero commands.");
   assert(!live.toolCommands.slice(previewStart).some(command => command.args[0] === "checkin"));
   const applyStart = live.toolCommands.length;
   const receipt = await live.tool("plastic_checkin", { message: "pi-plastic replaced-checkout regression", paths: [file] });
-  assert.equal(receipt.outcome, "completed");
+  assert.equal(receipt.outcome, "command-completed");
   assert(receipt.data.createdChangeset?.id);
   assert.equal(live.toolCommands.slice(applyStart).filter(command => command.args[0] === "checkin").length, 1);
   assert.equal(readFileSync(file, "utf8"), baselineBytes);

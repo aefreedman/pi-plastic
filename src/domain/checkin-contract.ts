@@ -1,32 +1,17 @@
-import { receiptAbsolutePath } from "./receipt-paths";
-import type { MarkerGate } from "./marker-gate";
-import { parseMergedPending } from "./merged-workspace";
-import { parseMachineReadablePendingItems, type PendingItem } from "./pending";
-import type { WorkspaceAssessment, WorkspaceIssue } from "./workspace-observation";
-import { observeWorkspacePending } from "./workspace-observation";
+import type { NativeHeader, NativeOutcome, NativeCommandData } from "./native-mutation";
 export type CheckinRequest = { message: string; paths?: string[]; applyChanged?: boolean; includePrivate?: boolean; includeAll?: boolean; updateAfter?: boolean; preflight?: boolean; format?: "text" | "json"; workdir?: string };
-import type { CheckinAttempt, CheckinCapture } from "../execution/checkin-command";
-export type { CheckinAttempt, CheckinCapture } from "../execution/checkin-command";
 export type CheckinEmission = { id: string; branch: string; repository: string; server: string; mount: string };
 export type CheckinChangeset = CheckinEmission & { mount: "/" };
-export type CheckinSummary = { totalPending: number; tracked: number; private: number; added: number; changed: number; moved: number; deleted: number; other: number };
-export type CheckinStep = { name: "pending-before" | "initial-checkin" | "private-add" | "private-retry" | "pending-recovery" | "fallback-checkin" | "pending-after" | "merge-diagnostic" | "merge-readiness"; operation: "status" | "checkin" | "add"; attempt: CheckinAttempt; capture: CheckinCapture; effect: "not-attempted" | "uncertain" | "command-completed" | "changeset-created" | "read-observed"; evidence: "unadmitted" | "admitted"; records: number; summary: CheckinSummary | null; changeset: CheckinChangeset | null };
-export type CheckinItemEvent = { operation: "CO" | "AD" | "DE" | "CP" | "RP"; path: string } | { operation: "MV"; sourcePath: string; path: string };
-export type CheckinData = {
-    linkedChangesets?: CheckinEmission[]; assessment?: WorkspaceAssessment; postObservationIssues?: { stage: "pending-recovery" | "pending-after"; issues: WorkspaceIssue[] }; markers: MarkerGate | null; sourceAdmission: "validated-cm-output"; requestedPaths: string[]; includedPaths: string[]; fallbackPaths: string[]; excludedPaths: Array<{ path: string; reason: string }>; privateAddPaths: string[]; blockedPrivatePaths: Array<{ path: string; reason: string }>; itemEvents: CheckinItemEvent[]; observedChangesets: CheckinChangeset[]; command: string[] | null; steps: CheckinStep[]; autoEnabledApplyChanged: boolean; usedFallbackRetry: boolean; usedPrivateAutoAddRecovery: boolean; pendingBefore: CheckinSummary | null; pendingAfter: CheckinSummary | null; wouldRun: boolean; omittedReferences: number; scopeExhaustion: "unverified"; branchHead: "unverified"; serverAliasEquivalence: "unverified"; xlinkEffects: "unverified"; mergeLinkIdentity: "unverified" };
-type Base = { schemaVersion: 1; action: "checkin"; provenance: { source: "plastic"; producer: "@aefree/pi-plastic"; contentTrust: "external" }; completeness: { capture: "complete" | "incomplete" | "unknown"; projection: boolean } };
-export type CheckinReceipt = Base & (
-    { ok: true; outcome: "completed"; data: CheckinData & { effect: "changeset-created"; createdChangeset: CheckinChangeset } } |
-    { ok: true; outcome: "preflight"; data: CheckinData & { effect: "not-attempted"; createdChangeset: null } } |
-    { ok: false; outcome: "failed" | "unsupported" | "uncertain"; data: CheckinData & { effect: "not-attempted" | "uncertain" | "command-completed" | "changeset-created"; createdChangeset: CheckinChangeset | null }; error: { code: string; stage: "input" | "pending" | "checkin" | "producer"; message: string } }
-);
+export type CheckinSeparators = { start: string; end: string; field: string };
+export type IdentityObservation = { complete: boolean; omitted: number; malformed: boolean; ambiguousRoot: boolean };
+export type CheckinData = NativeCommandData & { requested: CheckinRequest | null; createdChangeset: CheckinChangeset | null; linkedChangesets: CheckinEmission[]; observedChangesets: CheckinEmission[]; identityObservation: IdentityObservation };
+export type CheckinReceipt = NativeHeader & NativeOutcome & { action: "checkin"; data: CheckinData };
 export const checkinUnsafeText = /[\u0000-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 export const checkinSafeValue = (s: unknown): s is string => typeof s === "string" && s.length > 0 && s.length <= 4096 && !checkinUnsafeText.test(s);
 // Comments alone admit CR/LF; all other controls, bounds and surrogate rules stay unchanged.
 export const checkinSafeComment = (s: unknown): s is string => typeof s === "string" && s.length > 0 && s.length <= 4096 && !checkinUnsafeText.test(s.replace(/[\r\n]/g, " "));
 // Loss-marker rejection is a conservative admission policy, not proof of original Unicode fidelity.
 const identity = (s: string) => checkinSafeValue(s) && s === s.trim() && !/[?\uFFFD]/.test(s);
-const absolute = (s: string) => identity(s) && receiptAbsolutePath(s);
 export const checkinDecimal = /^(0|[1-9][0-9]{0,19})$/;
 export function parseCheckinEmission(payload: string): CheckinEmission | null {
     const m = /^cs:(0|[1-9][0-9]{0,19})@br:(\/[^@]+)@([^@]+)@([^@]+(?:@(cloud|unity))?) \(mount:'([^']+)'\)$/.exec(payload);
@@ -39,43 +24,54 @@ export function parseCheckinChangeset(payload: string): CheckinChangeset | null 
     const emission = parseCheckinEmission(payload);
     return emission?.mount === "/" ? { ...emission, mount: "/" } : null;
 }
-export type CheckinSeparators = { start: string; end: string; field: string };
-export function parseCheckinEvidence(text: string, s: CheckinSeparators) {
-    const changesets: CheckinChangeset[] = [], linkedChangesets: CheckinEmission[] = [], events: CheckinItemEvent[] = [];
-    let changesetRecords = 0;
-    if (Buffer.byteLength(text, "utf8") > 65536) return { admitted: false, records: 501, changesets, linkedChangesets, events };
-    const lines = text.split(/\r?\n/); if (lines.at(-1) === "") lines.pop();
-    let malformed = !lines.length || lines.length > 500, started = 0;
-    for (const [index, line] of lines.entries()) {
-        if (!line.startsWith(s.start) || !line.endsWith(s.end)) { malformed = true; continue; }
-        const fields = line.slice(s.start.length, -s.end.length).split(s.field), [op, value] = fields;
-        if (op === "CI_START" && fields.length === 1) { started++; if (index !== 0) malformed = true; }
-        else if (op === "STAGE" && fields.length === 2 && value.length <= 4096 && !checkinUnsafeText.test(value)) { if (changesets.length) malformed = true; }
-        else if ((op === "CO" || op === "AD" || op === "DE" || op === "CP" || op === "RP") && fields.length === 2 && absolute(value)) { events.push({ operation: op, path: value }); if (changesets.length) malformed = true; }
-        else if (op === "MV" && fields.length === 3 && absolute(value) && absolute(fields[2])) { events.push({ operation: "MV", sourcePath: value, path: fields[2] }); if (changesets.length) malformed = true; }
-        else if (op === "CHANGESET" && fields.length === 2) {
-            changesetRecords++;
-            // Current CM emits one comma-separated list in a single framed field.
-            const payloads = value.split(/(?<='\)),(?=cs:)/);
-            const mounts = new Set<string>();
-            if (payloads.length > 16) { malformed = true; continue; }
-            for (const payload of payloads) {
-                const cs = parseCheckinEmission(payload);
-                if (!cs || mounts.has(cs.mount.toLowerCase())) { malformed = true; continue; }
-                mounts.add(cs.mount.toLowerCase());
-                if (cs.mount === "/") changesets.push({ ...cs, mount: "/" }); else linkedChangesets.push(cs);
-            }
-            if (changesets.length !== 1) malformed = true;
+
+/** Observe identities independently of progress grammar and command outcome.
+ * Memory is bounded by retained identity bytes and one incomplete frame, never
+ * by the number of files that Plastic may check in. */
+export function checkinIdentityCollector(s: CheckinSeparators) {
+    const observed: CheckinEmission[] = []; let buffer = "", discarding = false, malformed = false, omitted = 0, retainedBytes = 0;
+    const accept = (frame: string) => {
+        const fields = frame.split(s.field);
+        if (fields[0] !== "CHANGESET") return;
+        if (fields.length !== 2) { malformed = true; return; }
+        for (const payload of fields[1].split(/(?<='\)),(?=cs:)/)) {
+            const emission = parseCheckinEmission(payload);
+            if (!emission) { malformed = true; continue; }
+            const bytes = Buffer.byteLength(JSON.stringify(emission), "utf8");
+            if (retainedBytes + bytes > (emission.mount === "/" ? 32768 : 16384)) { omitted++; continue; }
+            observed.push(emission); retainedBytes += bytes;
         }
-        else malformed = true;
-    }
-    if (started !== 1 || changesets.length > 1 || changesetRecords > 1) malformed = true;
-    return { admitted: !malformed, records: Math.min(lines.length, 501), changesets, linkedChangesets, events };
+    };
+    const feed = (chunk: string) => {
+        // Process bounded slices even when a stream yields a very large chunk.
+        for (let offset = 0; offset < chunk.length; offset += 4096) {
+            buffer += chunk.slice(offset, offset + 4096);
+            while (true) {
+                if (discarding) {
+                    const end = buffer.indexOf(s.end);
+                    if (end < 0) { buffer = buffer.slice(-s.end.length); break; }
+                    buffer = buffer.slice(end + s.end.length); discarding = false;
+                }
+                const start = buffer.indexOf(s.start);
+                if (start < 0) { buffer = buffer.slice(-s.start.length); break; }
+                if (start) buffer = buffer.slice(start);
+                const end = buffer.indexOf(s.end, s.start.length);
+                if (end >= 0) { if (end > 65536) malformed = true; else accept(buffer.slice(s.start.length, end)); buffer = buffer.slice(end + s.end.length); continue; }
+                if (buffer.length > 65536) { malformed = true; discarding = true; buffer = buffer.slice(-s.end.length); }
+                break;
+            }
+        }
+    };
+    const result = (transportComplete = true) => {
+        const roots = observed.filter((c): c is CheckinChangeset => c.mount === "/");
+        const ambiguousRoot = roots.length > 1 || new Set(observed.map(c => c.mount)).size !== observed.length;
+        const incomplete = malformed || discarding || buffer.startsWith(s.start) || omitted > 0 || ambiguousRoot;
+        return { observedChangesets: observed, changesets: roots, linkedChangesets: observed.filter(c => c.mount !== "/"), identityObservation: { complete: transportComplete && !incomplete && observed.length > 0, omitted, malformed: malformed || discarding || buffer.startsWith(s.start), ambiguousRoot } };
+    };
+    return { feed, result };
 }
-export function parseCheckinPending(text: string, cwd: string) {
-    const observation = observeWorkspacePending(text, cwd);
-    const items = observation.issues.length ? [] : parseMachineReadablePendingItems(text, observation.cwd).map(item => ({ ...item, kind: item.statusCode === "CP" ? "added" as const : item.kind }));
-    const merged = parseMergedPending(text, observation.cwd) ?? undefined;
-    return { admitted: observation.issues.length === 0 && items.length === observation.rows.length, records: observation.records, items,
-        repository: observation.repository, server: observation.server, merged, observation };
+export function parseCheckinEvidence(text: string, separators: CheckinSeparators) {
+    const collector = checkinIdentityCollector(separators); collector.feed(text);
+    const result = collector.result();
+    return { ...result, admitted: result.identityObservation.complete, records: text.split(/\r?\n/).filter(Boolean).length };
 }

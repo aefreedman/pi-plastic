@@ -1,276 +1,32 @@
-import { syntheticClearMarkerRead } from "./synthetic-marker-read";
-import assert from "node:assert/strict";
-import { EventEmitter } from "node:events";
-import { PassThrough } from "node:stream";
 import { readFileSync } from "node:fs";
-import { Check } from "typebox/value";
-import { loadRegisteredTools } from "./pi-tool-harness";
-import { runWithAbortSignal } from "../src/execution/context";
-import { captureCheckinCommand } from "../src/execution/checkin-command";
+import assert from "node:assert/strict";
+import { executeCheckinOutput, validateCheckinOutput } from "../src/pi/checkin-output";
 import { checkin } from "../src/operations/checkin";
-import { assembleCheckinReceipt } from "../src/operations/checkin-receipt";
-import { checkinOutputSchema, executeCheckinOutput, validateCheckinOutput } from "../src/pi/checkin-output";
-import { parseCheckinEvidence, parseCheckinPending, parseCheckinChangeset, checkinSafeComment, checkinSafeValue } from "../src/domain/checkin-contract";
-const us = "\x1f", cwd = "C:\\Example\\workspace", name = "résumé-é-日本-😀.txt", path = cwd + "\\" + name;
-const header = ["STATUS", "9007199254740993", "Example Repository", "example@unity"].join(us) + "\r\n";
-const row = (code = "CH", file = path) => [code, file, "False", code === "PR" || code === "AD" ? "-1" : "9007199254740995", "NO_MERGES"].join(us) + "\r\n";
-const checkedOutRow = (file = path) => ["CO", file, "False", "-1", "NO_MERGES"].join(us) + "\r\n";
-const payload = "cs:9007199254740997@br:/main/café-é-日本-😀@Example Repository@example@unity (mount:'/')";
-const input = { message: "Fixture résumé é 日本語 😀", workdir: cwd, paths: [name] };
-type Scenario = { fullStatus?: string; mode?: string; native?: string; private?: boolean; recoveryFail?: boolean; afterFail?: boolean; afterMalformed?: boolean; addFail?: boolean; retryFail?: boolean; fallback?: boolean; pending?: string; preabort?: boolean; launch?: "sync" | "async"; lateError?: boolean; decoded?: boolean; abort?: boolean; timeout?: boolean; ignoreTerm?: boolean; code?: number | null; signal?: string; stderr?: string; scopeMany?: boolean; noSpawn?: boolean; streamError?: boolean; payload?: string };
-async function invoke(scenario: Scenario = {}, args: any = input, core = false, registered?: any) {
-    const calls: string[][] = [], children: any[] = [], timers = new Set<any>(), controller = new AbortController();
-    let reads = 0, checkins = 0;
-    if (scenario.preabort) controller.abort();
-    const deps = { spawn: ((_: string, argv: string[], options: any) => {
-        const markerRead=syntheticClearMarkerRead(argv);if(markerRead)return markerRead;calls.push(argv); assert.equal(options.cwd, cwd); assert.equal(options.shell, false);
-        if (argv[0] === "checkin" && scenario.launch === "sync") throw Error("PRIVATE_PATH");
-        const c = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), kill(signal: string) { if (scenario.ignoreTerm && signal === "SIGTERM") return true; queueMicrotask(() => { c.stdout.end(); c.stderr.end(); c.emit("close", null, signal); }); return true; } }); children.push(c);
-        if (scenario.decoded && argv[0] === "checkin") c.stdout.setEncoding("utf8");
-        queueMicrotask(() => {
-            if (argv[0] === "checkin" && scenario.launch === "async") { c.emit("error", Object.assign(Error("PRIVATE_PATH"), { code: "ENOENT" })); return; }
-            if (!(argv[0] === "checkin" && scenario.noSpawn)) c.emit("spawn");
-            let out = "", err = "", code: number | null = 0;
-            if (argv[0] === "status") {
-                if (!argv.includes("--machinereadable")) {
-                    out = scenario.fullStatus ?? `/main/café-é-日本-😀@Example Repository@example@unity (cs:9007199254740993 - head)\r\n\r\n`;
-                } else {
-                reads++; out = header;
-                if (reads === 1) out += scenario.pending ?? (scenario.private ? row("PR") : scenario.fallback ? row("LD") : row());
-                if (reads > 1 && scenario.afterMalformed) out = "FUTURE_PENDING_HEADER\r\n";
-                if (reads > 1 && (scenario.recoveryFail || scenario.afterFail)) { err = "PRIVATE_PATH read failure"; code = 1; }
-                }
-            } else if (argv[0] === "add") { out = "PRIVATE_PATH native add output"; if (scenario.addFail) code = 1; }
-            else {
-                checkins++;
-                const sep = (k: string) => argv.find(a => a.startsWith(k + "="))!.slice(k.length + 1);
-                const record = (op: string, values: string[] = []) => sep("--startlineseparator") + [op, ...values].join(sep("--fieldseparator")) + sep("--endlineseparator") + "\r\n";
-                out = record("CI_START") + record("STAGE", [""]);
-                const failing = scenario.native && checkins === 1 || scenario.retryFail && checkins === 2 || scenario.fallback && checkins === 1;
-                if (failing) { err = scenario.fallback ? "is not changed in current workspace" : scenario.native ?? "No changes in the workspace"; code = 1; }
-                else out += record("CO", [path]) + record("CHANGESET", [scenario.payload ?? payload]);
-                switch (scenario.mode) {
-                    case "empty": out = ""; break;
-                    case "bom": out = "\uFEFF" + out; break;
-                    case "unknown": out += record("OTHER", ["unexpected"]); break;
-                    case "extra": out += record("AD", [path, "extra"]); break;
-                    case "duplicate": out += record("CHANGESET", [payload]); break;
-                    case "mount": out = record("CI_START") + record("CHANGESET", [payload.replace("mount:'/'", "mount:'/other'")]); break;
-                    case "repository": out = record("CI_START") + record("CHANGESET", [payload.replace("Example Repository", "Other")]); break;
-                    case "bare": out = record("CI_START") + record("CHANGESET", [payload.replace("@br:", "@")]); break;
-                    case "tail": out += "unframed"; break;
-                    case "overflow": out = "x".repeat(65537); break;
-                    case "stderrOverflow": err = "x".repeat(16385); break;
-                    case "records": out = record("CI_START") + Array.from({ length: 501 }, () => record("STAGE", [""])).join(""); break;
-                    case "projection": out = record("CI_START") + Array.from({ length: 101 }, (_, i) => record("AD", [cwd + "\\" + i + "-" + name])).join("") + record("CHANGESET", [scenario.payload ?? payload]); break;
-                    case "mv": out = record("CI_START") + record("DE", [path]) + record("MV", [path, cwd + "\\new-" + name]) + record("CHANGESET", [payload]); break;
-                }
-                if (scenario.stderr) err = scenario.stderr;
-                if (scenario.code !== undefined) code = scenario.code;
-                if (scenario.mode === "invalidUtf8") c.stdout.write(Buffer.from([255]));
-                else { const b = Buffer.from(out); for (let i = 0; i < b.length; i += 3) c.stdout.write(b.subarray(i, i + 3)); }
-                if (scenario.lateError) c.emit("error", Error("PRIVATE_PATH process failure"));
-                if (scenario.streamError) c.stdout.emit("error", Error("PRIVATE_PATH stream failure"));
-                if (scenario.abort) controller.abort();
-                if (scenario.timeout) return;
-                c.stdout.end(); c.stderr.end(err); c.emit("close", code, scenario.signal ?? null); return;
-            }
-            c.stdout.end(out); c.stderr.end(err); c.emit("close", code, null);
-        }); return c;
-    }) as any, setTimeout: ((cb: () => void, delay: number) => { const t = setTimeout(cb, delay); timers.add(t); if (scenario.timeout && calls.at(-1)?.[0] === "checkin" && (delay === 30000 || scenario.ignoreTerm && delay === 5000)) queueMicrotask(cb); return t; }) as any, clearTimeout: ((t: any) => { clearTimeout(t); timers.delete(t); }) as any };
-    const result = await runWithAbortSignal(controller.signal, () => registered ? registered.execute("fixture", args) : core ? checkin.execute(args) : executeCheckinOutput(args), deps);
-    if (core) return { result, calls, dto: null as any };
-    const r = result as Awaited<ReturnType<typeof executeCheckinOutput>>, dto = r.structuredContent;
-    assert(Check(checkinOutputSchema, dto)); assert(validateCheckinOutput(dto)); assert.equal(r.isError, !dto.ok); assert.deepEqual(r.details, {});
-    assert.doesNotMatch(JSON.stringify(dto), /PRIVATE_PATH/); assert(Buffer.byteLength(r.content[0].text, "utf8") <= 24000); assert(Buffer.byteLength(JSON.stringify(dto)) <= 131072);
-    assert.equal(timers.size, 0);
-    for (const c of children) { for (const e of ["spawn", "close", "error"]) assert(c.listenerCount(e) === 0 || e === "error" && c.listeners(e).length === 1 && c.listeners(e)[0].name === "ignoreRetiredError"); for (const stream of [c.stdout, c.stderr]) for (const e of ["data", "end", "error", "close"]) assert(stream.listenerCount(e) === 0 || e === "error" && stream.listeners(e).length === 1 && stream.listeners(e)[0].name === "ignoreRetiredError"); }
-    return { result, calls, dto };
+import { checkinIdentityCollector, parseCheckinEvidence } from "../src/domain/checkin-contract";
+import { nativeFixture, cwd } from "./native-adapter-fixture";
+for (const options of [{}, { stderr: "native warning" }, { prefix: "x".repeat(100000) + "😀\n" }, { unknownOutput: true }, { invalidIdentity: true }, { malformedAfter: true }, { checkinCode: 1 }, { streamFailure: true }]) {
+    const fixture = nativeFixture(options), result = await fixture.run(() => executeCheckinOutput({ message: "exact comment\nsecond line", paths: ["selected.txt", "selected.txt"], includeAll: true, includePrivate: true, workdir: cwd }));
+    assert(validateCheckinOutput(result.structuredContent)); const dto = result.structuredContent;
+    assert.equal(dto.schemaVersion, 2); assert.equal(dto.ok, !options.checkinCode && !options.streamFailure);
+    assert.equal(fixture.calls.length, 1); assert.equal(fixture.calls[0][0], "checkin"); if (!options.streamFailure) assert.equal(fixture.kills.length, 0);
+    assert.deepEqual(fixture.calls[0].slice(0, 6), ["checkin", "-c=exact comment\nsecond line", "--all", "--private", "selected.txt", "selected.txt"]);
+    assert(!fixture.calls[0].includes("--applychanged"));
+    if (!options.unknownOutput && !options.invalidIdentity) assert.equal(dto.data.createdChangeset?.id, "9007199254740997", "Valid identity survives later parse/native failure");
+    else { assert.equal(dto.data.createdChangeset, null); assert.equal(dto.data.identityObservation.complete, false); }
+    if (options.prefix) { assert(dto.data.capture?.truncated); assert(dto.data.capture.complete); assert(dto.data.identityObservation.complete); assert.equal(dto.completeness.projection, false); }
+    const forged = structuredClone(dto); forged.data.commandCompleted = !forged.data.commandCompleted; assert(!validateCheckinOutput(forged));
 }
-{
-let r = await invoke(); assert(r.dto.ok); assert.equal(r.dto.data.createdChangeset.id, "9007199254740997"); assert.equal(r.dto.data.createdChangeset.branch, "/main/café-é-日本-😀"); assert.equal(r.dto.data.createdChangeset.server, "example@unity"); assert.equal(r.calls.length, 3);
-const linked = "cs:17@br:/main/linked@Linked Repository@example@unity (mount:'/linked')";
-r = await invoke({ pending: checkedOutRow(), payload: linked + "," + payload });
-assert(r.dto.ok); assert.equal(r.dto.data.createdChangeset.mount, "/");
-assert.equal(r.dto.data.linkedChangesets[0].mount, "/linked"); assert.equal(r.dto.data.xlinkEffects, "unverified");
-assert.match(r.result.content[0].text, /Linked changeset emissions: 1/);
-for (const bad of [linked + "," + payload + "," + payload, linked + "," + linked + "," + payload, linked.replace("/linked'", "/../escape'") + "," + payload, linked + "," + payload + ",garbage", linked, linked + "," + payload.replace("Example Repository", "Foreign Repository")]) {
-    r = await invoke({ pending: checkedOutRow(), payload: bad }); assert(!r.dto.ok); assert.equal(r.dto.data.createdChangeset, null); assert.equal(r.calls.filter(c => c[0] === "checkin").length, 1);
+const preview = nativeFixture(); const p = await preview.run(() => executeCheckinOutput({ message: "preview", paths: Array.from({ length: 130 }, (_, i) => `file-${i}`), preflight: true }));
+assert(p.structuredContent.ok); assert.equal(preview.calls.length, 0); assert.equal(p.structuredContent.data.requested?.paths?.length, 130);
+for (const input of [{message:"bad",paths:["--all"]},{message:"bad",updateAfter:true},{message:""},{message:"bad",extra:true},{message:"bad",paths:["-"]}]) { const f=nativeFixture();const r=await f.run(()=>executeCheckinOutput(input));assert(!r.structuredContent.ok);assert.equal(f.calls.length,0); }
+const core=nativeFixture({checkinCode:1});await assert.rejects(()=>core.run(()=>checkin.execute({message:"native refusal"})));assert.equal(core.calls.length,1);
+const s={start:"__S__",end:"__E__",field:"__F__"};const list=Array.from({length:40},(_,i)=>`cs:${i}@br:/main@Repo${i}@example@unity (mount:'/mount${i}')`).join(",")+",cs:99@br:/main@Root@example@unity (mount:'/')";
+const parsed=parseCheckinEvidence(s.start+"CHANGESET"+s.field+list+s.end+"\n",s);assert(parsed.admitted);assert.equal(parsed.linkedChangesets.length,40);
+const collector=checkinIdentityCollector(s);collector.feed(s.start+"CHANGESET"+s.field+"x".repeat(70000)+s.end);assert.equal(collector.result().identityObservation.complete,false);
+console.log("PASS: v2 one-shot exact checkin, native refusals, identities after large output, chunked UTF8, no hidden recovery, pure preview, arbitrary counts projected not gated");
+
+for (const name of ["plastic-checkin-source.json", "plastic-checkin-xlink-source.json"]) {
+    const fixture=JSON.parse(readFileSync(new URL("./fixtures/"+name,import.meta.url),"utf8"));
+    const parsed=parseCheckinEvidence(fixture.created,fixture.separators);
+    assert(parsed.identityObservation.complete);assert.equal(parsed.changesets.length,1);
 }
-for (const scenario of [{code: 1}, {abort: true}, {mode: "overflow"}, {timeout: true}]) {
-    r = await invoke({ ...scenario, pending: checkedOutRow(), payload: linked + "," + payload }); assert(!r.dto.ok); assert.equal(r.dto.data.createdChangeset, null); assert.equal(r.calls.filter(c => c[0] === "checkin").length, 1);
-}
-r = await invoke({pending: checkedOutRow(), payload: linked + "," + payload});
-const projectedLinked = await invoke({mode: "projection", pending: checkedOutRow(), payload: linked + "," + payload});
-assert(projectedLinked.dto.ok); assert.equal(projectedLinked.dto.data.linkedChangesets.length, 0); assert(projectedLinked.dto.data.omittedReferences > 0); assert(projectedLinked.dto.data.createdChangeset);
-const wrongBranch = await invoke({pending: checkedOutRow(), payload: linked + "," + payload.replace("/main/café-é-日本-😀", "/main/foreign")});
-assert(!wrongBranch.dto.ok); assert.equal(wrongBranch.dto.data.createdChangeset, null);
-const unobservedBranch = await invoke({payload: linked + "," + payload}); assert(!unobservedBranch.dto.ok);
-const badMount = structuredClone(r.dto); badMount.data.linkedChangesets[0].mount = "/"; assert(!validateCheckinOutput(badMount));
-const duplicateMount = structuredClone(r.dto); duplicateMount.data.linkedChangesets.push(duplicateMount.data.linkedChangesets[0]); assert(!validateCheckinOutput(duplicateMount));
-const registered = (await loadRegisteredTools()).get("plastic_checkin")!;
-for (const newline of ["\n", "\r\n", "\r"]) {
-    const message = `  Fixture 😀${newline}Details${newline}  `;
-    for (const tool of [undefined, registered]) {
-        r = await invoke({}, { ...input, message }, false, tool);
-        assert(r.dto.ok);
-        assert.deepEqual(r.calls.find(c => c[0] === "checkin")!.filter(a => a.startsWith("-c=")), [`-c=${message}`]);
-        assert.equal(r.dto.data.command[2], `-c=${message}`);
-    }
-}
-for (const control of ["\0", "\t", "\x1f", "\x7f", "\x85"]) {
-    r = await invoke({}, { ...input, message: `Fixture\n${control}Details` }, false, registered);
-    assert.equal(r.calls.length, 0); assert.equal(r.dto.error.code, "invalid_request");
-}
-for (const newline of ["\n", "\r\n"]) {
-    for (const args of [{ ...input, paths: [`file${newline}other`] }, { ...input, workdir: `${cwd}${newline}other` }]) {
-        r = await invoke({}, args); assert.equal(r.calls.length, 0); assert.equal(r.dto.error.code, "invalid_request");
-    }
-}
-for (const format of ["text", "json"]) { r = await invoke({}, { ...input, preflight: true, format }); assert.equal(r.dto.outcome, "preflight"); assert.equal(r.calls.length, 1); }
-r = await invoke({}, { ...input, updateAfter: true, preflight: true }); assert.equal(r.calls.length, 0); assert.equal(r.dto.error.code, "UNATTENDED_UPDATE_AFTER_BLOCKED");
-for (const args of [{ ...input, message: "x".repeat(4097) }, { ...input, message: "bad\uD800" }, { ...input, paths: Array(101).fill("x") }, { ...input, paths: Array(10).fill("x".repeat(4096)) }, { ...input, paths: ["--private"] }, { ...input, paths: ["-"] }, { ...input, includePrivate: "true" }]) { r = await invoke({}, args); assert.equal(r.calls.length, 0); assert.equal(r.dto.outcome, "failed"); }
-for (const pending of ["", "UNKNOWN", row(), row("CO"), row("CH").replace("NO_MERGES", "other"), row("CH").replace(path, path + "?"), row("CH").replace(path, path + "\uFFFD"), row("CH").replace("9007199254740995", "1.5"), row("CH").replace("False", "False\x1fEXTRA")]) { r = await invoke({ pending: pending === "" ? "" : pending }); if (pending === "") assert.equal(r.dto.error.code, "NO_PENDING_PATHS"); else if (pending === row()) assert(r.dto.ok); else assert.equal(r.dto.outcome, "unsupported"); }
-for (const s of [{ mode: "empty" }, { mode: "bom" }, { noSpawn: true }, { streamError: true }, { mode: "unknown" }, { mode: "extra" }, { mode: "duplicate" }, { mode: "mount" }, { mode: "repository" }, { mode: "bare" }, { mode: "tail" }, { mode: "overflow" }, { mode: "stderrOverflow" }, { mode: "records" }, { mode: "invalidUtf8" }, { code: null }, { signal: "SIGTERM" }, { lateError: true }, { decoded: true }, { abort: true }, { timeout: true }, { timeout: true, ignoreTerm: true }, { stderr: "PRIVATE_PATH diagnostic" }, { code: 1 }] as Scenario[]) { r = await invoke(s); assert.equal(r.dto.outcome, "uncertain"); assert.equal(r.calls.filter(c => c[0] === "checkin").length, 1); assert.equal(r.dto.data.createdChangeset, null); }
-for (const launch of ["sync", "async"] as const) { r = await invoke({ launch }); assert.equal(r.dto.data.effect, "not-attempted"); assert.equal(r.dto.data.steps[1].attempt.state, "not-started"); }
-// Identity/path words are not merge-state markers. These full-status shapes
-// are synthetic regressions, not additional producer captures.
-const ordinaryBranch="/main/conflict-fix",ordinaryFile="ConflictResolver.cs";
-const ordinaryHeader=`${ordinaryBranch}@Example Repository@example@unity (cs:9007199254740993 - head)\r\n`;
-const ordinaryFull=ordinaryHeader+`\r\nChanged\r\n    Status                        Size        Last Modified    Path\r\n    Checked-out (changed)    12 bytes    Just now    ${ordinaryFile}\r\n`;
-for(const preflight of [false,true]){
-    r=await invoke({pending:checkedOutRow(cwd+"\\"+ordinaryFile),fullStatus:ordinaryFull,payload:payload.replace("/main/café-é-日本-😀",ordinaryBranch)},{message:"Ordinary checkout",workdir:cwd,includeAll:true,preflight});assert(r.dto.ok,"conflict in a valid branch/file name must not block ordinary CO");assert.equal(r.calls.filter(c=>c[0]==="checkin").length,preflight?0:1);
-}
-for(const suffix of ["Pending merge links\r\n    Merge from cs:43 at /main/source@Example Repository@example@unity\r\n","Merge in progress\r\n","Unresolved conflicts\r\n","Unexpected metadata\r\n"]){
-    r=await invoke({pending:checkedOutRow(),fullStatus:ordinaryHeader+suffix},{message:"Unknown checkout state",workdir:cwd,includeAll:true});assert.equal(r.dto.outcome,"unsupported");assert.equal(r.calls.filter(c=>c[0]==="checkin").length,0);
-}
-// Sanitized regression for the observed CO+RP/positive-revision/NO_MERGES
-// profile. Full status must corroborate it; no invented merge admission.
-const replacedCheckout = row("CO+RP");
-const replacedFull = `/main/café-é-日本-😀@Example Repository@example@unity (cs:9007199254740993 - head)\r\nChanged\r\n    Status  Size  Last Modified  Path\r\n    Replaced / Checked-out (unchanged)    70 KB    opaque age    ${name}\r\n`;
-const replacedParsed = parseCheckinPending(header + replacedCheckout, cwd);
-assert(replacedParsed.admitted);
-assert.equal(replacedParsed.items[0].statusCode, "CO+RP");
-assert.equal(replacedParsed.items[0].kind, "changed");
-assert.equal(replacedParsed.items[0].revisionId, "9007199254740995");
-for (const tool of [undefined, registered]) for (const preflight of [false, true]) {
-    r = await invoke({ pending: replacedCheckout, fullStatus: replacedFull }, { ...input, preflight }, false, tool);
-    assert(r.dto.ok, JSON.stringify(r.dto));
-    assert.equal(r.dto.outcome, preflight ? "preflight" : "completed");
-    assert.equal(r.dto.data.assessment.ready, true);
-    assert.deepEqual(r.dto.data.includedPaths, [name]);
-    assert.equal(r.calls.filter(c => c[0] === "checkin").length, preflight ? 0 : 1);
-}
-for (const pending of [replacedCheckout.replace("9007199254740995", "-1"), replacedCheckout.replace("False", "True"), replacedCheckout.replace("NO_MERGES", "Merge from 43"), replacedCheckout.replace("CO+RP", "CO+RP+UNKNOWN"), replacedCheckout.replace("CO+RP", "CO+CP")]) {
-    r = await invoke({ pending, fullStatus: replacedFull });
-    assert.equal(r.dto.outcome, "unsupported");
-    assert(!r.calls.some(c => c[0] === "checkin"));
-}
-for (const fullStatus of [replacedFull + "Merge in progress\r\n", replacedFull + "Unresolved conflicts\r\n", replacedFull + "Pending merge links\r\n    Merge from cs:43 at /main/source@Example Repository@example@unity\r\n", replacedFull.replace("Replaced / Checked-out (unchanged)", "Replaced"), replacedFull.replace(name, "other.txt"), replacedFull.split("Changed")[0]]) {
-    r = await invoke({ pending: replacedCheckout, fullStatus });
-    assert.equal(r.dto.outcome, "unsupported");
-    assert(!r.calls.some(c => c[0] === "checkin"));
-}
-// General CO admission: unrelated checkouts must not block a selected CH path,
-// and selected checkouts must retain their requested scope without invented bases.
-const unrelatedCheckout = cwd + "\\unrelated-checked-out.txt";
-const mixedPending = row() + checkedOutRow(unrelatedCheckout);
-const mixedParsed = parseCheckinPending(header + mixedPending, cwd);
-assert(mixedParsed.admitted);
-assert.equal(mixedParsed.items[1].kind, "changed");
-assert.equal(mixedParsed.items[1].revisionId, undefined);
-for (const tool of [undefined, registered]) {
-    r = await invoke({ pending: mixedPending, fullStatus: `/main/café-é-日本-😀@Example Repository@example@unity (cs:9007199254740993 - head)\r\nChanged\r\n    Status  Size  Last Modified  Path\r\n    Changed    opaque size    opaque age    ${name}\r\n` }, input, false, tool);
-    assert(r.dto.ok);
-    assert.equal(r.dto.data.pendingBefore.changed, 2);
-    assert.deepEqual(r.dto.data.includedPaths, [name]);
-    assert(!r.calls.find(c => c[0] === "checkin")!.some(a => a.includes("unrelated-checked-out")));
-    r = await invoke({ pending: checkedOutRow() }, input, false, tool);
-    assert(r.dto.ok);
-    assert.deepEqual(r.dto.data.includedPaths, [name]);
-    assert.deepEqual(r.calls.map(c => c[0]), ["status", "status", "checkin", "status"]);
-}
-for (const invalid of [
-    checkedOutRow().replace("-1", "0"), checkedOutRow().replace("-1", "42"),
-    checkedOutRow().replace("-1", "-2"), checkedOutRow().replace("NO_MERGES", "MERGE"),
-    checkedOutRow().replace("False", "unknown"), checkedOutRow().replace(path, "relative.txt"),
-    checkedOutRow().replace(path, path + "?"), checkedOutRow().replace(path, path + "\uFFFD"),
-    checkedOutRow().replace("NO_MERGES", "NO_MERGES" + us + "extra"),
-]) {
-    r = await invoke({ pending: row() + invalid });
-    assert.equal(r.dto.outcome, "unsupported");
-    assert.equal(r.dto.error.code, "pending_source_unadmitted");
-    assert.deepEqual(r.calls.map(c => c[0]), ["status"]);
-}
-r = await invoke({ preabort: true }); assert.equal(r.calls.length, 0); assert.equal(r.dto.outcome, "unsupported");
-r = await invoke({ private: true, native: "There are no changes in the workspace" }); assert(r.dto.ok); assert.deepEqual(r.calls.map(c => c[0]), ["status", "checkin", "add", "checkin", "status"]); assert.equal(r.dto.data.steps[2].effect, "command-completed"); assert.equal(r.dto.data.usedPrivateAutoAddRecovery, true);
-r = await invoke({ private: true, native: "No changes in the workspace", retryFail: true }); assert.equal(r.dto.outcome, "uncertain"); assert.equal(r.dto.data.steps[2].effect, "command-completed"); assert.equal(r.dto.data.effect, "uncertain");
-r = await invoke({ private: true, native: "No changes in the workspace", addFail: true }); assert.equal(r.dto.outcome, "uncertain"); assert.equal(r.calls.filter(c => c[0] === "checkin").length, 1);
-r = await invoke({ private: true, pending: row("PR", cwd + "\\.env.local"), native: "No changes in the workspace" }, { ...input, paths: [".env.local"] }); assert.equal(r.dto.error.code, "sensitive_private_paths"); assert.equal(r.calls.length, 2);
-r = await invoke({ private: true, native: "No changes in the workspace" }, { message: input.message, workdir: cwd }); assert.equal(r.dto.error.code, "private_items_ineligible"); assert.equal(r.calls.length, 2);
-for (const recoveryFail of [false, true]) { r = await invoke({ native: "No changes in the workspace", recoveryFail }); assert.equal(r.dto.outcome, "uncertain"); assert.equal(r.calls.length, 3); assert.equal(r.dto.data.pendingAfter?.totalPending ?? null, recoveryFail ? null : 0); }
-for (const tool of [undefined, registered]) {
-    r = await invoke({ pending: checkedOutRow(), afterMalformed: true }, { ...input, includeAll: true }, false, tool);
-    assert(r.dto.ok); assert.equal(r.dto.data.createdChangeset.id, "9007199254740997");
-    assert.equal(r.dto.data.effect, "changeset-created"); assert.equal(r.dto.data.assessment.ready, true);
-    assert.equal(r.dto.data.pendingAfter, null); assert.equal(r.dto.data.postObservationIssues.stage, "pending-after");
-    assert(r.dto.data.postObservationIssues.issues.some((i: any) => i.code === "pending_header_invalid"));
-    assert.equal(r.dto.data.steps.at(-1).evidence, "unadmitted"); assert.equal(r.calls.filter(c => c[0] === "checkin").length, 1);
-}
-const malformedCore = await invoke({ pending: checkedOutRow(), afterMalformed: true }, { ...input, format: "json" }, true);
-assert.equal(JSON.parse(malformedCore.result as string).data.createdChangeset.id, "9007199254740997");
-r = await invoke({ afterFail: true }); assert(r.dto.ok); assert.equal(r.dto.data.pendingAfter, null); assert.equal(r.dto.completeness.capture, "complete");
-r = await invoke({ private: true, native: "No changes in the workspace", afterFail: true }); assert(r.dto.ok); assert.equal(r.dto.data.pendingAfter, null); assert.equal(r.dto.data.steps[2].effect, "command-completed"); assert.equal(r.dto.data.steps[3].effect, "changeset-created");
-for (const scenario of [{ mode: "unknown" }, { mode: "bom" }, { mode: "repository" }, { noSpawn: true }, { streamError: true }, { lateError: true }, { timeout: true }] as Scenario[]) {
-    r = await invoke(scenario); assert.deepEqual(r.dto.data.itemEvents, []); assert.deepEqual(r.dto.data.observedChangesets, []);
-}
-r = await invoke({ fallback: true }); assert(r.dto.ok); assert.equal(r.dto.data.usedFallbackRetry, true); assert(r.calls[2].includes("--applychanged")); assert.equal(r.calls[2].filter(a => a === name).length, 0);
-r = await invoke({ native: "Checkin operation cannot be started because there is a merge in progress", recoveryFail: true }); assert.equal(r.dto.error.code, "merge_in_progress"); assert.deepEqual(r.calls[2], ["status"]);
-r = await invoke({ payload: `cs:9007199254740997@br:/${"日".repeat(4000)}@Example Repository@example@unity (mount:'/')` }); assert(r.dto.ok); assert(Buffer.byteLength(r.result.content[0].text, "utf8") <= 24000);
-r = await invoke({ mode: "projection" }); assert(r.dto.ok); assert(r.dto.data.omittedReferences > 0); assert.equal(r.dto.completeness.projection, false);
-r = await invoke({ mode: "mv" }); assert(r.dto.ok); assert.equal(r.dto.data.itemEvents[1].sourcePath, path); assert.equal(r.dto.data.itemEvents[1].path, cwd + "\\new-" + name);
-const damaged = structuredClone(r.dto); damaged.data.effect = "not-attempted"; assert(!validateCheckinOutput(damaged));
-const raw = structuredClone(r.dto); raw.data.rawResult = "opaque"; assert(!validateCheckinOutput(raw));
-const terminal = structuredClone(r.dto); terminal.data.steps[1].attempt.exitCode = null; assert(!validateCheckinOutput(terminal));
-const aggregate = structuredClone(r.dto); aggregate.data.requestedPaths = Array(100).fill("x"); assert(!validateCheckinOutput(aggregate));
-const core = await invoke({}, { ...input, preflight: true, format: "json" }, true); assert.equal(typeof core.result, "string"); assert.match(core.result as string, /"outcome":"preflight"/);
-console.log("PASS: checkin closed receipts, native compound policy, source admission, Unicode precision, bounded full classification/projection, uncertainty and injected lifecycle cleanup");
-}
-const xlinkFixture = JSON.parse(readFileSync(new URL("./fixtures/plastic-checkin-xlink-source.json", import.meta.url), "utf8"));
-const xlinkParsed = parseCheckinEvidence(xlinkFixture.created, xlinkFixture.separators);
-const tooMany = Array.from({length: 16}, (_, i) => `cs:${i + 1}@br:/main/link@Linked Repository@example@unity (mount:'/link-${i}')`).concat(payload).join(",");
-assert(!parseCheckinEvidence(`__START__CI_START__END__
-__START__CHANGESET__FIELD__${tooMany}__END__
-`, xlinkFixture.separators).admitted);
-assert(xlinkParsed.admitted); assert.equal(xlinkParsed.changesets[0].id, "44"); assert.equal(xlinkParsed.linkedChangesets.length, 1);
-const fixture = JSON.parse(readFileSync(new URL("./fixtures/plastic-checkin-source.json", import.meta.url), "utf8"));
-assert(parseCheckinPending(fixture.pending, cwd).admitted);
-const fixtureCreated = parseCheckinEvidence(fixture.created, fixture.separators);
-assert(fixtureCreated.admitted); assert.equal(fixtureCreated.changesets[0].id, "9007199254740997"); assert.equal(fixtureCreated.events[0].path, path);
-const fixtureNoChanges = parseCheckinEvidence(fixture.noChanges, fixture.separators);
-assert(fixtureNoChanges.admitted); assert.deepEqual(fixtureNoChanges.changesets, []); assert.equal(fixture.noChangesExit, 1);
-const seps = { start: "START", end: "END", field: "FIELD" }, framed = (op: string, ...fields: string[]) => seps.start + [op, ...fields].join(seps.field) + seps.end + "\r\n";
-assert(parseCheckinEvidence(framed("CI_START") + framed("STAGE", "") + framed("CHANGESET", payload), seps).admitted);
-assert(!parseCheckinEvidence(framed("CI_START") + framed("MV", path), seps).admitted);
-assert(!parseCheckinEvidence(framed("CI_START") + framed("MV", path, path, "extra"), seps).admitted);
-assert(!parseCheckinEvidence(framed("CI_START") + framed("CHANGESET", payload) + framed("STAGE", "late"), seps).admitted);
-assert(!parseCheckinChangeset(payload.replace("9007199254740997", "1.5")));
-const moved = ["MV", "100%", path, cwd + "\\new-" + name, "False", "9007199254740999", "NO_MERGES"].join(us);
-const p = parseCheckinPending(header + moved + "\r\n", cwd); assert(p.admitted); assert.equal(p.items[0].sourceWorkspacePath, path); assert.equal(p.items[0].workspacePath, cwd + "\\new-" + name);
-assert(!parseCheckinPending(header + moved.replace("100%", "99%"), cwd).admitted);
-assert(!parseCheckinPending(header + moved + us + "extra", cwd).admitted);
-assert(!parseCheckinPending(header + header, cwd).admitted);
-// Comment policy is independent of platform; path/identity controls remain strict.
-for (const newline of ["\n", "\r\n", "\r"]) {
-    assert(checkinSafeComment(`Fixture${newline}Details 😀`));
-    assert(!checkinSafeValue(`Fixture${newline}Details`));
-    assert(!parseCheckinChangeset(payload.replace("Example Repository", `Example${newline}Repository`)));
-}
-for (let code = 0; code <= 0x9f; code++) {
-    if (code > 0x1f && code < 0x7f || code === 10 || code === 13) continue;
-    assert(!checkinSafeComment(`Fixture${String.fromCharCode(code)}Details`));
-}
-for (const comment of ["", "x".repeat(4097), "bad\ud800", "bad\udc00", "\ud800\n\udc00", "\ud800\r\n\udc00"]) assert(!checkinSafeComment(comment));
-assert(checkinSafeComment("x".repeat(4096)));
-await assert.rejects(captureCheckinCommand(Array(121).fill("x"), cwd), /argv/);
-await assert.rejects(captureCheckinCommand(Array(10).fill("x".repeat(4096)), cwd), /argv/);

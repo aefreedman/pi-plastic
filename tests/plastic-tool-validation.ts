@@ -56,7 +56,7 @@ const main = (): void => {
     "export const mergeToBranch = tool({",
     "assembleCloseoutReceipt",
   ]);
-  failures += checkRequired(readText(new URL("../src/operations/closeout-receipt.ts", import.meta.url)), "closeout receipt", ["buildCloseoutParentArgv", "captureWorkspaceMergeCommand", "assembleCheckinReceipt", "target_unverified"]);
+  failures += checkRequired(readText(new URL("../src/operations/closeout-receipt.ts", import.meta.url)), "closeout receipt", ["buildCloseoutParentArgv", "runNativeMutation", "assembleCheckinReceipt", "target_unverified"]);
   failures += checkRequired(readText(new URL("../src/operations/patch.ts", import.meta.url)), "pi-plastic/src/operations/patch.ts", [
     "export const patch = tool({",
     "__plasticPatchInternals",
@@ -66,25 +66,8 @@ const main = (): void => {
     "export const diff = tool({",
     "assembleConsolidatedDiff"
 ]);
-  failures += checkRequired(readText(new URL("../src/operations/checkin.ts", import.meta.url)), "pi-plastic/src/operations/checkin.ts", [
-    "parseMachineReadablePendingItems",
-    "summarizePendingItems",
-    "selectPrivatePathsForAutoAdd",
-    "filterPendingItemsByScope",
-    "isNoChangesWorkspaceCheckinError",
-    "resolveCheckinPaths",
-    "buildFallbackScopePaths",
-    "isMergeInProgressCheckinError",
-    "buildMergeInProgressCheckinMessage",
-    "assembleCheckinReceipt"
-]);
-  failures += checkRequired(readText(new URL("../src/operations/checkin-receipt.ts", import.meta.url)), "pi-plastic/src/operations/checkin-receipt.ts", [
-    "updateAfter is disabled for unattended safety",
-    'record("private-add"',
-    'attempt("private-retry"',
-    "retryEligible",
-    "pending_recovery_failed",
-  ]);
+  failures += checkRequired(readText(new URL("../src/operations/checkin.ts", import.meta.url)), "native checkin", ["assembleCheckinReceipt"]);
+  failures += checkRequired(readText(new URL("../src/operations/checkin-receipt.ts", import.meta.url)), "native checkin producer", ["runNativeMutation", "buildCheckinArgv", "checkinIdentityCollector"]);
   failures += checkRequired(readText(new URL("../src/operations/switch.ts", import.meta.url)), "pi-plastic/src/operations/switch.ts", [
     "__plasticSwitchInternals",
     "normalizeBranchSpecForComparison",

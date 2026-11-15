@@ -21,7 +21,7 @@ const allowedLayers: Record<string, string[]> = {
   diff: ["execution", "domain", "diff"],
   presentation: ["domain", "diff", "presentation"],
   operations: ["execution", "domain", "diff", "presentation", "operations"],
-  pi: ["execution", "operations", "pi"],
+  pi: ["execution", "domain", "operations", "pi"],
 };
 for (const owner of owners) {
   const source = sources.get(owner)!;

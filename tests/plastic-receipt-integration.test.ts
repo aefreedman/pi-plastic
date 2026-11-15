@@ -30,7 +30,7 @@ assert.equal(typeof coreCheckin, "string"); assert.equal(typeof coreBranch, "str
 if (process.platform === "win32") {
   assert.equal(JSON.parse(coreCheckin).outcome, "preflight");
   assert.match(coreBranch, /command completed.*unverified/);
-  assert.deepEqual(calls.map(c => c[0]), ["status", "branch"]);
+  assert.deepEqual(calls.map(c => c[0]), ["branch"]);
 }
 await assert.rejects(() => checkin.execute({...request, preflight:false,updateAfter:true}), /updateAfter/);
 await assert.rejects(() => branchCreate.execute({branch:""}), /non-empty/);

@@ -56,28 +56,18 @@ Even complete exit 0 cannot establish restored bytes, preservation or zero pendi
 ## checkin
 
 ```text
-plastic_checkin(paths=["Assets/Example.txt"], message="Implement feature", includeAll=false, includePrivate=false)
+plastic_checkin(message="Save selected changes", paths=["Assets/Example.cs"], applyChanged=true)
 ```
 
-Inspect the declared selection defaults before omitting paths or enabling broad/private scope. `preflight=true` reads pending scope and any required merge-readiness observation without mutation; it is not a zero-command plan. `updateAfter` remains blocked before dispatch.
+Schema v2 forwards exact caller paths and explicit `includeAll`, `applyChanged` and `includePrivate` options to one native checkin. It does not inspect/rewrite pending scopes, infer flags, automatically add private files, fall back to parent paths or retry. Native Plastic decides whether the selection is eligible. `includeAll` is forwarded even with explicit paths; it applies within the native selection, not an implicit wider workspace selection. `updateAfter=true` remains disabled for unattended safety.
 
-Pending STATUS records use the [shared workspace observation and assessment](2026-10-06-merging.md#workspace-observations-and-safety-assessment), independently of nonce-framed CI_START/STAGE/CO/AD/DE/MV/CP/RP/CHANGESET execution records. Mixed ordinary and merged rows remain observations, but unrelated ordinary controlled work blocks merged checkin with a specific scope blocker; partial merged selection/private inclusion remain unsupported. Disjoint private-only extras are excluded. Native parent-directory CO events, including the workspace root when it is an ancestor of selected rows, are structural events rather than extra selected file content. Original Unicode, decimal-string changeset IDs, explicit branch prefixes and complete emitted server tails are preserved.
+`preflight=true` builds the exact command without executing any CLI read or mutation. It does not analyze pending scope or conflicts.
 
-Explicit resolved paths suppress `--all`, even when `includeAll=true`, so selection cannot silently sweep in unrelated controlled files. Caller workdirs are canonicalized once; observed paths remain validated evidence. Default text reports the blocker stage/code; the additive assessment records bounded observation gaps and safety blockers without mutation replay.
+The v2 receipt separates `commandCompleted`/actual attempt and exit from `createdChangeset`, `linkedChangesets`, `observedChangesets` and `identityObservation`. A successful command can have unknown identities. Well-formed emitted identities remain observations even alongside a later native failure; they do not establish every requested effect. Current-client comma-separated mounted identity lists are supported without a one-Xlink or fixed emission-count admission rule. Ambiguous roots stay null.
 
-One framed `CHANGESET` field may contain the current client's comma-separated root/linked emissions (at most 16, with unique safe mounts and exactly one root). Only the independently correlated root on successful complete capture supports `changeset-created`; additive optional `linkedChangesets` retains emitted mounted identities, not proof of Xlink effects. Linked emissions require an independently observed loaded branch. Ambiguous/duplicate roots or mounts remain uncertain without retry.
+Output retention is bounded while draining the native process; diagnostic truncation does not terminate the mutation. Identity frames are observed separately after the retained prefix fills. Incomplete identity observation or presentation does not erase actual terminal success. Failed execution/unknown terminal state is never permission for automatic retry.
 
-Only one admitted root changeset on successful complete capture supports `changeset-created`. Empty output/exit 0 alone does not. Unknown/malformed/full-tail records, incomplete capture and invalid UTF-8 fail before projection.
-
-### Existing recovery, not general retry permission
-
-Eligible complete admitted failures may use the existing path fallback or sensitive-filtered private add/retry path. Timeout, abort, launch/capture uncertainty and unadmitted evidence never authorize retry.
-
-Per-step attempts/captures/effects retain successful earlier adds/checkins after later failure. Failed post/recovery reads stay null; even empty pending after failed checkin is not completion proof. Non-preflight core failures reject, preventing compound continuation based on a presentation string.
-
-### Checkin bounds
-
-At most 8 steps, 500 admitted source records per observation, one aggregate 100-reference projection budget with explicit omissions, 131,072-byte UTF-8 receipt and 24,000-byte presentation. Whole identity references cap 4,096 code units and are never trimmed into plausible selectors.
+Standalone checkin accepts deliberately selected existing pending work; [compound closeout](2026-10-06-merging.md#mergetobranch) additionally requires a clean start because it chooses an automatic checkin. See [native Xlink behavior](2026-11-15-writable-xlink-merges.md).
 
 ## branchCreate
 

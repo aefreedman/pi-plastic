@@ -1118,7 +1118,7 @@
         },
         "preflight": {
           "type": "boolean",
-          "description": "Preview command and included paths without executing checkin."
+          "description": "Zero-command plan; paths and options are passed unchanged to Plastic."
         },
         "format": {
           "anyOf": [
@@ -1600,7 +1600,7 @@
       "properties": {
         "source": {
           "type": "string",
-          "description": "Exact source operand, not CLI options. Auto requires a branch or cs:<decimal> with optional repository/server qualifiers; label/shelveset resolution is unsupported in auto.",
+          "description": "Exact native branch, changeset, label or shelveset operand; not CLI options or stdin.",
           "minimum": 1
         },
         "strategy": {
@@ -1736,7 +1736,7 @@
   {
     "name": "plastic_mergeToBranch",
     "label": "plastic_mergeToBranch",
-    "description": "Merge a source branch into a target branch with a bounded typed stage ledger; unknown target/readiness stops before checkin and earlier effects remain recorded.",
+    "description": "Convenience sequence from a clean workspace: switch/update target if requested, merge once, then check in once; native failures stop continuation.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -1783,7 +1783,7 @@
         },
         "preflight": {
           "type": "boolean",
-          "description": "Read-only discovery/pending preview, not zero CLI or applying readiness proof."
+          "description": "Zero-command plan; source/target defaults remain unresolved until execution."
         },
         "format": {
           "anyOf": [

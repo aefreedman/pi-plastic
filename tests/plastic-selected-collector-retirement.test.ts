@@ -2,7 +2,7 @@ import { syntheticClearMarkerRead } from "./synthetic-marker-read";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { captureCheckinCommand } from "../src/execution/checkin-command";
+import { captureNativeMutation as captureCheckinCommand } from "../src/execution/native-mutation-command";
 import { captureBranchCreateCommand } from "../src/execution/branch-create-command";
 import { captureSwitchCommand } from "../src/execution/switch-command";
 import { captureUpdateCommand } from "../src/execution/update-command";
@@ -103,12 +103,12 @@ if (process.platform === "win32") {
     });
     assert(validate(result.structuredContent));assert(result.isError);assert.equal(result.structuredContent.outcome,"uncertain");
     const dto = result.structuredContent;
-    const attempt = tool === "plastic_checkin"?dto.data.steps[1].attempt:dto.data.attempt;
+    const attempt = tool === "plastic_checkin"?dto.data.attempt:dto.data.attempt;
     assert.equal(attempt.terminal,terminal?"observed":"not-observed");
     assert.equal(attempt.exitCode,terminal?0:null);
     if (tool === "plastic_checkin") {assert.equal(dto.data.createdChangeset,null);assert.deepEqual(dto.data.observedChangesets,[]);}
     else assert.equal(dto.data.observedCreatedIdentity,null);
-    assert.deepEqual(calls.map(a=>a[0]),tool==="plastic_checkin"?["status","checkin"]:["branch"],"No retry/duplicate mutation or verification after forced retirement");
+    assert.deepEqual(calls.map(a=>a[0]),tool==="plastic_checkin"?["checkin"]:["branch"],"No retry/duplicate mutation or verification after forced retirement");
     }
   }
 }

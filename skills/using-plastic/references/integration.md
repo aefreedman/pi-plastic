@@ -12,12 +12,12 @@
 Plastic does not perform a Git-style fast-forward. It applies the merge into the branch currently loaded in the workspace, and the resulting merge changeset belongs to the branch where checkin runs. Switching branches afterward does not move an incorrectly placed changeset.
 
 - Switch to the target branch/workspace and ensure you understand the current pending state.
-- For the [bounded one-writable-Xlink subset](../../../docs/2026-11-15-writable-xlink-merges.md), require complete repository/mount/source ownership observations, not matching path prefixes or numeric changeset IDs. Only 2–32 present RP/CO/CP files with no private/unrelated/directory/deleted/moved rows are supported; other compositions stop without replay.
-- Run `plastic_merge(...)`. Auto mode accepts exact branch or pinned `cs:<decimal>` operands, optionally `@repository@server`; label/shelveset operands are rejected before dispatch because their source identities are not resolved. Pinned changesets are checked against the exact observed pending link, not a guessed branch.
+- [Native Xlink operations](../../../docs/2026-11-15-writable-xlink-merges.md) are delegated to Plastic without ownership reconstruction, mount/file-count gates or status matrices.
+- Run `plastic_merge(...)` with the exact native branch, changeset, label or shelveset operand. It executes one noninteractive merge and reports the native result.
 - If Plastic stops on a delete/change directory conflict and source deletion is the intended resolution, run `plastic_resolveDeleteChangeConflict(...)`, then rerun `plastic_merge(...)`.
 - Immediately run `plastic_status()` and treat it as the source of truth.
 - Do not treat merge-tool success alone as proof that the merge is finished.
-- If `plastic_status()` still shows `Pending merge links`, merge-in-progress state, or conflict-like pending items, stop and follow troubleshooting before any checkin.
+- Pending merge links normally remain until checkin; they are not by themselves unresolved conflicts. Inspect native diagnostics and reconcile actual conflicts, then let native checkin decide eligibility.
 - List native markers with `plastic_mergeListConflictMarkers()`, edit/validate, then re-inspect markers AND remaining conflicts/scope. Unknown evidence blocks; never force-finalize or reapply automatically.
 - After compile/tests, run `plastic_status()` again so Unity-generated private artifacts are not mistaken for merge fallout.
 - Only then create the merge checkin.

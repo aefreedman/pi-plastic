@@ -8,7 +8,7 @@
 
 | Evidence | What it supports | What it does not establish by itself |
 |---|---|---|
-| Complete command exit 0 | Command completion, if that tool admits the capture | Changed files, clean workspace, deletion, preservation, or requested review state |
+| Complete command exit 0 | Command completion; v2 workspace commands separate diagnostic projection from execution | Changed files, clean workspace, deletion, preservation, or requested review state |
 | Admitted emitted ID | The exact creation identity emitted by that command | Requested/emitted server alias equivalence, target-head exclusivity, or unrelated repository effects |
 | Complete scoped read | Facts in that source/query scope | Repository totals, unselected records, global absence, or an atomic snapshot |
 | Separate resulting-byte/state observation | The inspected post-state at that time | Automatic rollback or a guarantee about concurrent activity |
@@ -59,9 +59,9 @@ Preflight is **not routine confirmation** and does not mean the same thing every
 |---|---|
 | Branch/object deletion, object writes, workspace merge/finalization, server merge | Command-only plan; zero CLI, no existence/conflict/permission proof |
 | Patch | Command-only plan; may read local selector metadata; no staging or generation |
-| Checkin | Reads pending scope once; no mutation |
+| Checkin | Zero-command exact argv plan; no pending/conflict analysis |
 | Switch | Two sequential local reads; not server switchability/conflict proof |
-| Closeout | Read-only discovery/pending preview; not zero CLI or applying-readiness proof |
+| Closeout | Zero-command sequence plan; omitted branch defaults remain unresolved |
 | Add, undo, update, branchCreate | No added preflight API; use the declared tool schema |
 
 Shelveset `preview=true` is different: it actually dispatches CM and can prompt/fail on conflicts. Read [shelveset application](2026-10-06-shelvesets-and-reviews.md#shelvesetapply).
@@ -73,7 +73,7 @@ Shelveset `preview=true` is different: it actually dispatches CM and can prompt/
 3. Inspect the exact affected scope when further investigation is authorized.
 4. Choose an explicit resolution or ask the user when ownership, permissions, interaction, or intent is unclear.
 
-Single-command producers do not silently retry, switch backends/strategies, or compensate. Compound operations can have multiple declared steps. Checkin and switch retain narrowly admitted existing recovery paths; those exceptions are documented in [workspace operations](2026-10-06-workspace-operations.md), not general retry permission.
+Single-command producers do not silently retry, switch backends/strategies, or compensate. Compound operations can have multiple declared steps. Checkin has no hidden mutation recovery. Switch retains its separately declared recovery path; see [workspace operations](2026-10-06-workspace-operations.md), not general retry permission.
 
 Parent/agent restoration is a separate action with its own scope and evidence. It is not producer rollback. Do not interpret null effects, empty stdout, or a no-op classification as globally verified absence.
 
@@ -85,6 +85,14 @@ Parent/agent restoration is a separate action with its own scope and evidence. I
 - Operation-specific containment checks do not turn all directory/wildcard operands into exclusively contained mutations.
 - `cm cat --file=<path>` writes and can overwrite that destination. Never treat it as a read-only selector or point an inspection export at canonical workspace files.
 - A bounded collector may retire while a child/server action can still be running. Per-command deadlines are not atomic compound deadlines.
+
+## Workspace mutation receipt v2
+
+`plastic_merge`, `plastic_checkin` and `plastic_mergeToBranch` use schemaVersion 2. This intentionally replaces their v1 ownership/readiness/step-admission contracts, not other tools' versions. Standalone `outcome="command-completed"` means observed native successful terminal completion, even with unfamiliar progress or diagnostic truncation. It does not require a parseable changeset identity. `createdChangeset` and mounted `linkedChangesets` are emitted observations; inspect `identityObservation` independently. A valid identity may remain on a later native failure without promoting that failure to success.
+
+Standalone exact paths/options are not rewritten or retried. Compound closeout requires a clean initial workspace/merge state because it automatically checks in. Its ordered ledger stops after execution failure, retaining prior effects. There is no ownership proof or per-file eligibility policy.
+
+Bounded stdout/stderr retention continues draining streams: diagnostic overflow does not kill a mutation. Terminal/stream/UTF-8 failure remains execution uncertainty; presentation truncation alone does not. Unknown terminal state, deadline or cancellation never establishes rollback or replay safety.
 
 ## Evidence and transport limits
 

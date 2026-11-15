@@ -3,7 +3,7 @@ import { outputFormatArg } from "../presentation/results";
 import { workdirArg } from "./arguments";
 import { assembleCloseoutReceipt, presentCloseoutReceipt } from "./closeout-receipt";
 export const mergeToBranch = tool({
- description: "Merge a source branch into a target branch with a bounded typed stage ledger; unknown target/readiness stops before checkin and earlier effects remain recorded.",
+ description: "Convenience sequence from a clean workspace: switch/update target if requested, merge once, then check in once; native failures stop continuation.",
  args: {
   source:tool.schema.string().optional().describe("Bounded hierarchical branch selector. Defaults to the directly observed loaded branch."),
   target:tool.schema.string().optional().describe("Bounded hierarchical branch selector. Defaults to an admitted source-parent read in the observed repository scope."),
@@ -12,8 +12,8 @@ export const mergeToBranch = tool({
   strategy:tool.schema.enum(["auto","source","destination"]).optional().describe("Conflict strategy; defaults to auto."),
   updateTarget:tool.schema.boolean().optional().describe("Update target before merge; defaults to true."),
   includePrivate:tool.schema.boolean().optional().describe("Include private items in merge checkin; defaults to false."),
-  preflight:tool.schema.boolean().optional().describe("Read-only discovery/pending preview, not zero CLI or applying readiness proof."),
+  preflight:tool.schema.boolean().optional().describe("Zero-command plan; source/target defaults remain unresolved until execution."),
   format:outputFormatArg,workdir:workdirArg,
  },
- async execute(args){const dto=await assembleCloseoutReceipt(args);if(!dto.ok&&!args.preflight)throw Error(dto.error.message);return presentCloseoutReceipt(dto,args.format);},
+ async execute(args){const dto=await assembleCloseoutReceipt(args);if(!dto.ok)throw Error(dto.error.message);return presentCloseoutReceipt(dto,args.format);},
 });

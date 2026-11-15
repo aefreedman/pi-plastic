@@ -32,15 +32,10 @@ plastic_checkin(message="feat(player): add dash mechanic", includeAll=true)
 
 Unattended behavior notes:
 
-- `includeAll=true` includes changed/moved/deleted tracked items, but does not include private items by itself.
-- `plastic_checkin` now inspects machine-readable pending changes before running checkin.
-- If Plastic reports `There are no changes in the workspace` and only private items are pending in scope,
-  the tool auto-runs `cm add` for safe in-scope private paths, then retries checkin once.
-- Sensitive private paths (for example `.env*`, private key extensions, `.npmrc`, credentials/secrets JSON)
-  are excluded from auto-add and reported as warnings/errors for explicit handling.
-- The closed receipt includes per-step attempts/capture/effects, pending summaries (null when unverified), and private-add/fallback decisions. Eligibility requires complete admitted native failure, never launch/capture/timeout/abort uncertainty.
-- A failed checkin followed by an empty or failed pending read remains uncertain, not completed. Successful earlier add/checkin effects remain recorded after later failure. Completion requires an admitted root changeset, not exit zero or empty output. Scope exhaustion, branch head, alias equivalence and Xlink/link effects stay unverified.
-- `preflight=true` performs one pending read, no mutation. Text/JSON present the same bounded receipt; registered native errors set `isError`.
+- Exact caller paths and explicit `includeAll`, `applyChanged` and `includePrivate` flags go to one native command. The adapter does not rewrite paths, infer flags, auto-add private files, widen scope or retry.
+- Plastic owns checkin eligibility, including pending merges and Xlinks. Native nonzero/timeout/cancel or unknown terminal state remains a stop, never permission for automatic replay.
+- Schema v2 separates command completion from root/linked identity observations. A successful command can have unknown identities; valid emitted identities can remain alongside a later failure without making it successful.
+- `preflight=true` performs zero reads or mutations and returns the exact argv plan. It is not scope/conflict analysis.
 
 Note: avoid `updateAfter=true` in unattended runs because it can trigger interactive update-merge. Use `plastic_update()` followed by `plastic_merge(...)` (default auto strategy) when a merge is required.
 
@@ -54,8 +49,8 @@ cm status --all
 
 Safe checklist:
 - Confirm deleted items appear in status output before checkin.
-- For path-scoped checkins containing moved/deleted items, use `plastic_checkin(preflight=true, paths=[...])` so the tool can preview rewriting unstable file scopes to stable parent scopes. Do not preflight ordinary exact-scope checkins routinely.
-- `plastic_checkin` now inspects `cm status --machinereadable` and auto-enables `--applychanged` when moved/deleted items are in scope.
+- Explicitly select intended paths/options, including for moved/deleted items. Preflight shows those exact operands without rewriting them.
+- Set `applyChanged` deliberately when native semantics require it; the tool does not infer it.
 - Re-run `cm status --all` after add/scope changes, then checkin.
 
 Example path-scoped checkin including a deletion:
@@ -112,4 +107,4 @@ cm find changeset --orderby="date desc" --limit=20 \
 
 ## Writable-Xlink checkin receipts
 
-A current-client checkin can emit linked and root identities in one record. The receipt retains one independently correlated root changeset and optional bounded `linkedChangesets` observations. Emissions do not prove Xlink effects; malformed/duplicate identity lists remain uncertain. Never retry an uncertain checkin automatically; inspect both histories and workspace state. Merged checkin supports only the [bounded present-file one-writable-Xlink subset](../../../docs/2026-11-15-writable-xlink-merges.md); ownership uncertainty or partial scope stops before checkin.
+A current-client checkin can emit linked and root identities in one record. The receipt retains observed mounted identities with explicit completeness, without requiring ownership/source-tree reconstruction. A unique root emission appears as `createdChangeset`; missing/ambiguous roots remain unknown even if the native command completed. See [native Xlink operations](../../../docs/2026-11-15-writable-xlink-merges.md). Never retry an uncertain checkin automatically; inspect actual histories and workspace state.

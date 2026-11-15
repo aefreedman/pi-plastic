@@ -15,36 +15,41 @@ try {
   const rootFile=join(directory,"root.txt"),mount=join(directory,"mount"),linkedFile=join(mount,"linked.txt");
   const setup=(message:string)=>{const seps={start:"__SETUP_S__",end:"__SETUP_E__",field:"__SETUP_F__"};const output=live.native(["checkin",directory,"--applychanged","--private","--machinereadable",`--startlineseparator=${seps.start}`,`--endlineseparator=${seps.end}`,`--fieldseparator=${seps.field}`,`-c=${message}`]);const p=parseCheckinEvidence(output.stdout,seps);assert(p.admitted);assert.equal(p.changesets.length,1);live.clean();return p;};
   live.createBranch(target);live.switch(target);mkdirSync(directory,{recursive:true});writeFileSync(rootFile,"root baseline\n");live.native(["add",rootFile]);live.native(["xlink","-w",mount,"/",`cs:0@${linkedRepository}@${server}`]);setup("pi-plastic Xlink merge mount setup");
-  writeFileSync(linkedFile,"linked baseline\n");live.native(["add",linkedFile]);const baseline=setup("pi-plastic Xlink merge baseline");
-  live.createBranch(source);live.switch(source);writeFileSync(rootFile,"root source\n");writeFileSync(linkedFile,"linked source\n");const incoming=setup("pi-plastic Xlink merge source");
+  writeFileSync(linkedFile,"linked baseline\n");
+  for(let i=0;i<40;i++)writeFileSync(join(mount,`bulk-${i}.txt`),`base ${i}\n`);
+  live.native(["add",mount,"-R"]);const baseline=setup("pi-plastic Xlink merge baseline");
+  live.createBranch(source);live.switch(source);writeFileSync(rootFile,"root source\n");writeFileSync(linkedFile,"linked source\n");
+  for(let i=0;i<40;i++)writeFileSync(join(mount,`bulk-${i}.txt`),`source ${i}\n`);
+  const incoming=setup("pi-plastic Xlink merge source");
+  const sourceFiles=xmlTexts(parseLiveXml(live.native(["ls",mount,"-R","--xml","--encoding=utf-8"]).stdout),"Name");
+  assert(sourceFiles.filter(name=>name.startsWith("bulk-")).length>=40,"Size regression must actually contain >32 linked tree entries before applying.");
+  const sourceLinked=incoming.linkedChangesets[0];
+  const changedPaths=xmlTexts(parseLiveXml(live.native(["log",`cs:${sourceLinked.id}@${sourceLinked.repository}@${sourceLinked.server}`,"--xml"]).stdout),"DstCmPath");
+  assert(changedPaths.filter(path=>path.includes("bulk-")).length>=40,"Size regression must actually change >32 linked files before applying.");
   const start=live.toolCommands.length;
   let checked;
   if(scenario==="standalone") {
    live.switch(target);
    const merged=await live.tool("plastic_merge",{source:`cs:${incoming.changesets[0].id}`,format:"json"});
-   assert(merged.data.assessment.ownership.complete);assert.equal(merged.data.assessment.ownership.reads.length,4);
-   // Retain exact native profiles privately for independently sanitized fixtures.
-   live.native(["status","--machinereadable","--includeRevId","--fieldseparator=\x1f"]);live.native(["status"]);
-   live.native(["fileinfo",rootFile,linkedFile,"--fields=ClientPath,RepSpec,IsXlink,XlinkTarget,IsUnderXlink,UnderXlinkTarget,UnderXlinkPath,UnderXlinkWritable","--xml","--encoding=utf-8"]);
-   live.native(["fileinfo",mount,"--fields=ClientPath,RepSpec,IsXlink,XlinkTarget,IsUnderXlink,UnderXlinkTarget,UnderXlinkPath,UnderXlinkWritable","--xml","--encoding=utf-8"]);
-   for(const id of [baseline.changesets[0].id,incoming.changesets[0].id]) live.native(["ls","/"+relative(workspace,mount).replaceAll("\\","/"),`--tree=cs:${id}@${baseline.changesets[0].repository}@${server}`,"-R","--xml","--encoding=utf-8"]);
-   const preview=await live.tool("plastic_checkin",{message:"pi-plastic owned Xlink merge",includeAll:true,preflight:true,format:"json"});assert(preview.data.assessment.ownership.complete);
+   assert(merged.data.commandCompleted);
+   const preview=await live.tool("plastic_checkin",{message:"pi-plastic native Xlink merge",includeAll:true,preflight:true,format:"json"});assert.equal(preview.outcome,"preflight");
    checked=await live.tool("plastic_checkin",{message:"pi-plastic owned Xlink merge",includeAll:true,format:"json"});
   } else {
    const closeout=await live.tool("plastic_mergeToBranch",{source,target,updateTarget:false,message:"pi-plastic Xlink full closeout",format:"json"});
-   const stages=closeout.data.stages;assert(stages.find((s:any)=>s.name==="loaded-before-checkin").result.assessment.ownership.complete);
+   const stages=closeout.data.stages;
    checked=stages.find((s:any)=>s.name==="checkin").result;
   }
-  assert(checked.data.assessment.ownership.complete);assert.equal(checked.data.linkedChangesets.length,1);
-  const linked=checked.data.linkedChangesets[0];assert.equal(linked.branch,checked.data.assessment.ownership.mount.branch);
+  assert(checked.data.commandCompleted);assert.equal(checked.data.linkedChangesets.length,1);
+  for(let i=0;i<40;i++)assert.equal(readFileSync(join(mount,`bulk-${i}.txt`),"utf8"),`source ${i}\n`);
+  const linked=checked.data.linkedChangesets[0];
   assert.equal(readFileSync(rootFile,"utf8"),"root source\n");assert.equal(readFileSync(linkedFile,"utf8"),"linked source\n");
   live.verifyIntegration(checked.data.createdChangeset.id,target,incoming.changesets[0].id,baseline.changesets[0].id,[relative(workspace,rootFile)]);
   const linkedLog=parseLiveXml(live.native(["log",`cs:${linked.id}@${linked.repository}@${linked.server}`,"--ancestors",`--from=cs:${baseline.linkedChangesets[0].id}@${linked.repository}@${linked.server}`,"--xml"]).stdout);
   assert(xmlTexts(linkedLog,"ChangesetId").includes(incoming.linkedChangesets[0].id));assert.equal(xmlTexts(linkedLog,"Branch")[0],linked.branch);
   assert.equal(live.native(["cat",`${rootFile}#cs:${checked.data.createdChangeset.id}`]).stdout,"root source\n");assert.equal(live.native(["cat",`${linkedFile}#cs:${linked.id}`]).stdout,"linked source\n");
-  const commands=live.toolCommands.slice(start);assert.equal(commands.filter(c=>c.args[0]==="merge"&&c.args.includes("--merge")).length,1);assert.equal(commands.filter(c=>c.args[0]==="checkin").length,1);
+  const commands=live.toolCommands.slice(start);assert(!commands.some(c=>["fileinfo","ls"].includes(c.args[0])),"No ownership proof queries");assert.equal(commands.filter(c=>c.args[0]==="merge"&&c.args.includes("--merge")).length,1);assert.equal(commands.filter(c=>c.args[0]==="checkin").length,1);
   live.clean(target);live.switch(original.branch);assert.equal(live.clean(original.branch).changeset,original.changeset);
   live.record("scenario-passed",{scenario,target,source,baseline,incoming,checked});
  }
- live.saveSummary({outcome:"passed",original,final:live.clean(original.branch)});console.log(`PASS: one writable-Xlink merge/checkin and compound closeout; independent both-repository ancestry/history/bytes; ${live.evidenceDirectory}`);
+ live.saveSummary({outcome:"passed",original,final:live.clean(original.branch)});console.log(`PASS: native writable-Xlink >32 file merge/checkin and compound closeout; independent both-repository ancestry/history/bytes; ${live.evidenceDirectory}`);
 } catch(error) {live.saveSummary({outcome:"failed-preserved",error:String(error)});console.error(`STOP preserved sandbox; ${live.evidenceDirectory}`);throw error;}

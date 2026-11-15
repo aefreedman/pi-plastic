@@ -1,88 +1,29 @@
-import { workspaceAssessmentSchema, validateOwnershipAssessment } from "./workspace-assessment-output";
-import { markerGateSchema, validateMarkerGate } from "./marker-gate-output";
-import { Type, type TProperties } from "typebox";
+import { Type } from "typebox";
 import { Check } from "typebox/value";
-import { assembleCheckinReceipt, presentCheckinReceipt, checkinSafeValue, parseCheckinChangeset, parseCheckinEmission, type CheckinReceipt } from "../operations/checkin-receipt";
-const object = <P extends TProperties>(p: P) => Type.Object(p, { additionalProperties: false });
-const enumOf = <const V extends readonly string[]>(v: V) => Type.Unsafe<V[number]>({ anyOf: v.map(value => ({ type: "string", const: value })) });
-const str = (max = 4096) => Type.String({ maxLength: max });
-const uint = (max = Number.MAX_SAFE_INTEGER) => Type.Integer({ minimum: 0, maximum: max });
-const nullable = <T extends ReturnType<typeof object> | ReturnType<typeof Type.Array>>(s: T) => Type.Union([s, Type.Null()]);
-const cs = object({ id: Type.String({ pattern: "^(0|[1-9][0-9]{0,19})$" }), branch: str(), repository: str(), server: str(), mount: Type.Literal("/") });
-const linkedCs = object({ ...cs.properties, mount: str() });
-const summary = object({ totalPending: uint(499), tracked: uint(499), private: uint(499), added: uint(499), changed: uint(499), moved: uint(499), deleted: uint(499), other: uint(499) });
-const attempt = object({ state: enumOf(["not-attempted", "not-started", "started", "unknown"]), terminal: enumOf(["not-observed", "observed"]), exitCode: Type.Union([uint(2147483647), Type.Null()]), aborted: Type.Boolean(), timedOut: Type.Boolean() });
-const capture = object({ stdoutBytes: uint(), stderrBytes: uint(), stdoutRetainedBytes: uint(65536), stderrRetainedBytes: uint(16384), truncated: Type.Boolean(), complete: Type.Boolean(), validUtf8: Type.Boolean() });
-const step = object({ name: enumOf(["pending-before", "initial-checkin", "private-add", "private-retry", "pending-recovery", "fallback-checkin", "pending-after", "merge-diagnostic", "merge-readiness"]), operation: enumOf(["status", "checkin", "add"]), attempt, capture, effect: enumOf(["not-attempted", "uncertain", "command-completed", "changeset-created", "read-observed"]), evidence: enumOf(["unadmitted", "admitted"]), records: uint(501), summary: nullable(summary), changeset: nullable(cs) });
-const paths = Type.Array(str(), { maxItems: 100 });
-const reasons = Type.Array(object({ path: str(), reason: str(256) }), { maxItems: 100 });
-const data = { linkedChangesets: Type.Optional(Type.Array(linkedCs, { maxItems: 15 })), assessment: Type.Optional(workspaceAssessmentSchema), postObservationIssues: Type.Optional(object({ stage: enumOf(["pending-recovery", "pending-after"]), issues: Type.Array(object({ code: str(64), path: Type.Union([str(), Type.Null()]) }), { minItems: 1, maxItems: 8 }) })), markers: Type.Union([markerGateSchema, Type.Null()]), sourceAdmission: Type.Literal("validated-cm-output"), requestedPaths: paths, includedPaths: paths, fallbackPaths: paths, excludedPaths: reasons, privateAddPaths: paths, blockedPrivatePaths: reasons, itemEvents: Type.Array(Type.Union([object({ operation: enumOf(["CO", "AD", "DE", "CP", "RP"]), path: str() }), object({ operation: Type.Literal("MV"), sourcePath: str(), path: str() })]), { maxItems: 100 }), observedChangesets: Type.Array(cs, { maxItems: 100 }), command: nullable(Type.Array(str(8192), { maxItems: 120 })), steps: Type.Array(step, { maxItems: 8 }), autoEnabledApplyChanged: Type.Boolean(), usedFallbackRetry: Type.Boolean(), usedPrivateAutoAddRecovery: Type.Boolean(), pendingBefore: nullable(summary), pendingAfter: nullable(summary), wouldRun: Type.Boolean(), omittedReferences: uint(10000), scopeExhaustion: Type.Literal("unverified"), branchHead: Type.Literal("unverified"), serverAliasEquivalence: Type.Literal("unverified"), xlinkEffects: Type.Literal("unverified"), mergeLinkIdentity: Type.Literal("unverified") };
-const header = { schemaVersion: Type.Literal(1), action: Type.Literal("checkin"), provenance: object({ source: Type.Literal("plastic"), producer: Type.Literal("@aefree/pi-plastic"), contentTrust: Type.Literal("external") }), completeness: object({ capture: enumOf(["complete", "incomplete", "unknown"]), projection: Type.Boolean() }) };
-const error = object({ code: str(64), stage: enumOf(["input", "pending", "checkin", "producer"]), message: str(512) });
-export const checkinOutputSchema = Type.Unsafe<CheckinReceipt>(Type.Union([
-    object({ ...header, ok: Type.Literal(true), outcome: Type.Literal("completed"), data: object({ ...data, effect: Type.Literal("changeset-created"), createdChangeset: cs }) }),
-    object({ ...header, ok: Type.Literal(true), outcome: Type.Literal("preflight"), data: object({ ...data, effect: Type.Literal("not-attempted"), createdChangeset: Type.Null() }) }),
-    object({ ...header, ok: Type.Literal(false), outcome: enumOf(["failed", "unsupported", "uncertain"]), error, data: object({ ...data, effect: enumOf(["not-attempted", "uncertain", "command-completed", "changeset-created"]), createdChangeset: nullable(cs) }) }),
-]));
+import { assembleCheckinReceipt, buildCheckinArgv } from "../operations/checkin-receipt";
+import { checkinSafeComment, parseCheckinEmission, type CheckinReceipt } from "../domain/checkin-contract";
+import { presentCheckinReceipt } from "../operations/checkin-receipt";
+import { nativeObject as obj, nativeDataProperties, nativeReceiptSchema, validateNativeReceipt } from "./native-mutation-output";
+const emission = obj({ id: Type.String({ pattern: "^(0|[1-9][0-9]{0,19})$" }), branch: Type.String(), repository: Type.String(), server: Type.String(), mount: Type.String() });
+const requested = obj({ message: Type.String(), paths: Type.Optional(Type.Array(Type.String())), ...Object.fromEntries(["applyChanged", "includePrivate", "includeAll", "updateAfter", "preflight"].map(k => [k, Type.Optional(Type.Boolean())])), format: Type.Optional(Type.Union([Type.Literal("text"), Type.Literal("json")])), workdir: Type.Optional(Type.String()) });
+export const checkinOutputSchema = Type.Unsafe<CheckinReceipt>(nativeReceiptSchema("checkin", obj({ ...nativeDataProperties, requested: Type.Union([requested, Type.Null()]), createdChangeset: Type.Union([emission, Type.Null()]), linkedChangesets: Type.Array(emission), observedChangesets: Type.Array(emission), identityObservation: obj({ complete: Type.Boolean(), omitted: Type.Integer({ minimum: 0 }), malformed: Type.Boolean(), ambiguousRoot: Type.Boolean() }) })));
 export function validateCheckinOutput(value: unknown): value is CheckinReceipt {
-    if (!Check(checkinOutputSchema, value) || Buffer.byteLength(JSON.stringify(value), "utf8") > 131072) return false;
-    const d = (value as CheckinReceipt).data, dto = value as CheckinReceipt;
-    if (d.assessment && !validateOwnershipAssessment(d.assessment)) return false;
-    if (d.assessment && (d.assessment.ready !== (d.assessment.blockers.length === 0) || d.assessment.mergeRowCount + d.assessment.ordinaryRowCount > d.assessment.rowCount || dto.ok && !d.assessment.ready)) return false;
-    if (d.postObservationIssues && !d.steps.some(s => s.name === d.postObservationIssues!.stage && s.operation === "status" && s.evidence === "unadmitted" && s.summary === null)) return false;
-    if (d.markers !== null && !validateMarkerGate(d.markers)) return false;
-    if ((dto.ok || d.steps.some(s => s.operation !== "status")) && d.markers?.state !== "clear") return false;
-    const lists = [d.requestedPaths, d.includedPaths, d.fallbackPaths, d.excludedPaths, d.privateAddPaths, d.blockedPrivatePaths, d.itemEvents, d.observedChangesets, d.linkedChangesets ?? [], d.command ?? []];
-    if (lists.reduce((n, a) => n + a.length, 0) > 100 || dto.completeness.projection !== (d.omittedReferences === 0)) return false;
-    if (![...d.requestedPaths, ...d.includedPaths, ...d.fallbackPaths, ...d.privateAddPaths, ...d.excludedPaths.map(p => p.path), ...d.blockedPrivatePaths.map(p => p.path)].every(checkinSafeValue)) return false;
-    const validCs = (c: NonNullable<typeof d.createdChangeset>) => !!parseCheckinChangeset(`cs:${c.id}@br:${c.branch}@${c.repository}@${c.server} (mount:'/')`);
-    if (!d.observedChangesets.every(validCs) || d.createdChangeset && !validCs(d.createdChangeset)) return false;
-    const linked = d.linkedChangesets ?? [];
-    const ownership = d.assessment?.ownership;
-    if (ownership?.complete && d.createdChangeset) {
-        const root = ownership.root!, mount = ownership.mount!;
-        if (d.createdChangeset.branch !== root.branch || d.createdChangeset.repository !== root.repository || d.createdChangeset.server !== root.server) return false;
-        if ((dto.completeness.projection || linked.length) && (linked.length !== 1 || linked[0].mount !== mount.path || linked[0].branch !== mount.branch || linked[0].repository !== mount.repository || linked[0].server !== mount.server)) return false;
-    }
-    if (linked.some(c => c.mount === "/" || !parseCheckinEmission(`cs:${c.id}@br:${c.branch}@${c.repository}@${c.server} (mount:'${c.mount}')`)) || new Set(linked.map(c => c.mount.toLowerCase())).size !== linked.length) return false;
-    if (linked.length && !d.steps.some(s => s.operation === "checkin" && s.evidence === "admitted")) return false;
-    for (const e of d.itemEvents) if (!checkinSafeValue(e.path) || e.operation === "MV" && !checkinSafeValue(e.sourcePath)) return false;
-    if (d.command && (d.command.reduce((n, a) => n + a.length, 0) > 32768 || Buffer.byteLength(JSON.stringify(d.command), "utf8") > 65536 || d.command[0] !== "cm" || d.command[1] !== "checkin")) return false;
+    if (!Check(checkinOutputSchema, value)) return false;
+    const dto = value as CheckinReceipt, d = dto.data;
+    if (!validateNativeReceipt(dto) || Buffer.byteLength(JSON.stringify(d.observedChangesets), "utf8") > 32770) return false;
     const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-    const summaryValid = (s: NonNullable<typeof d.pendingBefore>) => s.totalPending === s.tracked + s.private && s.totalPending === s.added + s.changed + s.moved + s.deleted + s.private + s.other;
-    if (d.pendingBefore && !summaryValid(d.pendingBefore) || d.pendingAfter && !summaryValid(d.pendingAfter)) return false;
-    const normal = (s: typeof d.steps[number]) => s.attempt.state === "started" && s.attempt.terminal === "observed" && s.attempt.exitCode !== null && !s.attempt.aborted && !s.attempt.timedOut && s.capture.complete;
-    for (const s of d.steps) {
-        const a = s.attempt, c = s.capture;
-        if (a.exitCode !== null && a.terminal !== "observed" || c.stdoutRetainedBytes > c.stdoutBytes || c.stderrRetainedBytes > c.stderrBytes || c.complete && (!c.validUtf8 || c.truncated || a.terminal !== "observed" || a.aborted || a.timedOut)) return false;
-        if (s.name === "merge-readiness" && (s.operation !== "status" || s.effect !== "not-attempted" || s.summary || s.evidence === "admitted" && (!normal(s) || a.exitCode !== 0 || c.stderrBytes))) return false;
-        if (s.summary && (!summaryValid(s.summary) || s.operation !== "status" || s.effect !== "read-observed")) return false;
-        if (s.operation === "status" && !["not-attempted", "read-observed"].includes(s.effect)) return false;
-        if (s.operation !== "status" && s.summary) return false;
-        if (s.effect === "read-observed" && (!normal(s) || a.exitCode !== 0 || c.stderrBytes || s.evidence !== "admitted" || !s.summary)) return false;
-        if (s.effect === "command-completed" && (s.operation !== "add" || !normal(s) || a.exitCode !== 0)) return false;
-        if (s.effect === "changeset-created" && (s.operation !== "checkin" || !normal(s) || a.exitCode !== 0 || c.stderrBytes || s.evidence !== "admitted" || !s.changeset || !validCs(s.changeset))) return false;
-        if (s.changeset && s.effect !== "changeset-created") return false;
-        if (s.operation !== "status" && s.effect === "not-attempted" && !["not-attempted", "not-started"].includes(a.state)) return false;
-    }
-    const readiness = d.steps.filter(s => s.name === "merge-readiness");
-    if (readiness.length > 1 || readiness.length && (d.steps[0]?.name !== "pending-before" || d.steps[1] !== readiness[0] || (dto.ok || d.steps.length > 2) && readiness[0].evidence !== "admitted")) return false;
-    const mutations = d.steps.filter(s => s.operation !== "status"), created = mutations.filter(s => s.effect === "changeset-created");
-    const expected = created.length ? "changeset-created" : mutations.some(s => s.effect === "uncertain") ? "uncertain" : mutations.some(s => s.effect === "command-completed") ? "command-completed" : "not-attempted";
-    if (d.effect !== expected || created.length > 1 || !!d.createdChangeset !== !!created.length || d.createdChangeset && !same(d.createdChangeset, created[0].changeset)) return false;
-    if (dto.outcome === "completed" && (!d.createdChangeset || !d.pendingBefore || !d.wouldRun)) return false;
-    if (dto.outcome === "preflight" && (mutations.length || !d.pendingBefore || !d.wouldRun || d.steps.some(s => !["pending-before", "merge-readiness"].includes(s.name)))) return false;
-    if ((dto.outcome === "failed" || dto.outcome === "unsupported") && mutations.length) return false;
-    if (d.usedFallbackRetry !== d.steps.some(s => s.name === "fallback-checkin")) return false;
-    if (d.usedPrivateAutoAddRecovery !== d.steps.some(s => s.name === "private-add" && s.effect === "command-completed")) return false;
-    if (dto.completeness.capture !== (d.steps.length ? d.steps.every(s => s.capture.complete) && (d.assessment?.ownership?.reads??[]).every(s=>s.capture.complete) && (!d.markers || d.markers.capture?.complete === true) ? "complete" : "incomplete" : "unknown")) return false;
-    if (d.pendingBefore && !same(d.pendingBefore, d.steps.find(s => s.name === "pending-before")?.summary)) return false;
-    if (d.pendingAfter && !d.steps.some(s => ["pending-recovery", "pending-after"].includes(s.name) && same(s.summary, d.pendingAfter))) return false;
-    return true;
+    if (d.observedChangesets.some(c => !parseCheckinEmission(`cs:${c.id}@br:${c.branch}@${c.repository}@${c.server} (mount:'${c.mount}')`))) return false;
+    const roots = d.observedChangesets.filter(c => c.mount === "/"), ambiguous = roots.length > 1 || new Set(d.observedChangesets.map(c => c.mount)).size !== d.observedChangesets.length;
+    if (d.identityObservation.ambiguousRoot !== ambiguous || !same(d.createdChangeset, !ambiguous && roots.length === 1 ? roots[0] : null) || !same(d.linkedChangesets, d.observedChangesets.filter(c => c.mount !== "/"))) return false;
+    if (d.identityObservation.complete && (!d.capture?.complete || !d.observedChangesets.length || ambiguous || d.identityObservation.omitted || d.identityObservation.malformed)) return false;
+    if (!d.requested) return !dto.ok && dto.error.code === "invalid_request" && d.command === null && d.capture === null && !d.observedChangesets.length;
+    if (!checkinSafeComment(d.requested.message) || !d.requested.message.trim() || d.requested.updateAfter === true || d.requested.paths?.some(p => !p.trim() || p.trimStart().startsWith("-")) || Buffer.byteLength(JSON.stringify(d.requested), "utf8") > 24576) return false;
+    const argv = d.command ?? [], option = (name: string) => argv.find(a => a.startsWith(name + "="))?.slice(name.length + 1) ?? "";
+    const separators = { start: option("--startlineseparator"), end: option("--endlineseparator"), field: option("--fieldseparator") };
+    return !!d.workingDirectory && /^__PI_CI_START_[a-f0-9]{32}__$/.test(separators.start) && same(argv, buildCheckinArgv(d.requested, separators)) && (dto.outcome === "preflight") === (d.requested.preflight === true) && (dto.outcome !== "preflight" || !d.observedChangesets.length);
 }
 export async function executeCheckinOutput(args: unknown) {
     const dto = await assembleCheckinReceipt(args);
-    if (!validateCheckinOutput(dto)) throw new Error("The bounded checkin producer receipt could not be verified.");
-    const text = presentCheckinReceipt(dto, (args as { format?: unknown })?.format === "json" ? "json" : "text");
-    return { content: [{ type: "text" as const, text }], details: {}, structuredContent: dto, isError: !dto.ok };
+    if (!validateCheckinOutput(dto)) throw Error("Native checkin receipt is inconsistent; inspect effects before any retry.");
+    return { content: [{ type: "text" as const, text: presentCheckinReceipt(dto, dto.data.requested?.format) }], details: {}, structuredContent: dto, isError: !dto.ok };
 }

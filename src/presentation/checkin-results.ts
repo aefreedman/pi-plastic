@@ -1,17 +1,5 @@
 import type { CheckinReceipt } from "../domain/checkin-contract";
 export function presentCheckinReceipt(dto: CheckinReceipt, format: "text" | "json" = "text"): string {
-    const text = format === "json" ? JSON.stringify(dto) : [
-        `## Checkin ${dto.outcome}`,
-        `- Effect: ${dto.data.effect}`,
-        ...(dto.outcome === "preflight" ? [`- Would run: ${dto.data.wouldRun ? "yes" : "no"}`, `- Command argv: ${JSON.stringify(dto.data.command)}`] : []),
-        ...(dto.data.createdChangeset ? [`- Observed root changeset: cs:${dto.data.createdChangeset.id}@br:${dto.data.createdChangeset.branch}@${dto.data.createdChangeset.repository}@${dto.data.createdChangeset.server}`] : []),
-        ...(dto.data.linkedChangesets?.length ? [`- Linked changeset emissions: ${dto.data.linkedChangesets.length}; Xlink effects remain unverified.`] : []),
-        ...(dto.data.assessment?.ownership?.complete ? ["- Merge ownership: one writable mount; repository/source correlation observed, not global Xlink-effect proof."] : []),
-        `- Steps: ${dto.data.steps.map(s => `${s.name} (${s.effect})`).join(", ") || "none"}`,
-        `- Pending after: ${dto.data.pendingAfter ? dto.data.pendingAfter.totalPending : "not verified"}`,
-        ...(dto.data.postObservationIssues ? [`- ${dto.data.postObservationIssues.stage} observation: ${dto.data.postObservationIssues.issues.map(i => i.code).join(", ")}${dto.data.createdChangeset ? "; created identity is retained" : ""}.`] : []),
-        "- Requested scope exhaustion, branch head, alias equivalence, merge links and Xlink effects: unverified",
-        ...(!dto.ok ? [`- Blocker: ${dto.error.stage}/${dto.error.code}: ${dto.error.message}`] : []),
-    ].join("\n");
-    return Buffer.byteLength(text, "utf8") <= 24000 ? text : JSON.stringify({ action: dto.action, outcome: dto.outcome, ok: dto.ok, note: "Presentation omitted; inspect structuredContent for the bounded receipt." });
+    if (format === "json") return JSON.stringify(dto);
+    return [`Checkin: ${dto.outcome}.`, `Native command completed: ${dto.data.commandCompleted}; exit: ${dto.data.attempt.exitCode ?? "unobserved"}.`, ...(dto.outcome === "preflight" ? [`Command argv: ${JSON.stringify(dto.data.command)}`] : []), ...(dto.data.createdChangeset ? [`Observed root changeset: cs:${dto.data.createdChangeset.id}@br:${dto.data.createdChangeset.branch}@${dto.data.createdChangeset.repository}@${dto.data.createdChangeset.server}`] : ["Root changeset identity: unobserved or ambiguous."]), `Linked changeset emissions: ${dto.data.linkedChangesets.length}; identity observation ${dto.data.identityObservation.complete ? "complete" : "incomplete"}.`, dto.data.commandOutput?.stdout ?? "", dto.data.commandOutput?.stderr ?? "", ...(!dto.completeness.projection ? ["Diagnostic output truncated; native execution was not stopped by the presentation budget."] : []), ...(!dto.ok ? [dto.error.message] : []), "Emitted identities are observations, not global Xlink-effect proof. No automatic retry."].filter(Boolean).join("\n");
 }

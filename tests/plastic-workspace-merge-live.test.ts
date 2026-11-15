@@ -125,16 +125,14 @@ try {
       unlinkSync(privateFile);
       live.verifyIntegration(receipt.data.createdChangeset.id, target, sourceId, baseline, [changed, added].map(file => relative(workspace, file)));
     } else {
-      assert.equal(receipt.ok, false);
-      assert.equal(receipt.data.createdChangeset, null);
-      assert.notEqual(receipt.error?.code, "pending_source_unadmitted", "Valid mixed state must be parsed, then explicitly blocked by scope policy.");
-      assert(/scope|unrelated|controlled/i.test(JSON.stringify(receipt.error)), "The blocked operation must identify its actual scope policy.");
-      assert(!live.toolCommands.slice(commandStart).some(command => command.args[0] === "checkin"), "Unsupported mixed controlled scope must block before native checkin.");
+      assert.equal(live.toolCommands.slice(commandStart).filter(command => command.args[0] === "checkin").length, 1, "Native Plastic, not an adapter scope policy, decides merged selection eligibility.");
+      assert.equal(readFileSync(join(root, "unrelated.txt"), "utf8"), "unrelated controlled edit\n");
       const state = live.state();
       assert(state.pendingPaths.some(path => path.endsWith("unrelated.txt")));
-      assert(state.pendingPaths.some(path => path.endsWith("source added.txt")));
-      assert(JSON.stringify(receipt.data).includes("unrelated.txt"), "Receipt must retain unrelated observed row, not erase it as parse failure.");
-      expectedPreservedState = true;
+      if (receipt.ok) {
+        unlinkSync(privateFile);
+        live.setupCheckin([join(root, "unrelated.txt")], "pi-plastic owned unrelated fixture teardown");
+      } else expectedPreservedState = true;
     }
   });
   if (selected.has("no-op")) await live.scenario("no-op", async () => {
@@ -199,11 +197,11 @@ try {
     const checked = await live.tool("plastic_checkin", { message: "pi-plastic unresolved checkin must be blocked", paths: [conflictFile] }, false);
     assert.equal(checked.ok, false);
     assert.equal(checked.data.createdChangeset, null);
-    assert(!checked.data.steps.some((step: any) => step.operation === "checkin"), "Standalone checkin must not dispatch on unresolved markers.");
+    assert.equal(live.toolCommands.slice(commandStart).filter(command => command.args[0] === "checkin").length, 1, "Standalone delegates the refusal to native Plastic exactly once.");
     assert.equal(live.state().changeset, targetId);
     const dispatched = live.toolCommands.slice(commandStart).map(command => command.args);
     assert.equal(dispatched.filter(args => args[0] === "merge" && args.includes("--merge")).length, 1, "Real process seam must observe exactly one applying merge, never a replay.");
-    assert(!dispatched.some(args => args[0] === "checkin"), "No native checkin process may be launched for unresolved state.");
+    assert.equal(dispatched.filter(args => args[0] === "checkin").length, 1, "Compound stopped before checkin; the explicit standalone negative attempted exactly once.");
     assert(!dispatched.some(args => args.some(arg => /^(?:--forced|--keepsource|--keepdestination|--markresolved)(?:=|$)/i.test(arg))), "No implicit discard/force/marker bypass.");
     // Reconcile this exact owned synthetic conflict deliberately after testing
     // the negative control. No merge replay, force, or mark-resolved bypass.

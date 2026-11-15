@@ -2,22 +2,22 @@ import { spawn } from "node:child_process";
 import type { Readable } from "node:stream";
 import { commandExecutionStorage, getActiveAbortSignal } from "./context";
 import { getCmExecutable } from "./process";
-export type CheckinAttempt = { state: "not-attempted" | "not-started" | "started" | "unknown"; terminal: "not-observed" | "observed"; exitCode: number | null; aborted: boolean; timedOut: boolean };
-export type CheckinCapture = { stdoutBytes: number; stderrBytes: number; stdoutRetainedBytes: number; stderrRetainedBytes: number; truncated: boolean; complete: boolean; validUtf8: boolean };
-export const emptyCheckinAttempt = (): CheckinAttempt => ({ state: "not-attempted", terminal: "not-observed", exitCode: null, aborted: false, timedOut: false });
-export type CheckinCommandObservation = { attempt: CheckinAttempt; capture: CheckinCapture; stdout: string | null; stderr: string | null; failed: boolean };
+export type WorkspaceMergeAttempt = { state: "not-attempted" | "not-started" | "started" | "unknown"; terminal: "not-observed" | "observed"; exitCode: number | null; aborted: boolean; timedOut: boolean };
+export const emptyWorkspaceMergeAttempt = (): WorkspaceMergeAttempt => ({ state: "not-attempted", terminal: "not-observed", exitCode: null, aborted: false, timedOut: false });
+export type WorkspaceMergeCapture = { stdoutBytes: number; stderrBytes: number; stdoutRetainedBytes: number; stderrRetainedBytes: number; truncated: boolean; complete: boolean; validUtf8: boolean };
+export type WorkspaceMergeCommandObservation = { attempt: WorkspaceMergeAttempt; capture: WorkspaceMergeCapture; stdout: string | null; stderr: string | null; failed: boolean };
 // Forced-retirement guards have no per-command state or retained buffers.
 const ignoreRetiredError = () => {};
 /** Selected-tool byte capture; never retries, changes encoding, or discards effect uncertainty. */
-export async function captureCheckinCommand(args: string[], workdir: string, timeoutMs = 30000): Promise<CheckinCommandObservation> {
-    if (args.length > 120 || args.reduce((n, a) => n + a.length, 0) > 32768 || Buffer.byteLength(JSON.stringify(args), "utf8") > 65536) throw new Error("Checkin argv exceeds the admitted bound.");
-    const attempt = emptyCheckinAttempt();
-    const capture: CheckinCapture = { stdoutBytes: 0, stderrBytes: 0, stdoutRetainedBytes: 0, stderrRetainedBytes: 0, truncated: false, complete: false, validUtf8: false };
-    const result: CheckinCommandObservation = { attempt, capture, stdout: null, stderr: null, failed: false };
+export async function captureNativeMutation(args: string[], workdir?: string, timeoutMs = 30000, onStdout?: (chunk: string) => void): Promise<WorkspaceMergeCommandObservation> {
+    if (Buffer.byteLength(JSON.stringify(args), "utf8") > 32768) throw new Error("Command arguments exceed the execution byte budget.");
+    const attempt = emptyWorkspaceMergeAttempt();
+    const capture: WorkspaceMergeCapture = { stdoutBytes: 0, stderrBytes: 0, stdoutRetainedBytes: 0, stderrRetainedBytes: 0, truncated: false, complete: false, validUtf8: false };
+    const result: WorkspaceMergeCommandObservation = { attempt, capture, stdout: null, stderr: null, failed: false };
     const signal = getActiveAbortSignal(), deps = commandExecutionStorage.getStore() ?? {};
     if (signal?.aborted) { attempt.aborted = true; return result; }
     let child: ReturnType<typeof spawn>;
-    try { child = (deps.spawn ?? spawn)(getCmExecutable(), args, { cwd: workdir, shell: false, stdio: ["ignore", "pipe", "pipe"] }); }
+    try { child = (deps.spawn ?? spawn)(getCmExecutable(), args, { cwd: workdir ?? process.cwd(), shell: false, stdio: ["ignore", "pipe", "pipe"] }); }
     catch { attempt.state = "not-started"; result.failed = true; return result; }
     attempt.state = "unknown";
     const schedule = deps.setTimeout ?? setTimeout, cancel = deps.clearTimeout ?? clearTimeout;
@@ -48,18 +48,22 @@ export async function captureCheckinCommand(args: string[], workdir: string, tim
     };
     const collect = (stream: Readable | null, cap: number, name: "stdout" | "stderr") => {
         let length = 0; const parts: Buffer[] = [];
+        const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+        let valid = true;
         if (!stream) { failed = true; terminate(); return Promise.resolve(Buffer.alloc(0)); }
         if (stream.readableEncoding) { failed = true; terminate(); }
         return new Promise<Buffer>(resolve => {
             let done = false;
-            const finish = () => { if (!done) { done = true; const bytes = Buffer.concat(parts, length); parts.length = 0; resolve(bytes); } };
+            const finish = () => { if (!done) { done = true; try { const tail = decoder.decode(); if (name === "stdout" && tail) onStdout?.(tail); } catch { valid = false; } if (!valid) capture.validUtf8 = false; const bytes = Buffer.concat(parts, length); parts.length = 0; resolve(bytes); } };
             finishers.push(finish);
             const data = (chunk: unknown) => {
                 if (done || retired || finalized) return;
                 if (!(chunk instanceof Uint8Array)) { failed = true; terminate(); return; }
-                capture[name === "stdout" ? "stdoutBytes" : "stderrBytes"] += chunk.byteLength;
+                const key = name === "stdout" ? "stdoutBytes" : "stderrBytes";
+                capture[key] = Math.min(Number.MAX_SAFE_INTEGER, capture[key] + chunk.byteLength);
+                try { const text = decoder.decode(chunk, { stream: true }); if (name === "stdout") onStdout?.(text); } catch { valid = false; }
                 const available = cap - length;
-                if (chunk.byteLength > available) { capture.truncated = true; terminate(); }
+                if (chunk.byteLength > available) capture.truncated = true;
                 if (available > 0) { const part = Buffer.from(chunk.subarray(0, available)); parts.push(part); length += part.length; }
             };
             const error = () => { if (retired || finalized) return; failed = true; terminate(); finish(); };
@@ -74,8 +78,10 @@ export async function captureCheckinCommand(args: string[], workdir: string, tim
         settleExit = resolve;
         onClose = (code, terminalSignal) => {
             if (settled || retired || finalized) return; settled = true; attempt.terminal = "observed";
-            attempt.exitCode = Number.isInteger(code) && code !== null && code >= 0 ? code : null;
-            if (!started || attempt.exitCode === null || terminalSignal) failed = true;
+            attempt.exitCode = Number.isInteger(code) && code !== null && code >= 0 && code <= 2147483647 ? code : null;
+            // A terminal event is not a substitute for the native start event.
+            if (!started) failed = true;
+            if (attempt.exitCode === null || terminalSignal) failed = true;
             resolve();
         };
         onError = error => {
@@ -87,6 +93,7 @@ export async function captureCheckinCommand(args: string[], workdir: string, tim
         };
         child.once("spawn", onSpawn); child.once("close", onClose); child.on("error", onError);
     });
+    capture.validUtf8 = true;
     const out = collect(child.stdout, 65536, "stdout"), err = collect(child.stderr, 16384, "stderr");
     const onAbort = () => { if (retired || finalized) return; attempt.aborted = true; terminate(); };
     signal?.addEventListener("abort", onAbort, { once: true });
@@ -96,14 +103,13 @@ export async function captureCheckinCommand(args: string[], workdir: string, tim
         const [, stdout, stderr] = await Promise.all([exit, out, err]);
         capture.stdoutRetainedBytes = stdout.length; capture.stderrRetainedBytes = stderr.length;
         result.failed = failed;
-        try {
-            // Preserve a BOM as evidence rather than silently removing source bytes.
-            result.stdout = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(stdout);
-            result.stderr = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(stderr);
-            capture.validUtf8 = true;
-        } catch { result.stdout = null; result.stderr = null; }
+        // A retained prefix may end mid-codepoint. Streaming decoders above
+        // validate the full streams; projection decoding must not invent loss.
+        const prefix = (bytes: Buffer) => { const decoder = new TextDecoder("utf-8", { ignoreBOM: true }); return decoder.decode(bytes, { stream: true }); };
+        result.stdout = capture.validUtf8 ? prefix(stdout) : null;
+        result.stderr = capture.validUtf8 ? prefix(stderr) : null;
         if (signal?.aborted) attempt.aborted = true;
-        capture.complete = !failed && !result.failed && !attempt.aborted && !attempt.timedOut && capture.validUtf8 && !capture.truncated && attempt.terminal === "observed";
+        capture.complete = !failed && !result.failed && !attempt.aborted && !attempt.timedOut && capture.validUtf8 && attempt.terminal === "observed";
         return result;
     } finally {
         finalized = true;

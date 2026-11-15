@@ -7,17 +7,20 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Changed
+
+- Workspace merge, checkin and compound closeout now use receipt schema v2: native completion, diagnostics and emitted changeset observations are separate. Unknown progress/identity formats do not turn native success into adapter failure.
+- Delegate workspace and Xlink eligibility to Plastic instead of reconstructing ownership or enforcing file/link/status composition limits. Exact standalone paths/options are passed once, without automatic add, inferred flags, path rewrites or fallback checkins.
+- All workspace merge/checkin/closeout preflights are zero-command plans. Compound execution requires a clean initial workspace/merge state, skips unnecessary switches and stops after native failure without replay.
+
 ### Fixed
 
-- Correlate pinned workspace merge sources with exact pending changeset links instead of interpreting them as branch names. Auto-mode label/shelveset selectors now stop before dispatch when source identity cannot be verified.
-
-- Retain the root changeset from current-client writable-Xlink checkin identity lists and expose bounded linked emissions without claiming verified Xlink effects. Ambiguous lists remain uncertain without retry.
+- Retain root and linked identities from current-client comma-separated checkin emissions. Native branch, changeset, label and shelveset merge operands are forwarded unchanged.
+- Drain verbose mutation output through real terminal completion while retaining bounded diagnostics and incremental identity observations; presentation overflow no longer kills a valid command.
 
 ### Added
 
-- Bounded one-writable-Xlink merge/checkin and compound closeout readiness for 2–32 present RP/CO/CP files, using per-path ownership and immutable root/source mount-tree observations. Unsupported compositions remain blocked; linked emissions do not imply global effect verification.
-
-- Opt-in live regression for pinned merges, independent target history/content verification, no-op integration and current-client loaded-base diffs; separate writable-Xlink checkin coverage independently verifies both repository histories and historical bytes.
+- Live regression coverage for native selectors, scoped checkin beside unrelated/private work, conflict refusal, pinned merges and Xlink merges/closeout with more than 32 changed linked files/tree entries.
 
 ## [0.10.0] - 2026-11-10
 

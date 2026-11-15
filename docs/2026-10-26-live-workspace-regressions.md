@@ -37,7 +37,7 @@ With the same workspace, mutation permission and attestation settings, run `npm 
 
 ## Replaced-checkout regression
 
-With the same exact disposable workspace, mutation permission and attestation settings, run `npm run test:live:replaced-checkout` for the standalone `CO+RP` checkin profile. It creates two synthetic revisions on a unique descendant branch, reverts only its owned file to the earlier revision (which checks it out), and requires native `CO+RP` with a positive revision and `NO_MERGES`. It verifies a read-only preflight, one typed checkin, exact reverted bytes and native changeset history, then restores the original clean branch. On failure it preserves state without undo, retry or a native checkin workaround.
+With the same exact disposable workspace, mutation permission and attestation settings, run `npm run test:live:replaced-checkout` for the standalone `CO+RP` checkin profile. It creates two synthetic revisions on a unique descendant branch, reverts only its owned file to the earlier revision (which checks it out), and requires native `CO+RP` with a positive revision and `NO_MERGES`. It verifies a zero-command preflight, one typed checkin, exact reverted bytes and native changeset history, then restores the original clean branch. On failure it preserves state without undo, retry or a native checkin workaround.
 
 ## Scenario matrix
 
@@ -50,10 +50,10 @@ With the same exact disposable workspace, mutation permission and attestation se
 | `mixed-relative` | Same workflow with explicit relative workdir and controlled process cwd |
 | `scope-private` | Selected standalone checkin leaves unrelated controlled bytes and private work uncommitted; independent history verifies selection |
 | `merged-private` | Complete controlled merge scope may be checked in while explicitly excluding a disjoint private sibling |
-| `merged-unrelated` | Valid merged rows plus an unrelated controlled edit are retained as observations but explicitly blocked by scope policy before checkin; not mislabeled as a parse failure |
+| `merged-unrelated` | Exact selected merged paths are dispatched once; native Plastic decides eligibility while unrelated/private fixture work is independently checked |
 | `no-op` | Already integrated source can be inspected/merged without inventing another changeset |
 | `text-conflict` | Real overlapping edits create diff3 markers; closeout and standalone checkin stop; real process trace proves one applying merge, no checkin, replay, force or contributor discard; explicit owned-file reconciliation is tested afterward |
-| `large-merge` | 130 source files: either complete verified integration, or an explicit bounded stop with all native pending paths retained—not silent prefix success |
+| `large-merge` | 130 source files exercise native completion and bounded diagnostic projection, without a semantic file-count admission rule |
 | `unicode-path` | Unicode filename/content: either verified integration or an observable capture/encoding stop, with original path retained in independent UTF-8 XML; no lossy decoding fallback |
 
 The default matrix runs the seven positive/real-conflict scenarios and can take several minutes. Give the outer command runner at least a 15-minute deadline, or select one scenario per invocation and inspect its completed result before starting the next. Individual CM calls remain bounded at 30 seconds. An outer timeout is an infrastructure failure, not a failed merge-normalization assertion: inspect the exact run's evidence and current sandbox state before any new attempt; do not replay an uncertain mutation.
@@ -64,7 +64,7 @@ Capacity, Unicode-path and `merged-unrelated` scope probes run **alone**, becaus
 PI_PLASTIC_LIVE_SCENARIOS=large-merge npm run test:live:merge
 ```
 
-Supply the workspace/mutation/attestation variables too. A negative probe reporting `passed-state-preserved` proves the expected stop, not successful integration or a clean sandbox. Review its evidence and make an explicit recovery decision before another run.
+Supply the workspace/mutation/attestation variables too. A probe reporting `passed-state-preserved` proves only its recorded stop/state, not successful integration or a clean sandbox. Review its evidence and make an explicit recovery decision before another run.
 
 Positive mixed scenarios use ASCII/space-containing paths with Unicode UTF-8 file content. This avoids confusing the client's historical non-UTF-8 display encoding with successful Unicode path support. The separate Unicode-path probe tests that boundary rather than weakening capture validation.
 
@@ -85,3 +85,11 @@ The process trace wraps the real execution seam and launches the actual executab
 For a redesign/regression investigation, run the same scenario against the baseline and candidate source. Record both revisions and exact scenario selections. Keep failures, partial effects and infrastructure errors distinct. Live execution is bounded per CLI process, with no timeout retry or fallback. A client/platform observation is not universal support or an atomic repository snapshot.
 
 `npm run test:live:contract` is credential-free and runs no CM commands. It validates opt-in/attestation behavior and ensures unknown/malformed independent pending XML cannot be interpreted as a clean workspace. Default `npm test` includes these harness controls. The ordinary deterministic suites still own malformed transport, cancellation, synthetic warning, and schema-semantic adversarial coverage.
+
+## Native workspace receipt v2 probes
+
+With the same disposable-workspace mutation settings, `npm run test:live:selectors` verifies native label and shelveset operands and exact historical bytes. `npm run test:live:pinned-merge` covers pinned sources, no-op and loaded-base diffs. `npm run test:live:xlink-checkin` and `npm run test:live:xlink-merge` additionally require an existing synthetic `PI_PLASTIC_TEST_XLINK_REPOSITORY`; the merge suite changes more than 32 linked files and independently verifies both repository histories/ancestry and historical bytes, without ownership-proof queries.
+
+`PI_PLASTIC_LIVE_SCENARIOS=scope-private,text-conflict npm run test:live:merge` verifies exact standalone selection alongside unrelated/private work and genuine native marker refusal. Compound closeout stops after the failed merge; a separately requested standalone checkin reaches Plastic once and is refused by native eligibility. The owned text fixture is deliberately reconciled afterward, with no merge replay or marker bypass.
+
+`npm run test:live:conflict` exercises a genuine binary conflict and requires zero automatic checkins after native merge failure. It deliberately preserves the unresolved synthetic fixture and reports `passed-conflict-state-preserved`; this is not a clean sandbox or completed merge. Obtain an explicit recovery decision before another sandbox mutation. Clear marker listings alone do not establish binary merge completion.

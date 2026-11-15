@@ -173,13 +173,13 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
   } else if (name === "mergeToBranch" && action === "merge-to-branch") {
     summary.label = `Closeout: ${scalar(envelope.outcome)}`;
     summary.tone = envelope.ok === false ? "error" : envelope.outcome === "completed" ? "success" : "warning";
-    summary.rows = [`Effect: ${scalar(data.effect)}`, `Recorded stages: ${records(data.stages).length}`, `Created changeset: ${scalar(record(data.createdChangeset).id) || "unobserved"}`, `Target verification: ${scalar(data.targetVerification)}`];
+    summary.rows = [`Effect: ${scalar(data.effect)}`, `Recorded stages: ${records(data.stages).length}`, `Created changeset: ${scalar(record(data.createdChangeset).id) || "unobserved"}`, `Target: ${scalar(data.targetBranch) || "unresolved"}`];
     if (envelope.ok === false) notices.unshift(scalar(record(envelope.error).message));
     notices.push("Earlier child effects remain recorded. Source links, branch head, aliases, exclusive scope and rollback unverified; no automatic replay.");
   } else if (name === "merge" && action === "merge") {
     summary.label = `Workspace merge: ${scalar(envelope.outcome)}`;
     summary.tone = envelope.ok === false ? "error" : "warning";
-    summary.rows = [`Applying command completed: ${String(data.commandCompleted)}`, `Checkin readiness: ${scalar(data.checkinReadiness)}`, `Effect: ${scalar(data.effect)}`];
+    summary.rows = [`Applying command completed: ${String(data.commandCompleted)}`, `Native exit: ${scalar(record(data.attempt).exitCode) || "unobserved"}`, `Effect: ${scalar(data.effect)}`];
     if (envelope.ok === false) notices.unshift(scalar(record(envelope.error).message));
     notices.push(envelope.outcome === "preflight" ? "Command-only preview; no readiness analysis." : "Marker absence alone does not prove conflict resolution, preservation or complete scope.");
   } else if (name === "resolveDeleteChangeConflict" && action === "resolve-delete-change-conflict") {
@@ -210,11 +210,13 @@ function summarize(name: string, result: Result, raw: string, context?: Context)
     summary.tone = envelope.ok === false ? "error" : name === "checkin" ? "success" : "warning";
     const changeset = scalar(record(data.createdChangeset).id);
     if (changeset) summary.label += `${separator}cs:${changeset}`;
-    summary.rows = records(data.steps).map(step => `${scalar(step.name)}: ${scalar(step.effect)}`);
+    summary.rows = name === "checkin" ? [`Native command completed: ${String(data.commandCompleted)}`, `Linked emissions: ${records(data.linkedChangesets).length}`] : records(data.steps).map(step => `${scalar(step.name)}: ${scalar(step.effect)}`);
     if (envelope.ok === false) notices.unshift(scalar(record(envelope.error).message));
     if (name === "branchCreate") notices.push("Created identity and repository effects unverified; no workspace switch requested.");
     else {
-      notices.push("Scope exhaustion, branch head, alias equivalence, merge links and Xlink effects unverified.");
+      notices.push("Native completion and emitted identities are separate observations. Do not retry automatically.");
+      if (record(envelope.completeness).projection === false) notices.push("Diagnostic output truncated; native command was not stopped by presentation limits.");
+      if (record(data.identityObservation).complete === false) notices.push("Changeset identity observation incomplete.");
       if (data.pendingAfter === null) notices.push("Pending after not verified.");
       if (count(data.omittedReferences)) notices.unshift(`${count(data.omittedReferences)} references omitted.`);
     }

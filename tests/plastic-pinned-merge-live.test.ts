@@ -29,7 +29,7 @@ try {
   live.setupCheckin([file], "pi-plastic pinned target");
   const start = live.toolCommands.length;
   const merged = await live.tool("plastic_merge", { source: `cs:${sourceId}@rep:${repository}@repserver:${server}`, format: "json" });
-  assert.equal(merged.data.assessment.ready, true);
+  assert.equal(merged.data.commandCompleted, true);
   assert.equal(readFileSync(file, "utf8"), "source first\ntarget last\n");
   const checked = await live.tool("plastic_checkin", { message: "pi-plastic pinned merge", includeAll: true, format: "json" });
   live.verifyIntegration(checked.data.createdChangeset.id, target, sourceId, baseline, [relative(workspace, file)]);
