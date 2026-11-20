@@ -31,7 +31,21 @@ assert(rows.some(r => r.text === "synthetic café Ω\nsecond line <xml> & | #\n"
 assert(rows.every(r => r.serverPath === null));
 assert(parseReviewCommentsXml(wideXml, "1110").some(r => r.type === "conversation" && r.line === null && r.location === "-1"));
 assert(parseReviewCommentsXml(replyXml, "1114").some(r => r.parentId === "1116" && r.type === "comment" && r.line === 1));
-for (const xml of [questionXml.replace("<PLASTICQUERY>", "<!DOCTYPE PLASTICQUERY [<!ENTITY x 'x'>]><PLASTICQUERY>"), questionXml.replace("<LINE>2</LINE>", "<LINE></LINE>"), questionXml.replace("<LINE>2</LINE>", "<LINE>0</LINE>"), questionXml.replace("</GUID>", "</GUID><GUID>x</GUID>"), questionXml.replace("<COMMENT>", "<COMMENT><x/>"), questionXml.replace("</PLASTICQUERY>", "<x/></PLASTICQUERY>"), questionXml + "junk", questionXml.slice(0, -30), questionXml.replace("&lt;", "&unknown;"), questionXml.replace("<TYPE>question</TYPE>", "<TYPE>unrecognized</TYPE>")]) assert.throws(() => parseReviewCommentsXml(xml, "1114"));
+for (const xml of [questionXml.replace("<PLASTICQUERY>", "<!DOCTYPE PLASTICQUERY [<!ENTITY x 'x'>]><PLASTICQUERY>"), questionXml.replace("<LINE>2</LINE>", "<LINE>0</LINE>"), questionXml.replace("</GUID>", "</GUID><GUID>x</GUID>"), questionXml.replace("<COMMENT>", "<COMMENT><x/>"), questionXml.replace("</PLASTICQUERY>", "<x/></PLASTICQUERY>"), questionXml + "junk", questionXml.slice(0, -30), questionXml.replace("&lt;", "&unknown;"), questionXml.replace("<TYPE>question</TYPE>", "<TYPE>unrecognized</TYPE>")]) assert.throws(() => parseReviewCommentsXml(xml, "1114"));
+const locationsXml = await readFile(new URL("./fixtures/review-comments/cm-10694-locations.xml", import.meta.url), "utf8");
+const locationReceipt = await invoke("find", { review: "9000" }, { out: locationsXml });
+assert(locationReceipt.ok);
+assert.equal(locationReceipt.completeness.projection, true);
+assert.deepEqual(locationReceipt.data.rows!.map(r => [r.text, r.line, r.location, r.revisionId]), [
+    ["synthetic wide", null, "-1", "-1"],
+    ["synthetic line", 1, "0", "100"],
+    ["synthetic range", 1, "lines:0-1", "100"],
+    ["synthetic whole-file", null, "-1", "100"],
+    ["synthetic custom", null, "image:120,80&x=y", "100"],
+]);
+const forgedLocation = structuredClone(locationReceipt);
+forgedLocation.data.rows![2].location = "lines:0-2";
+assert(!validateReviewCommentOutput(forgedLocation));
 const multilineXml = wideXml.replace("synthetic wide &lt;xml&gt; &amp; | #", "first\n\nΩ &lt;x&gt; &amp; last");
 assert(parseReviewCommentsXml(multilineXml, "1110").some(r => r.text === "first\n\nΩ <x> & last" && r.line === null));
 const record = questionXml.match(/<CHANGEREVIEWCOMMENT>[\s\S]*?<\/CHANGEREVIEWCOMMENT>/)![0];
@@ -58,7 +72,7 @@ for (const action of REVIEW_COMMENT_ACTIONS) {
 for (const bad of [{ review: "--all" }, { review: "0" }, { review: "1 or 1=1" }, { review: guid }, { maxItems: 0 }, { maxItems: 501 }, { maxItems: 1.5 }]) { assert(!(await invoke("find", { ...bases.find, ...bad })).ok); assert.equal(calls.length, 0); }
 for (const action of ["add", "reply", "edit"] as const) for (const bad of [{ comment: "" }, { comment: " " }, { comment: undefined }, { comment: "x", commentsFile: "x" }, { comment: undefined, commentsFile: "-" }, { comment: undefined, commentsFile: " - " }, { comment: "x\u0000" }, { comment: "\ud800" }, { comment: "x".repeat(4097) }]) { assert(!(await invoke(action, { ...bases[action], ...bad })).ok); assert.equal(calls.length, 0); }
 for (const action of ["reply", "edit"] as const) for (const id of ["1114", "--help", "x", guid + "\n"]) { assert(!(await invoke(action, { ...bases[action], commentGuid: id })).ok); assert.equal(calls.length, 0); }
-for (const bad of [{ path: "src/x", line: 1 }, { path: "C:/x", line: 1 }, { path: "/a/../x", line: 1 }, { path: "/a\\x", line: 1 }, { path: "/a" }, { line: 1 }, { path: "/a", line: 0 }, { path: "/a", line: 1.5 }, { path: "/a", line: Number.MAX_SAFE_INTEGER + 1 }, { type: "Change" }, { changeset: "cs:1" }, { path: "/a", line: 1, type: "change" }, { path: "/a", line: 1, changeset: "1" }, { path: "/a", line: 1, changeset: ["cs:16"] }, { path: "/a", line: 1, changeset: {} }, { path: "/a", line: 1, changeset: { toString: () => "cs:16" } }]) { assert(!(await invoke("add", { ...bases.add, ...bad })).ok); assert.equal(calls.length, 0); }
+for (const bad of [{ path: "src/x", line: 1 }, { path: "C:/x", line: 1 }, { path: "/a/../x", line: 1 }, { path: "/a\\x", line: 1 }, { line: 1 }, { line: "2-3" }, { path: "/a", line: "2" }, { path: "/a", line: "0-2" }, { path: "/a", line: "2-3 --force" }, { path: "/a", line: "2-3\n" }, { path: "/a", line: "2".repeat(64) + "-3" }, { path: "/a", line: 0 }, { path: "/a", line: 1.5 }, { path: "/a", line: Number.MAX_SAFE_INTEGER + 1 }, { type: "Change" }, { changeset: "cs:1" }, { path: "/a", line: 1, type: "change" }, { path: "/a", line: 1, changeset: "1" }, { path: "/a", line: 1, changeset: ["cs:16"] }, { path: "/a", line: 1, changeset: {} }, { path: "/a", line: 1, changeset: { toString: () => "cs:16" } }]) { assert(!(await invoke("add", { ...bases.add, ...bad })).ok); assert.equal(calls.length, 0); }
 for (const type of ["Change", "Question", "Comment"]) { const d = await invoke("add", { ...bases.add, path: "/README.md", line: 2, changeset: "cs:16", type, repository: "synthetic-repository@synthetic-org@unity" }, { out: guid + "\r\n" }); assert(d.ok); assert.deepEqual(calls[0], ["codereview", "comment", "add", "1114", `-c=${bases.add.comment}`, "--path=/README.md", "--line=2", "--changeset=cs:16", `--type=${type}`, "--repository=synthetic-repository@synthetic-org@unity"]); }
 for (const action of ["add", "reply"] as const) for (const out of ["progress " + guid, guid + "\r\nmore", "1116\r\n", "", " " + guid, guid + "\n\n"]) { const d = await invoke(action, bases[action], { out }); assert(d.ok); assert.equal(d.data.observedGuid, null); }
 for (const discard of [undefined, false, true]) { const d = await invoke("reply", { ...bases.reply, ...(discard === undefined ? {} : { discard }) }, { out: guid }); assert(d.ok); assert.equal(calls[0].includes("--discard"), discard === true); }
@@ -68,7 +82,21 @@ const mixed = await invoke("delete", { commentGuids: [guid, "00000000-0000-4000-
 const bounded = await invoke("find", { review: "1114", maxItems: 1 }, { out: questionXml }); assert(bounded.ok); assert.equal(bounded.data.rows!.length, 1); assert.equal(bounded.completeness.projection, false); assert.deepEqual(calls[0], ["find", "changereviewcomment", "where reviewid=1114", "--xml", "--encoding=utf-8"]);
 for (const action of ["reply", "edit", "delete"] as const) for (const extra of [{ review: "1114" }, { type: "Question" }, { path: "/a", line: 1 }]) { assert(!(await invoke(action, { ...bases[action], ...extra })).ok); assert.equal(calls.length, 0); }
 const anchored=await invoke("add",{...bases.add,revision:"revid:102",line:2},{out:guid}); assert(anchored.ok); assert(calls[0].includes("--revision=revid:102"));
-for(const extra of [{revision:"cs:16",line:1},{revision:"revid:0",line:1},{revision:"revid:102"},{revision:"revid:102",path:"/a",line:1}]) {assert(!(await invoke("add",{...bases.add,...extra})).ok);assert.equal(calls.length,0);}
+for (const [args, flags] of [
+    [{ path: "/README.md", type: "Comment" }, ["--path=/README.md", "--type=Comment"]],
+    [{ revision: "revid:102" }, ["--revision=revid:102"]],
+    [{ revision: "revid:102", line: "2-5" }, ["--revision=revid:102", "--line=2-5"]],
+    // The adapter forwards the explicit native range; ordering/eligibility belongs to CM.
+    [{ path: "/README.md", line: "5-2" }, ["--path=/README.md", "--line=5-2"]],
+] as const) {
+    const base = { ...bases.add, ...args };
+    const expected = ["codereview", "comment", "add", "1114", `-c=${bases.add.comment}`, ...flags];
+    const preview = await invoke("add", { ...base, preflight: true });
+    assert(preview.ok); assert.equal(calls.length, 0); assert.deepEqual(preview.data.intendedArgv, expected);
+    const added = await invoke("add", base, { out: guid });
+    assert(added.ok); assert.deepEqual(calls, [expected]);
+}
+for(const extra of [{revision:"cs:16",line:1},{revision:"revid:0",line:1},{revision:"revid:102",path:"/a",line:1}]) {assert(!(await invoke("add",{...bases.add,...extra})).ok);assert.equal(calls.length,0);}
 for(const [action,args,argv] of [["apply",bases.apply,["codereview","comment","apply",guid,"--changeset=cs:16"]],["unapply",bases.unapply,["codereview","comment","unapply",guid]]] as const) {assert((await invoke(action,args)).ok);assert.deepEqual(calls[0],argv); for(const extra of [{commentGuid:"1116"},{discard:true},{comment:"not allowed"},{changeset:"16"}]) {assert(!(await invoke(action,{...args,...extra})).ok);assert.equal(calls.length,0);}}
 const mutable = { review: "1114", comment: "original" };
 const immutable = await invoke("add", mutable, { out: guid, mutate: () => { mutable.comment = "later"; } }); assert(immutable.ok); assert.equal(immutable.data.requested!.comment, "original");

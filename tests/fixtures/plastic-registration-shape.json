@@ -108,7 +108,7 @@
   {
     "name": "plastic_codeReviewCommentFind",
     "label": "plastic_codeReviewCommentFind",
-    "description": "Read bounded comments for one exact numeric review ID using CM 11.0.16.10616 XML; lastRepositoryPath is NOT review/workspace identity.",
+    "description": "Read bounded comments for one exact numeric review ID using native XML (including CM 11.0.16.10694 comment locations); lastRepositoryPath is NOT review/workspace identity.",
     "parameters": {
       "type": "object",
       "required": [
@@ -150,7 +150,7 @@
   {
     "name": "plastic_codeReviewCommentAdd",
     "label": "plastic_codeReviewCommentAdd",
-    "description": "Add explicit review-wide or inline text/file comment; completion is unverified stored state.",
+    "description": "Add an explicit review-wide, whole-file, or line/range comment; completion is unverified stored state.",
     "parameters": {
       "type": "object",
       "required": [
@@ -169,8 +169,16 @@
           "description": "Exact genuine revid:N anchor from the review diff; exclusive with path. Deleted files use base revision. Never substitute a changeset ID."
         },
         "line": {
-          "type": "integer",
-          "minimum": 1
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "One-based integer line or an inclusive native range such as 12-18 (CM 11.0.16.10694+). Omit for a whole-file comment when path or revision is supplied."
         },
         "changeset": {
           "type": "string"

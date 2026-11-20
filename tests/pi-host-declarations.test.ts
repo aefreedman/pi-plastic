@@ -88,6 +88,9 @@ try {
   assert.equal(diff[2].properties.paths.maxItems, 20);
   assert.equal(diff[2].properties.paths.items.minLength, 1);
   assert.equal(diff[2].properties.paths.items.maxLength, 1024);
+  const reviewLine = session.getToolDefinition("plastic_codeReviewCommentAdd").parameters.properties.line.anyOf;
+  assert.equal(reviewLine[0].type, "integer"); assert.equal(reviewLine[0].minimum, 1);
+  assert.equal(reviewLine[1].type, "string");
   const branch = session.getToolDefinition("plastic_branchCreate").parameters.properties.branch;
   assert.equal(branch.minimum, 1); assert.equal(branch.minLength, undefined);
   const ids = session.getToolDefinition("plastic_codeReviewDelete").parameters.properties.ids;
@@ -112,7 +115,7 @@ try {
   tagged("plastic_branchList", "maxItems", ["@integer", "@minimum 1", "@maximum 500"]);
   tagged("plastic_branchList", "limit", ["@integer", "@minimum 1", "@maximum 9007199254740991"]);
   tagged("plastic_codeReviewCommentFind", "maxItems", ["@integer", "@minimum 1", "@maximum 500"]);
-  tagged("plastic_codeReviewCommentAdd", "line", ["@integer", "@minimum 1"]);
+  assert.match(declarations.plastic_codeReviewCommentAdd, /line\?: number \| string/);
   assert.match(declarations.plastic_codeReviewSetStatus, /"reviewed"/);
   assert.match(declarations.plastic_codeReviewCommentAdd, /"Question"/);
   assert.match(declarations.plastic_branchEditComment, /commentsFile\??:/);

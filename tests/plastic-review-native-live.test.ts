@@ -81,6 +81,27 @@ try {
     const unapplied = nativeComments(id).find(row => field(row, "GUID") === commentGuid);
     assert(unapplied); assert.equal(field(unapplied, "APPLIEDINCHANGESET"), "-1");
   });
+  await live.scenario("native-review-comment-locations", async () => {
+    const revision = `revid:${revisionId}`;
+    const start = live.toolCommands.length;
+    const whole = await live.tool("plastic_codeReviewCommentAdd", { review: id, revision, repository, comment: "Synthetic whole-file comment.", type: "Comment" });
+    const range = await live.tool("plastic_codeReviewCommentAdd", { review: id, revision, repository, line: "1-2", comment: "Synthetic range comment.", type: "Comment" });
+    const writes = live.toolCommands.slice(start);
+    assert.equal(writes.length, 2, "Each add must dispatch once.");
+    assert(!writes[0].args.some(arg => arg.startsWith("--line=")));
+    assert(writes[1].args.includes("--line=1-2"));
+    // Simulate a custom location written by another client, without adding a write API for it.
+    const customGuid = live.native(["codereview", "comment", "add", id, `--revision=${revision}`, `--repository=${repository}`, "--type=Comment", "--location=image:120,80&x=y", "-c=Synthetic custom-location comment."]).stdout.trim();
+    const comments = await live.tool("plastic_codeReviewCommentFind", { review: id, maxItems: 500 });
+    const rawRows = nativeComments(id);
+    for (const [guid, location, line] of [[whole.data.observedGuid, "-1", null], [range.data.observedGuid, "lines:0-1", 1], [customGuid, "image:120,80&x=y", null]] as const) {
+      assert(typeof guid === "string");
+      const raw = rawRows.find(row => field(row, "GUID") === guid);
+      assert(raw); assert.equal(field(raw, "LOCATION"), location); assert.equal(field(raw, "LINE"), line === null ? "" : String(line));
+      const row = comments.data.rows.find((r: { guid: string }) => r.guid === guid);
+      assert(row); assert.equal(row.revisionId, revisionId); assert.equal(row.location, location); assert.equal(row.line, line);
+    }
+  });
   await live.scenario("reviewer-membership-and-own-subscription", async () => {
     const membership = await live.tool("plastic_codeReviewReviewerList", { id, repository, output: "json" });
     assert.equal(membership.data.observedMembership.length, 1);

@@ -10,7 +10,7 @@ const common = { workdir: text, preflight: Type.Boolean(), output: enm(["text", 
 const content = { comment: optional(text), commentsFile: optional(text), repository: optional(text) };
 const requests = {
     find: obj({ ...common, review: text, maxItems: optional(uint(500)) }),
-    add: obj({ ...common, ...content, review: text, path: optional(text), revision: optional(text), line: optional(uint()), changeset: optional(text), type: optional(enm(["Change", "Question", "Comment"])) }),
+    add: obj({ ...common, ...content, review: text, path: optional(text), revision: optional(text), line: optional(Type.Union([uint(), Type.String({ maxLength: 64 })])), changeset: optional(text), type: optional(enm(["Change", "Question", "Comment"])) }),
     reply: obj({ ...common, ...content, commentGuid: text, discard: optional(Type.Boolean()) }),
     edit: obj({ ...common, ...content, commentGuid: text }),
     apply: obj({ ...common, commentGuid: text, changeset: text, repository: optional(text) }),

@@ -7,6 +7,14 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
+### Fixed
+
+- Read Unity VCS 11.0.16.10694 review comments without rejecting whole-file, range, or custom locations. Preserve the native location and reported line separately.
+
+### Added
+
+- Forward explicit whole-file and line-range code review comments to Unity VCS 11.0.16.10694+.
+
 ## [0.11.0] - 2026-11-15
 
 ### Breaking changes
