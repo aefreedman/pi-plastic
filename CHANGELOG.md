@@ -7,8 +7,9 @@ and this project follows semantic versioning for public package releases.
 
 ## Unreleased
 
-### Fixed
+## [0.12.0] - 2026-11-20
 
+### Fixed
 - Read Unity VCS 11.0.16.10694 review comments without rejecting whole-file, range, or custom locations. Preserve the native location and reported line separately.
 
 ### Added
@@ -18,7 +19,8 @@ and this project follows semantic versioning for public package releases.
 
 ### Changed
 
-- Shorten the `using-plastic` skill and correct guidance on native merge and checkin behavior.
+- Shorten the `using-plastic` skill and public manual, and correct guidance on native merge and checkin behavior.
+- Validate with Pi 1.6.0, including its read-only render output.
 
 ## [0.11.0] - 2026-11-15
 

@@ -24,7 +24,7 @@ const hints = {
 };
 const colors: Array<{ color: string; text: string }> = [];
 const theme: Pick<Theme, "fg" | "bold"> = { fg: (color, text) => { colors.push({ color, text }); return text; }, bold: text => text };
-const plain = (component: { render(width: number): string[] }, width = 100) => component.render(width).map(line => stripVTControlCharacters(line).trimEnd()).join("\n");
+const plain = (component: { render(width: number): readonly string[] }, width = 100) => component.render(width).map(line => stripVTControlCharacters(line).trimEnd()).join("\n");
 const textResult = (text: string) => ({ content: [{ type: "text", text }] });
 const structured = (action: string, data: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
   const raw = `## ${action}\n\n\`\`\`json\n${JSON.stringify({ ok: true, action, data, ...extra }, null, 2)}\n\`\`\``;
