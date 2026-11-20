@@ -3,6 +3,7 @@ export { status } from "./operations/status";
 export { update, add, undo, resolveDeleteChangeConflict, workspaceCreate, workspaceList } from "./operations/workspace";
 export { branchCreate, currentBranch, branchList, branchExists, branchDelete, __plasticBranchInternals } from "./operations/branches";
 export { shelvesetCreate, shelvesetApply, shelvesetDelete, shelvesetList } from "./operations/shelvesets";
+export { mergeRequest, mergeRequestFind } from "./operations/merge-requests";
 export { codeReviewCreate, codeReviewUpdate, codeReviewDelete, codeReviewFind } from "./operations/reviews";
 export { checkin } from "./operations/checkin";
 export { switchBranch, __plasticSwitchInternals } from "./operations/switch";

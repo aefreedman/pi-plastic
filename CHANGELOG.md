@@ -13,6 +13,7 @@ and this project follows semantic versioning for public package releases.
 
 ### Added
 
+- Discover Unity VCS merge requests and run native `cm mergerequest` subcommands through Pi (CM 11.0.16.10694+).
 - Forward explicit whole-file and line-range code review comments to Unity VCS 11.0.16.10694+.
 
 ### Changed

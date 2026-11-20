@@ -9,7 +9,7 @@ export type WorkspaceMergeCommandObservation = { attempt: WorkspaceMergeAttempt;
 // Forced-retirement guards have no per-command state or retained buffers.
 const ignoreRetiredError = () => {};
 /** Selected-tool byte capture; never retries, changes encoding, or discards effect uncertainty. */
-export async function captureNativeMutation(args: string[], workdir?: string, timeoutMs = 30000, onStdout?: (chunk: string) => void): Promise<WorkspaceMergeCommandObservation> {
+export async function captureNativeMutation(args: string[], workdir?: string, timeoutMs = 30000, onStdout?: (chunk: string) => void, env?: NodeJS.ProcessEnv): Promise<WorkspaceMergeCommandObservation> {
     if (Buffer.byteLength(JSON.stringify(args), "utf8") > 32768) throw new Error("Command arguments exceed the execution byte budget.");
     const attempt = emptyWorkspaceMergeAttempt();
     const capture: WorkspaceMergeCapture = { stdoutBytes: 0, stderrBytes: 0, stdoutRetainedBytes: 0, stderrRetainedBytes: 0, truncated: false, complete: false, validUtf8: false };
@@ -17,7 +17,7 @@ export async function captureNativeMutation(args: string[], workdir?: string, ti
     const signal = getActiveAbortSignal(), deps = commandExecutionStorage.getStore() ?? {};
     if (signal?.aborted) { attempt.aborted = true; return result; }
     let child: ReturnType<typeof spawn>;
-    try { child = (deps.spawn ?? spawn)(getCmExecutable(), args, { cwd: workdir ?? process.cwd(), shell: false, stdio: ["ignore", "pipe", "pipe"] }); }
+    try { child = (deps.spawn ?? spawn)(getCmExecutable(), args, { cwd: workdir ?? process.cwd(), shell: false, stdio: ["ignore", "pipe", "pipe"], ...(env && { env }) }); }
     catch { attempt.state = "not-started"; result.failed = true; return result; }
     attempt.state = "unknown";
     const schedule = deps.setTimeout ?? setTimeout, cancel = deps.clearTimeout ?? clearTimeout;

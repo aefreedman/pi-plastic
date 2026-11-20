@@ -28,4 +28,6 @@ Prefer `plastic_*` tools. Use `plastic_tool_search` to activate the capability y
 | Create or manage a code review | [Code review creation](references/code-review-creation.md) or [review comments and reviewers](../../docs/2026-10-23-comments-and-review-workflow.md) |
 | Diagnose a failed command | [Troubleshooting](references/troubleshooting.md) |
 
+For merge requests (CM 11.0.16.10694+), discover `plastic_mergeRequestFind` and `plastic_mergeRequest` through `plastic_tool_search`. Read discussion with `plastic_codeReviewCommentFind(review="<merge-request ID>")`. Follow native syntax: `merge <id>` analyzes; only add `--merge` when applying is authorized. Do not run follow-up commands printed in diagnostics automatically.
+
 For a specific tool contract, use the [package index](../../docs/README.md). Don't load the whole manual.

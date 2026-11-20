@@ -2725,9 +2725,99 @@
     "hasOutputSchema": true
   },
   {
+    "name": "plastic_mergeRequestFind",
+    "label": "plastic_mergeRequestFind",
+    "description": "Find Unity VCS merge requests in native XML (CM 11.0.16.10694+). Returns IDs, native branch selectors, and separate merge-request and review statuses.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "A single native cm find clause, e.g. where id=1367 or where reviewer='me' limit 20. No CLI options."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the command."
+        }
+      }
+    },
+    "hasOutputSchema": true
+  },
+  {
+    "name": "plastic_mergeRequest",
+    "label": "plastic_mergeRequest",
+    "description": "Run one native cm mergerequest subcommand (CM 11.0.16.10694+). Can mutate reviews or merge branches. merge <id> analyzes; merge <id> --merge applies. Reports native completion and output, not verified effects.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "subcommand",
+        "args"
+      ],
+      "properties": {
+        "subcommand": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "create"
+            },
+            {
+              "type": "string",
+              "const": "edit"
+            },
+            {
+              "type": "string",
+              "const": "delete"
+            },
+            {
+              "type": "string",
+              "const": "comment"
+            },
+            {
+              "type": "string",
+              "const": "reviewer"
+            },
+            {
+              "type": "string",
+              "const": "review"
+            },
+            {
+              "type": "string",
+              "const": "subscribe"
+            },
+            {
+              "type": "string",
+              "const": "unsubscribe"
+            },
+            {
+              "type": "string",
+              "const": "subscription"
+            },
+            {
+              "type": "string",
+              "const": "merge"
+            }
+          ],
+          "description": "Native subcommand. Use args=['--help'] for its syntax."
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Native operands/options in order, one string per argument, without shell quotes. For example: ['add', '1367', '-c=Looks good'] with subcommand='comment'. Stdin is not supported."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for the command."
+        }
+      }
+    },
+    "hasOutputSchema": true
+  },
+  {
     "name": "plastic_tool_search",
     "label": "Plastic Tool Search",
-    "description": "Search and enable Plastic SCM / Unity Version Control tools for workspace status and sync, changes and checkins, text-only diffs and patches, branches and merges, shelvesets, code reviews, and workspaces.",
+    "description": "Search and enable Plastic SCM / Unity Version Control tools for workspace status and sync, changes and checkins, text-only diffs and patches, branches and merges, shelvesets, code reviews, merge requests, and workspaces.",
     "parameters": {
       "type": "object",
       "properties": {

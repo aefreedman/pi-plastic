@@ -22,6 +22,7 @@ const titles: Record<string, string> = {
   branchList: "Branches", branchExists: "Branch exists", branchDelete: "Delete branch", shelvesetCreate: "Create shelveset",
   shelvesetApply: "Apply shelveset", shelvesetDelete: "Delete shelveset", shelvesetList: "Shelvesets",
   codeReviewCreate: "Create review", codeReviewUpdate: "Update review", codeReviewDelete: "Delete reviews",
+  mergeRequestFind: "Find merge requests", mergeRequest: "Merge request",
   codeReviewFind: "Find reviews", workspaceList: "Workspaces", tool_search: "Find tools",
 };
 
@@ -63,6 +64,8 @@ function list(value: unknown): string {
 }
 function target(name: string, args: Args): string {
   if (name === "tool_search") return list(args.toolNames) || scalar(args.query) || "Browse capabilities";
+  if (name === "mergeRequest") return [scalar(args.subcommand), list(args.args)].filter(Boolean).join(" ");
+  if (name === "mergeRequestFind") return scalar(args.query);
   if (name === "diff" && args.mode === "revisions") return `${scalar(args.leftRevision) || "..."} -> ${scalar(args.rightRevision) || "..."}`;
   if (name === "mergeBranches" || name === "mergeToBranch") return `${scalar(args.source) || "..."} -> ${scalar(args.target) || "parent branch"}`;
   if (name === "patch") return [scalar(args.source), scalar(args.destination)].filter(Boolean).join(" -> ");
@@ -114,6 +117,10 @@ function pending(summary: Record<string, unknown>): string {
 }
 
 function summarize(name: string, result: Result, raw: string, context?: Context): Summary {
+  if (name === "mergeRequest" || name === "mergeRequestFind") {
+    const [label, ...rows] = raw.split(/\r?\n/).filter(line => line.trim());
+    return { label: label || "No output", tone: context?.isError ? "error" : "toolOutput", notices: [], rows };
+  }
   const envelope = payload(result, raw);
   const data = record(envelope.data);
   const action = scalar(envelope.action);

@@ -15,6 +15,7 @@ import { mergeBranches } from "../operations/server-merge";
 import { mergeToBranch } from "../operations/closeout";
 import { shelvesetCreate, shelvesetApply, shelvesetDelete, shelvesetList } from "../operations/shelvesets";
 import { codeReviewCreate, codeReviewUpdate, codeReviewDelete, codeReviewFind } from "../operations/reviews";
+import { mergeRequest, mergeRequestFind } from "../operations/merge-requests";
 import { PLASTIC_TOOL_NAMES } from "../plastic-tool-loading";
 
 type CoreTool = {
@@ -70,6 +71,8 @@ export const PLASTIC_TOOL_REGISTRY = {
   codeReviewDelete,
   codeReviewFind,
   workspaceList,
+  mergeRequestFind,
+  mergeRequest,
 } as const;
 
 export type PlasticExportName = keyof typeof PLASTIC_TOOL_REGISTRY;

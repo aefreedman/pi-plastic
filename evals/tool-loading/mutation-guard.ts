@@ -20,7 +20,7 @@ export const MUTATING_PLASTIC_TOOLS = new Set([
   "plastic_codeReviewSetStatus",
   "plastic_codeReviewRequestReview",
 
-  "plastic_update", "plastic_mergeBranches",
+  "plastic_update", "plastic_mergeBranches", "plastic_mergeRequest",
   "plastic_add", "plastic_checkin", "plastic_undo", "plastic_resolveDeleteChangeConflict",
   "plastic_branchCreate", "plastic_switchBranch", "plastic_merge", "plastic_mergeToBranch",
   "plastic_mergeMarkResolved", "plastic_branchDelete", "plastic_shelvesetCreate", "plastic_shelvesetApply",

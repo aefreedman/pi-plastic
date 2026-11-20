@@ -36,9 +36,9 @@ async function loadHarness(activeTools: string[], branchEntries: unknown[] = [],
 async function main(): Promise<void> {
   await withMode(undefined, async () => {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
-    assert.equal(harness.registry.size, 47, "all 46 public Plastic tools plus the loader should be registered");
+    assert.equal(harness.registry.size, publicToolNames.length + 1, "all public Plastic tools plus the loader should be registered");
     assert(harness.registry.has(PLASTIC_TOOL_SEARCH_NAME));
-    assert.equal([...harness.registry.values()].filter(t => t.outputSchema).length,46);
+    assert.equal([...harness.registry.values()].filter(t => t.outputSchema).length, publicToolNames.length);
     const initialActive = harness.getActiveTools();
     for (const name of ["plastic_checkin","plastic_branchCreate"]) {
       const result = await harness.registry.get(PLASTIC_TOOL_SEARCH_NAME)!.execute("receipt-load",{toolNames:[name]});
@@ -55,7 +55,7 @@ async function main(): Promise<void> {
 
   await withMode("all-active", async () => {
     const harness = await loadHarness(["read", "foreign_tool", ...publicToolNames]);
-    assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", ...publicToolNames]), "all-active should expose all 46 current Plastic tools without the new loader");
+    assert.deepEqual(new Set(harness.getActiveTools()), new Set(["read", "foreign_tool", ...publicToolNames]), "all-active should expose all current Plastic tools without the new loader");
   });
 
   await withMode("balanced", async () => {
@@ -92,6 +92,9 @@ async function main(): Promise<void> {
   assert.deepEqual(searchPlasticTools({ query: "branch", limit: 3 }).map((match) => match.name), ["plastic_branchList", "plastic_branchExists", "plastic_currentBranch"], "ambiguous branch searches should prioritize inspection and query tools when multiple results are requested");
   assert.deepEqual(searchPlasticTools({ query: "list available branches" }).map((match) => match.name), ["plastic_branchList"], "multi-term branch discovery should not activate unrelated list tools");
   assert.deepEqual(searchPlasticTools({ query: "list branches in a specified workspace read-only", limit: 1 }).map((match) => match.name), ["plastic_branchList"], "the first capability domain should outrank incidental workspace context");
+  for (const [query, name] of [["find merge requests", "plastic_mergeRequestFind"], ["create merge request", "plastic_mergeRequest"], ["merge request comment", "plastic_mergeRequest"], ["merge request reviewer", "plastic_mergeRequest"]]) {
+    assert.deepEqual(searchPlasticTools({ query }).map(match => match.name), [name]);
+  }
   assert.deepEqual(searchPlasticTools({ query: "find existing code reviews" }).map((match) => match.name), ["plastic_codeReviewFind"], "contextual review discovery should select the smallest sufficient query tool");
   assert.deepEqual(searchPlasticTools({ query: "what changed" }).map((match) => match.name), ["plastic_status"], "changed-file questions should route to status rather than GUI-capable diff commands");
   const diffMatches = searchPlasticTools({ query: "diff" }).map((match) => match.name);

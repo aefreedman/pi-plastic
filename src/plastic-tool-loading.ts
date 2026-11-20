@@ -62,6 +62,8 @@ export const PLASTIC_SEARCH_CATALOG: readonly PlasticSearchCatalogEntry[] = [
   { name: "plastic_codeReviewSubscribe", aliases: ["subscribe review email"], tags: ["review","mutation"], guidance: ["Current user only; no email delivery guarantee."] },
   { name: "plastic_codeReviewUnsubscribe", aliases: ["unsubscribe review email"], tags: ["review","mutation"], guidance: ["Current user only; later participation may resubscribe."] },
   { name: "plastic_codeReviewSubscription", aliases: ["review email subscription"], tags: ["review","inspect"], guidance: ["Read fixed-English current-user subscription; not group-delivery or notification-settings evidence."] },
+  { name: "plastic_mergeRequestFind", aliases: ["find merge requests", "list merge requests", "merge request queue"], tags: ["merge request", "inspect", "query"], guidance: ["Use native find clauses to narrow the results to the request or reviewer queue you need."] },
+  { name: "plastic_mergeRequest", aliases: ["create merge request", "edit merge request", "delete merge request", "merge request review", "merge request reviewer", "merge request comment", "merge request subscription", "merge a merge request", "cm mergerequest"], tags: ["merge request", "mutation"], guidance: ["Pass explicit native argv. merge <id> analyzes; merge <id> --merge applies. Use the exact tool name for known subcommands."] },
 ] as const;
 
 export const PLASTIC_SEARCHABLE_TOOL_NAMES = new Set(PLASTIC_SEARCH_CATALOG.map((entry) => entry.name));
@@ -234,7 +236,7 @@ export function isPlasticToolBrowseRequest(input: PlasticToolSearchInput): boole
   return query.length === 0 || BROAD_PRODUCT_QUERIES.has(query);
 }
 
-export const PLASTIC_TOOL_BROWSE_TEXT = "Browse Plastic capabilities without activating tools: workspace status/sync; changes and checkins; text-only diffs and patches; branches and merges; shelvesets; code reviews; and workspaces. Examples: ‘pending changes’, ‘diff file’, ‘list branches’, or ‘find code reviews’.";
+export const PLASTIC_TOOL_BROWSE_TEXT = "Browse Plastic capabilities without activating tools: workspace status/sync; changes and checkins; text-only diffs and patches; branches and merges; shelvesets; code reviews; merge requests; and workspaces. Examples: ‘pending changes’, ‘diff file’, ‘list branches’, or ‘find code reviews’.";
 
 export function getRestoredPlasticToolNames(branchEntries: readonly unknown[], effectiveToolNames: ReadonlySet<string> = PLASTIC_TOOL_NAMES): string[] {
   const restored = new Set<string>();

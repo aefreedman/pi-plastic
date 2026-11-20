@@ -225,7 +225,7 @@ try {
   // Verify the registration boundary and a real command-only preflight without launching cm.
   const tools: ToolDefinition[] = [];
   registerPlastic({ registerTool: tool => tools.push(tool), on() {} } as ExtensionAPI);
-  assert.equal(tools.length, 47);
+  assert.equal(tools.length, 49);
   for (const tool of tools) assert(tool.renderCall && tool.renderResult, `${tool.name} needs both renderers`);
   const serverMerge = tools.find(tool => tool.name === "plastic_mergeBranches")!;
   const actual = await serverMerge.execute("preview", { source: "br:/main/task@Game@cloud", target: "br:/main@Game@cloud", message: "Review", preflight: true, format: "json" }, undefined, undefined, { cwd: "C:/Projects/MyGame" } as ExtensionContext);
