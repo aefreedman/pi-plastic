@@ -9,19 +9,20 @@
 
 ## Autonomous Merge Workflow
 
-Plastic does not perform a Git-style fast-forward. It applies the merge into the branch currently loaded in the workspace, and the resulting merge changeset belongs to the branch where checkin runs. Switching branches afterward does not move an incorrectly placed changeset.
+Workspace merges are not Git fast-forwards. A merge applies to the branch currently loaded, and switching to the target after a checkin on the source branch does not move or integrate that changeset.
+
+Use `plastic_mergeToBranch` for clean-start closeout. If `target` is omitted, the tool resolves the source branch's Plastic parent branch. It switches if needed, updates only if requested, merges once, and checks in once after native merge success. A native failure stops the sequence; standalone checkin lets Plastic decide eligibility. For marker handling, see the [marker workflow](../../../docs/2026-10-23-marker-merges-and-comments.md#resolve-and-inspect).
 
 - Switch to the target branch/workspace and ensure you understand the current pending state.
 - [Native Xlink operations](../../../docs/2026-10-06-merging.md#xlinks) are delegated to Plastic without ownership reconstruction, mount/file-count gates or status matrices.
 - Run `plastic_merge(...)` with the exact native branch, changeset, label or shelveset operand. It executes one noninteractive merge and reports the native result.
-- If Plastic stops on a delete/change directory conflict and source deletion is the intended resolution, run `plastic_resolveDeleteChangeConflict(...)`, then rerun `plastic_merge(...)`.
-- Immediately run `plastic_status()` and treat it as the source of truth.
-- Do not treat merge-tool success alone as proof that the merge is finished.
+- If Plastic stops on a delete/change directory conflict and source deletion is the intended resolution, use `plastic_resolveDeleteChangeConflict(...)` on the exact path. Reinspect pending effects before attempting another merge.
+- Use `plastic_status()` to inspect pending work. It doesn't certify that a merge is complete or ready to check in.
 - Pending merge links normally remain until checkin; they are not by themselves unresolved conflicts. Inspect native diagnostics and reconcile actual conflicts, then let native checkin decide eligibility.
 - List native markers with `plastic_mergeListConflictMarkers()`, edit/validate, then re-inspect markers AND remaining conflicts/scope. Unknown evidence blocks; never force-finalize or reapply automatically.
 - After compile/tests, run `plastic_status()` again so Unity-generated private artifacts are not mistaken for merge fallout.
 - Only then create the merge checkin.
-- Verify the merge checkin was created on the target branch. If the workspace or changeset is on the source branch, stop: do not switch to the target and claim completion. Inspect target history and rerun the merge while the target is actually loaded.
+- Verify the merge checkin was created on the target branch. If the workspace or changeset is on the source branch, stop: do not switch to the target and claim completion. Inspect target history and pending effects before deciding whether another merge is needed.
 
 ## Server-side File Conflict Resolution
 

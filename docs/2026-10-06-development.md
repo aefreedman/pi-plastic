@@ -22,9 +22,9 @@ Default tests are credential-free. They cover schemas/semantic guards, registrat
 
 ## Structured API and transport
 
-All 46 core tools have closed output schemas and direct native producer execution. The capability loader is deliberately schema-less. Core exports remain string-returning views; selected failures reject so compound callers cannot proceed on presentation text.
+Core tools declare their structured results in code. The capability loader is deliberately schema-less. Core exports remain string-returning views; selected failures reject so compound callers cannot proceed on presentation text.
 
-Producers own request snapshots, source admission, bounded projection and same-observation presentation. Native details vary by route: legacy read presentation can remain in rawResult, while mutation/diff receipts use empty details. Don't parse strings to reconstruct canonical facts.
+Plastic owns VCS behavior. Follow the [adapter design rules in CONTRIBUTING](https://github.com/aefreedman/pi-plastic/blob/main/CONTRIBUTING.md#keep-the-adapter-thin). A structured result can be a small envelope around bounded native output. Use the tool's schema and implementation for the contract; don't add a parser just to turn human-readable progress into fields.
 
 ### Consumer caveats
 
@@ -34,7 +34,7 @@ Producers own request snapshots, source admission, bounded projection and same-o
 - Ordinary transcript messages don't automatically persist the full DTO; general RPC/provider fidelity is not claimed.
 - Identity, capture, request/argv/outcome/effect consistency matters beyond closed JSON shape. Keep adversarial semantic tests when changing schemas.
 
-The [family references](README.md#look-up-a-tool) describe the canonical fields/bounds; [receipt semantics](2026-10-06-safety-and-receipts.md) explains chaining decisions.
+Use the schema and implementation for fields and bounds; [receipt semantics](2026-10-06-safety-and-receipts.md) explains chaining decisions.
 
 ## Source map
 
@@ -81,7 +81,7 @@ PI_PLASTIC_SANDBOX_ATTESTATION=disposable-synthetic-only \
 npm run test:live:reviews
 ```
 
-The suite creates uniquely titled reviews of the loaded changeset, checks description text/file replacement and clearing, genuine revision anchors, change-request apply/unapply and own email subscription transitions, then independently verifies deletion of its exact owned reviews/comments and unchanged workspace state. It never switches branches or creates changesets. A missing description file exercises native pre-create rejection without retry; synthetic tests separately cover identity preservation after a genuine post-create failure.
+The suite creates uniquely titled reviews of the loaded changeset, checks description text/file replacement and clearing, genuine revision anchors, CM 11.0.16.10694 range and whole-file comments, change-request apply/unapply and own email subscription transitions, then independently verifies deletion of its exact owned reviews/comments and unchanged workspace state. It never switches branches or creates changesets. A missing description file exercises native pre-create rejection without retry; synthetic tests separately cover identity preservation after a genuine post-create failure.
 
 For explicit branch-creation mutation validation:
 
@@ -92,6 +92,8 @@ npm run test:live:branch-create
 ```
 
 The branch test creates uniquely named hierarchical branches, checks explicit-parent/root guards, does not switch the workspace and removes its temporary branches under its cleanup contract. Do not run broad mutation suites merely to add evidence; inspect exact scope first.
+
+See the [checkout-only workspace regression guide](https://github.com/aefreedman/pi-plastic/blob/main/tests/2026-10-26-live-workspace-regressions.md) for other sandbox scenarios.
 
 For behavior changes, report the narrow actual live test and resulting-state/cleanup evidence without private coordinates. If unavailable, mark live validation pending. Documentation-only/internal changes can mark live validation not applicable with a reason. Source-backed platform/client limits remain in the family references.
 
@@ -115,6 +117,6 @@ Codex grammar capability does not imply strict JSON-schema capability. Grammar s
 
 Keep README as a landing page, docs as the consumer reference, skill files as progressive workflow guidance, and workspace plans/private evidence outside the package. New topic pages retain date-prefixed filenames; update navigation and links when adding/moving content.
 
-Documentation tests verify relative links/anchors, every core tool route, schema-bearing coverage, concise README, current baseline claims and packed-document closure. Review `npm pack --dry-run` content as well as its file list: no tests/evals/private coordination material is added by splitting the manual.
+Documentation tests verify relative links/anchors, examples against the tool registry, concise README, current baseline claims and packed-document closure. Review `npm pack --dry-run` content as well as its file list: no tests/evals/private coordination material is added by splitting the manual.
 
 These are structural and execution checks, not a browser accessibility audit or proof that every agent will choose the right page. No provider-backed doc-reading eval is implied.

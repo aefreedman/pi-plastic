@@ -110,9 +110,7 @@ const main = (): void => {
     "plastic_patch",
     "plastic_merge",
     "plastic_mergeToBranch",
-  "source branch's Plastic parent branch",
-    "not Git fast-forwards",
-    "Switching to the target after a checkin on the source branch does not move or integrate that changeset",
+    "[Integration](references/integration.md)",
   ]);
   failures += checkForbidden(skillText, "pi-plastic/skills/using-plastic/SKILL.md", [
     /^\s*-\s+plastic_diff\s*$/m,
@@ -124,6 +122,12 @@ const main = (): void => {
     ["troubleshooting.md", readText(troubleshootingPath)],
     ["integration.md", readText(integrationPath)],
   ] as const;
+
+  failures += checkRequired(readText(integrationPath), "pi-plastic/skills/using-plastic/references/integration.md", [
+    "source branch's Plastic parent branch",
+    "not Git fast-forwards",
+    "switching to the target after a checkin on the source branch does not move or integrate that changeset",
+  ]);
 
   for (const [name, text] of refs) {
     failures += checkForbidden(text, `pi-plastic/skills/using-plastic/references/${name}`, [

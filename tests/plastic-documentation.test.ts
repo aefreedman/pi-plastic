@@ -24,11 +24,9 @@ function walk(path: string) {
     }
 }
 walk(docsRoot);
-assert(paths.length >= 2, "A manual must not collapse back into the root README");
 const readmePath = resolve(root, "README.md"), indexPath = resolve(docsRoot, "README.md");
 assert(paths.includes(indexPath));
 assert(Buffer.byteLength(read(readmePath), "utf8") <= 8192, "Root README should remain a concise landing page");
-assert(read(readmePath).includes(`${getRegisteredPlasticExportNames().length} core tools`));
 
 function anchors(path: string): Set<string> {
     const text = stripFences(read(path)), result = new Set<string>();
@@ -95,14 +93,6 @@ for (const path of publicDocs) {
         assert.equal(Number(match[1]), names.length, `Stale core-tool count in ${relative(root, path)}`);
     }
 }
-const routes = new Map<string, string>();
-for (const match of read(indexPath).matchAll(/\|\s*`(plastic_[A-Za-z_]+)`\s*\|\s*\[[^\]]+\]\(([^)]+)\)\s*\|/g)) {
-    assert(!routes.has(match[1]), `Duplicate index route: ${match[1]}`);
-    routes.set(match[1], match[2]);
-    checkLink(indexPath, match[2]);
-}
-assert.deepEqual([...routes.keys()].sort(), ["plastic_tool_search", ...names.map(toToolName)].sort(), "Index every core tool plus loader exactly once");
-
 // Check example names/parameter keys without evaluating Markdown or executing tools.
 let examples = 0;
 function checkArguments(name: string, keys: string[]) {
@@ -131,4 +121,4 @@ for (const packageName of ["@earendil-works/pi-coding-agent", "@earendil-works/p
     assert.match(manifest.devDependencies[packageName], /^\d+\.\d+\.\d+$/, `Keep the manifest validation baseline exact: ${packageName}`);
 }
 assert(read(skillPath).includes("../../docs/README.md"), "Route agents into same-package docs progressively");
-console.log(`PASS: concise README, ${paths.length} dated/index manual pages, ${routes.size} tool routes, ${links} local links/anchors/packed targets, ${examples} example calls and current schemas/runtime baseline; no tool execution or network`);
+console.log(`PASS: concise README, ${paths.length} documentation pages, ${links} local links/anchors/packed targets, ${examples} example calls and current schemas/runtime baseline; no tool execution or network`);

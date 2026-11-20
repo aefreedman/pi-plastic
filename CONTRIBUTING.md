@@ -1,89 +1,21 @@
 # Contributing
 
-Thanks for improving Pi Plastic.
+## Keep the adapter thin
 
-## Prerequisites
+Plastic owns VCS behavior. Pi Plastic makes native commands discoverable, callable, and readable in Pi.
 
-- Node.js 22.19.0 or newer
-- npm
-- Plastic SCM / Unity Version Control CLI for opt-in live validation
-- A compatible non-GUI `diff` executable for text-only comparisons (see the README setup guide)
+- Prefer one native command with explicit arguments. Let `cm` validate targets, options, permissions, and state. Don't add hidden probes, retries, fallbacks, or workflow rules to a command wrapper.
+- Reuse the existing execution and rendering helpers. Keep calls noninteractive, bound retained output, and report native completion separately from observed effects. Parse stable fields only when they help the caller act; otherwise return the native output.
+- Treat code, tool descriptions, schemas, and tests as the reference. If a new behavior needs a long explanation, simplify it first. Keep the skill for tool choice, sequencing, and hazards agents cannot infer from a signature. Keep the README for installation and discovery.
+- Preserve existing public contracts unless deliberately changing them. Put user-visible changes under `## Unreleased` in [CHANGELOG.md](CHANGELOG.md); don't bump the version for ordinary changes.
 
-## Setup
+## Validate from the package root
 
 ```bash
 npm ci --ignore-scripts --no-audit --no-fund
 npm test
 ```
 
-The default suite is credential-free. Keep it that way. Tests that require Plastic access must remain explicitly opt-in and target a dedicated disposable workspace.
+Keep default tests offline and credential-free. If a change affects real `cm` invocation or interpretation, run the narrowest relevant [opt-in live test](docs/2026-10-06-development.md#live-validation) in a clean, authorized disposable sandbox. Report what ran and what state or cleanup was verified, or say that live validation is pending.
 
-## Making changes
-
-- Keep public tool names and output shapes stable unless the change intentionally documents a breaking release.
-- Preserve built-in and foreign-extension tools when changing active-tool composition.
-- Do not weaken confirmation, preflight, path, process, or mutation safeguards.
-- Add focused regression coverage for behavior changes.
-- Keep the README a concise landing page. Update the relevant public docs/tool-family reference and skill guidance when behavior changes; maintain links and the docs index.
-- Keep unreleased user-visible changes under `## Unreleased` in `CHANGELOG.md` during ordinary development.
-- Do not bump the package version for every implementation commit. Convert the accumulated Unreleased section into one dated SemVer release only when preparing a release.
-
-## Validation
-
-Run:
-
-```bash
-npm test
-npm run test:docs
-npm run eval:tool-loading -- --dry-run
-npm pack --dry-run
-```
-
-Review the tarball list for machine-specific paths, credentials, raw provider payloads, generated results, and unrelated files.
-
-Plastic live tests are intentionally local-only. This project has no shared Plastic Cloud account or CI credentials, and contributors must authenticate `cm` with their own account and use a repository they are authorized to modify. Never add Plastic credentials, tokens, cloud organization details, or private repository data to tests, fixtures, logs, pull requests, or GitHub Actions.
-
-For an opt-in read-only Plastic smoke test:
-
-```bash
-PI_PLASTIC_TEST_WORKSPACE=/absolute/path/to/dedicated/sandbox npm run test:live
-```
-
-For branch-creation behavior, use the opt-in mutation test only against a clean, dedicated disposable repository:
-
-```bash
-PI_PLASTIC_TEST_WORKSPACE=/absolute/path/to/dedicated/sandbox \
-PI_PLASTIC_ALLOW_MUTATION_TESTS=true \
-npm run test:live:branch-create
-```
-
-The mutation test creates uniquely named hierarchical branches, verifies explicit-parent behavior and the top-level guard, does not switch the workspace, and removes temporary branches in cleanup.
-
-### Behavior completion gate
-
-When a change modifies how a `plastic_*` tool invokes or interprets real Plastic behavior:
-
-1. Add or update credential-free regression coverage for policy, parsing, and command construction.
-2. Locally run the narrowest relevant opt-in live test in a clean disposable Plastic repository using the contributor's own authenticated account.
-3. Verify the workspace state and temporary-resource cleanup afterward.
-4. Report the exact live test and that an authenticated disposable repository was used, without exposing account, organization, server, credential, or private repository details.
-
-GitHub Actions is not expected to run Plastic live tests. If local authenticated validation is unavailable, describe the work as implemented with live validation pending; do not claim the behavior is done or verified. Documentation-only and purely internal changes may mark live validation as not applicable with a reason.
-
-Follow `evals/tool-loading/README.md` before any live model evaluation. Never use an ordinary production workspace for mutation testing.
-
-## Pull requests
-
-Keep pull requests focused. Describe:
-
-- the behavior changed;
-- safety or compatibility considerations;
-- tests and environments actually run;
-- checks intentionally skipped;
-- relevant before/after metadata or latency measurements for loader changes.
-
-Do not include secrets, account data, private repository content, or raw provider captures.
-
-## Security reports
-
-Follow [SECURITY.md](SECURITY.md) instead of opening a public issue for vulnerabilities.
+Run `npm pack --dry-run` when changing what ships. Never commit credentials, private repository data, or raw captures. Report vulnerabilities through [SECURITY.md](SECURITY.md).

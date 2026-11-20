@@ -1,8 +1,8 @@
 # Tools and loading
 
-[Documentation index](README.md) · [Tool-by-tool routing](README.md#look-up-a-tool)
+[Documentation index](README.md)
 
-Pi Plastic registers **46 core tools** with output schemas, plus `plastic_tool_search`. The loader describes/activates capabilities and intentionally has no core receipt schema.
+Use `plastic_tool_search` to discover and activate tools. Use a loaded tool's description and schema to see what it accepts and returns.
 
 ## Capability loader
 
@@ -21,9 +21,7 @@ Matches are bounded, include workflow/safety guidance, and enable selected tools
 | `toolNames` | Up to four exact public tool names |
 | `limit` | 1–4 matches; default is the single best capability match |
 
-Use exact names only when you actually need those tools. Browsing the catalog does not require enabling everything. The [index](README.md#look-up-a-tool) maps every registered tool to its semantic reference.
-
-`plastic_workspaceCreate` is not registered or discoverable: the package does not yet provide the paired safe workspace-cleanup capability. It is not an alternative to the read-only `plastic_workspaceList` tool.
+Use exact names only when you need those tools. Browsing does not require enabling everything.
 
 ## Loading modes
 
@@ -33,7 +31,7 @@ Set `PI_PLASTIC_TOOL_LOADING_MODE` before starting Pi:
 |---|---|---|
 | `balanced` | Loader, `plastic_status`, `plastic_currentBranch` | Default; inspect first and activate task capabilities as needed |
 | `loader-only` | Loader | Maximum initial schema reduction |
-| `all-active` | All 46 core tools; loader omitted from the active set | Controlled comparison or intentional full exposure |
+| `all-active` | All core tools; loader omitted from the active set | Controlled comparison or intentional full exposure |
 
 Inactive tools remain registered. Prior loader additions on the active session branch are restored on startup, resume, fork, and reload.
 

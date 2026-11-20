@@ -59,11 +59,7 @@ Example path-scoped checkin including a deletion:
 cm checkin -c="<commit-message>" <workspace-path-1> <workspace-path-2>
 ```
 
-Use full-scope checkin when in doubt:
-
-```bash
-cm checkin -c="<commit-message>"
-```
+Use a full-scope checkin only when whole-workspace checkin is intended and you've inspected all pending work.
 
 ## Safe Diff Usage
 

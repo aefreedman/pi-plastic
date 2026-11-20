@@ -15,6 +15,10 @@ and this project follows semantic versioning for public package releases.
 
 - Forward explicit whole-file and line-range code review comments to Unity VCS 11.0.16.10694+.
 
+### Changed
+
+- Shorten the `using-plastic` skill and correct guidance on native merge and checkin behavior.
+
 ## [0.11.0] - 2026-11-15
 
 ### Breaking changes

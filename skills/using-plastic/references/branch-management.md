@@ -2,9 +2,7 @@
 
 ## Detect Current Branch
 
-```bash
-current_branch=$(cm status | head -1 | cut -d@ -f1 | xargs)
-```
+Use `plastic_currentBranch`. Inspect the reported selector and preserve its repository/server qualifiers when needed; don't split human-readable `cm status` output to synthesize an identity.
 
 ## Detect Naming Convention
 
@@ -61,7 +59,7 @@ plastic_merge(source="<source-branch-spec>")
 Manual shell fallback:
 
 ```bash
-cm merge <source-branch-spec> --merge --nointeractiveresolution --mergetype=try
+cm merge <source-branch-spec> --merge --nointeractiveresolution --mergetype=try --conflict-markers
 ```
 
 Optional explicit override (higher clobber risk, use only when required):

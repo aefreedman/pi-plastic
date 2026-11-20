@@ -32,15 +32,7 @@ Agent preference: use runtime `plastic_*` methods first; keep shell commands as 
 
 ## Reviewer Not Assigned
 
-- Reviewer assignment is required for code review workflow.
-- Preferred: gather branch/status via `plastic_status()` first, then assign reviewer in review edit flow.
-- Shell fallback:
-
-```bash
-cm codereview -e <review-id> --reviewer="reviewer-name"
-```
-
-- If the reviewer flag differs in your server, use `cm codereview --help` and apply the equivalent reviewer option.
+Inspect membership with `plastic_codeReviewReviewerList`. To assign an explicitly requested reviewer, use `plastic_codeReviewReviewerAdd` with the observed review ID and repository. Reviewer membership is not edited through `codereview -e`.
 
 ## GUI Opens When Using cm diff
 
@@ -65,7 +57,7 @@ plastic_merge(source="<source-branch-spec>")
 - Shell fallback must be non-interactive and use safe auto-resolution:
 
 ```bash
-cm merge <source-branch-spec> --merge --nointeractiveresolution --mergetype=try
+cm merge <source-branch-spec> --merge --nointeractiveresolution --mergetype=try --conflict-markers
 ```
 
 - Explicit override (only when intentional):
@@ -81,8 +73,7 @@ plastic_merge(source="<source-branch-spec>", strategy="source")
 plastic_resolveDeleteChangeConflict(paths=["<workspace-path>"], keepOnDisk=true)
 ```
 
-- Then rerun `plastic_merge(...)`.
-- Even when `plastic_merge(...)` reports success, run `plastic_status()` before checkin. Merge output is not authoritative if Plastic still reports merge state.
+- Inspect the pending scope and conflict state before deciding whether another merge is needed. Native completion alone is not proof that the workspace is ready to check in.
 
 ## Merge Checkin Says Merge Is Still In Progress
 
